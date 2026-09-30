@@ -1,0 +1,487 @@
+/* iQMS v2 — core: state, derived data, shared components, router. */
+(() => {
+  'use strict';
+  const SEED = window.QMS_DATA;
+  const STORE_KEY = 'iqms.v3.data';
+  const UI_KEY = 'iqms.v3.ui';
+  const clone = v => JSON.parse(JSON.stringify(v));
+
+  const Q = window.Q = { views: {}, actions: {}, tables: {} };
+
+  /* ---------------- State (browser-local; sample data) ---------------- */
+  function loadData() {
+    try { const s = JSON.parse(localStorage.getItem(STORE_KEY)); if (s && s.v === 4 && s.data) return s.data; } catch (_) { /* storage unavailable */ }
+    return clone(SEED);
+  }
+  Q.S = loadData();
+  Q.save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify({ v: 4, data: Q.S })); } catch (_) { /* ignore */ } };
+  Q.resetData = () => { Q.S = clone(SEED); try { localStorage.removeItem(STORE_KEY); } catch (_) { /* ignore */ } };
+  Q.UI = (() => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (_) { return {}; } })();
+  Q.saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(Q.UI)); } catch (_) { /* ignore */ } };
+
+  /* ---------------- Helpers ---------------- */
+  const esc = Q.esc = (v = '') => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  Q.icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ''}></i>`;
+  Q.refreshIcons = () => { if (window.lucide) window.lucide.createIcons(); };
+  Q.today = () => Q.S.organization.today;
+  Q.me = () => Q.S.currentUser;
+  Q.person = id => Q.S.people[id] || { name: id || '—', title: '', dept: '' };
+  Q.pname = id => id ? Q.person(id).name : '—';
+  Q.initials = id => Q.pname(id).split(' ').map(s => s[0]).slice(0, 2).join('');
+  Q.who = id => id === Q.me() ? `${esc(Q.pname(id))} <span class="muted">(you)</span>` : esc(Q.pname(id));
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  Q.fmt = d => { if (!d) return '—'; const [y, m, day] = d.slice(0, 10).split('-'); return `${Number(day)} ${MONTHS[Number(m) - 1]} ${y}`; };
+  Q.days = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+  Q.addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  Q.addYears = (d, n) => `${Number(d.slice(0, 4)) + n}${d.slice(4)}`;
+  Q.uid = p => `${p}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+
+  /* ---------------- Processes ---------------- */
+  Q.proc = id => Q.S.processes.find(p => p.process_id === id);
+  Q.byOrder = (a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name);
+  Q.topProcesses = (includeArchived = false) => Q.S.processes.filter(p => !p.parent_process_id && (includeArchived || p.status === 'active')).sort(Q.byOrder);
+  Q.children = (id, includeArchived = false) => Q.S.processes.filter(p => p.parent_process_id === id && (includeArchived || p.status === 'active')).sort(Q.byOrder);
+  Q.rootId = id => { const p = Q.proc(id); return p && p.parent_process_id ? Q.rootId(p.parent_process_id) : id; };
+  Q.inProc = (recordPid, pid) => { if (!pid || pid === 'all') return true; let cur = Q.proc(recordPid); while (cur) { if (cur.process_id === pid) return true; cur = Q.proc(cur.parent_process_id); } return false; };
+  /* Process categories (organization configuration). Subprocesses inherit the parent's. */
+  if (!Q.S.processCategories) {
+    Q.S.processCategories = JSON.parse(JSON.stringify(SEED.processCategories));
+    const map = { Management: 'management', Core: 'core', Support: 'support' };
+    Q.S.processes.forEach(p => { if (map[p.category]) p.category = map[p.category]; });
+    Q.save();
+  }
+  Q.categories = () => Q.S.processCategories;
+  Q.catOf = p => { const root = p && Q.proc(Q.rootId(p.process_id)); return Q.S.processCategories.find(c => c.id === (root || p)?.category) || null; };
+  Q.catChip = (c, withIcon = true) => c ? `<span class="cat-chip" style="--c:${c.color}">${withIcon ? Q.icon(c.icon || 'folder') : '<i class="dot"></i>'}${esc(c.name)}</span>` : '<span class="cat-chip none">Uncategorized</span>';
+  Q.CAT_COLORS = ['#6E56CF', '#0E7C86', '#2F6FB6', '#B43F7E', '#5E7A1F', '#8A5A2B', '#475569'];
+  Q.CAT_ICONS = ['landmark', 'workflow', 'package', 'users', 'shield-alert', 'target', 'network', 'handshake', 'cloud', 'files'];
+  Q.plabel = id => { const p = Q.proc(id); return p ? `${p.process_code} ${p.name}` : '—'; };
+  Q.pcell = id => { const p = Q.proc(id); if (!p) return '—'; return `<a class="proc" href="#/process/${p.process_id}" title="${esc(p.process_code + ' ' + p.name)}"><b>${esc(p.process_code)}</b>${esc(p.name)}</a>`; };
+  Q.processOptions = (selected = 'all', { all = 'All processes', withChildren = true } = {}) => {
+    let html = all ? `<option value="all">${esc(all)}</option>` : '';
+    Q.topProcesses().forEach(p => {
+      html += `<option value="${p.process_id}"${p.process_id === selected ? ' selected' : ''}>${esc(p.process_code + ' ' + p.name)}</option>`;
+      if (withChildren) Q.children(p.process_id).forEach(c => { html += `<option value="${c.process_id}"${c.process_id === selected ? ' selected' : ''}>&nbsp;&nbsp;&nbsp;${esc(c.process_code + ' ' + c.name)}</option>`; });
+    });
+    return html;
+  };
+  Q.peopleOptions = (selected, filter = () => true) => Object.entries(Q.S.people).filter(([id]) => filter(id)).map(([id, p]) => `<option value="${id}"${id === selected ? ' selected' : ''}>${esc(p.name)} — ${esc(p.title)}</option>`).join('');
+
+  /* ---------------- Documents & workflows ---------------- */
+  Q.doc = id => Q.S.documents.find(d => d.id === id);
+  Q.wf = id => Q.S.workflows.find(w => w.id === id);
+  Q.wfForDoc = docId => Q.S.workflows.find(w => w.doc === docId);
+  Q.docOverdue = d => !!(d.nextReview && d.nextReview < Q.today() && d.rev && !['Obsolete', 'Superseded'].includes(d.status));
+  Q.docDueSoon = d => !!(d.nextReview && !Q.docOverdue(d) && Q.days(Q.today(), d.nextReview) <= 30);
+  Q.docIso = d => [...new Set([...(d.iso || []), ...Q.S.iso.filter(r => r.controls.includes(d.id)).map(r => r.clause)])];
+
+  /* ---------------- ISO 9001 clause structure (the standard, not org config) ---------------- */
+  Q.CLAUSES = [['4', 'Context of the organization'], ['5', 'Leadership'], ['6', 'Planning'], ['7', 'Support'], ['8', 'Operation'], ['9', 'Performance evaluation'], ['10', 'Improvement']];
+  Q.clauseTitle = c => (Q.CLAUSES.find(x => x[0] === c) || [])[1] || '';
+  Q.clauseTop = c => String(c).split('.')[0];
+  // A record mapped to 8.3.4 satisfies requirement 8.3 and top-level clause 8.
+  Q.clauseIn = (rec, target) => rec === target || rec.startsWith(target + '.');
+  Q.clauseSort = c => c.split('.').map(x => x.padStart(2, '0')).join('.');
+  Q.reqsIn = top => Q.S.iso.filter(r => Q.clauseTop(r.clause) === top).sort((a, b) => Q.clauseSort(a.clause) < Q.clauseSort(b.clause) ? -1 : 1);
+  Q.docsForClause = c => Q.S.documents.filter(d => Q.docIso(d).some(x => Q.clauseIn(x, c) || Q.clauseIn(c, x)));
+  Q.evForClause = c => Q.S.evidence.filter(e => e.iso && (Q.clauseIn(e.iso, c) || Q.clauseIn(c, e.iso)));
+  Q.nextRev = r => String((parseInt(r || '-1', 10) || 0) + (r ? 1 : 0)).padStart(2, '0');
+  Q.wfAssignees = w => {
+    if (!w) return [];
+    if (w.changesRequested) return [w.startedBy];
+    if (w.stage === 'review') return w.reviewers.filter(r => r.state === 'Pending').map(r => r.who);
+    if (w.stage === 'approval') return w.approvers.filter(r => r.state === 'Pending').map(r => r.who);
+    if (w.stage === 'publication') return [w.publisher];
+    return [];
+  };
+  Q.wfStatus = w => w.changesRequested ? 'Changes Requested' : w.stage === 'review' ? 'In Review' : w.stage === 'approval' ? 'Approval in Progress' : 'Approved';
+  Q.wfStageLabel = w => w.changesRequested ? 'Review — changes requested' : { review: 'Review', approval: 'Approval', publication: 'Publication' }[w.stage];
+  Q.assignedToMe = w => Q.wfAssignees(w).includes(Q.me()) && !w.changesRequested;
+  Q.myWorkflows = () => Q.S.workflows.filter(Q.assignedToMe);
+
+  const DOC_STATUS = { 'Published': 'success', 'Draft': 'neutral', 'In Review': 'info', 'Changes Requested': 'orange', 'Approval in Progress': 'warning', 'Approved': 'success outline', 'Superseded': 'muted', 'Obsolete': 'muted' };
+  Q.st = (text, kind) => `<span class="st ${kind || DOC_STATUS[text] || 'neutral'}">${esc(text)}</span>`;
+  Q.docStatus = d => {
+    const base = Q.st(d.status);
+    return base;
+  };
+  Q.reviewDate = (date, isOverdue, soon) => {
+    if (!date) return '<span class="muted">—</span>';
+    if (isOverdue) return `<span class="date-overdue" title="Review overdue">${Q.icon('triangle-alert')} ${Q.fmt(date)}<span class="sr-only"> (overdue)</span></span>`;
+    if (soon) return `<span class="date-soon" title="Due within 30 days">${Q.fmt(date)}</span>`;
+    return Q.fmt(date);
+  };
+  Q.dueDate = (date, closed = false) => {
+    if (!date) return '—';
+    if (!closed && date < Q.today()) return `<span class="date-overdue" title="Overdue">${Q.icon('triangle-alert')} ${Q.fmt(date)}<span class="sr-only"> (overdue)</span></span>`;
+    if (!closed && Q.days(Q.today(), date) <= 7) return `<span class="date-soon">${Q.fmt(date)}</span>`;
+    return Q.fmt(date);
+  };
+
+  /* ---------------- Risks, KPIs, evidence, actions ---------------- */
+  Q.riskScore = r => r.likelihood * r.impact;
+  Q.riskLevel = r => { const s = Q.riskScore(r); return s >= 15 ? 'High' : s >= 8 ? 'Medium' : 'Low'; };
+  Q.riskOpen = r => !['Closed'].includes(r.status);
+  Q.kpiOk = k => k.dir === '≥' ? k.actual >= k.target : k.dir === '≤' ? k.actual <= k.target : k.actual === k.target;
+  Q.kpiFmt = (v, k) => `${v}${k.unit}`;
+  Q.evGap = e => e.status === 'Missing' || e.status === 'Link unavailable';
+  Q.actionClosed = a => a.stage === 'Closed';
+  Q.actionOverdue = a => !Q.actionClosed(a) && a.due < Q.today();
+
+  /* ---------------- ISO readiness (documented formula) ---------------- */
+  Q.ISO_POINTS = { 'Complete': 1, 'Partially Complete': 0.5, 'At Risk': 0, 'Missing': 0 };
+  Q.ISO_KIND = { 'Complete': 'success', 'Partially Complete': 'warning', 'At Risk': 'orange', 'Missing': 'danger', 'Not Applicable': 'muted' };
+  Q.isoScore = reqs => {
+    const c = { 'Complete': 0, 'Partially Complete': 0, 'At Risk': 0, 'Missing': 0, 'Not Applicable': 0 };
+    reqs.forEach(r => { c[r.status]++; });
+    const applicable = reqs.length - c['Not Applicable'];
+    const points = c['Complete'] + c['Partially Complete'] * 0.5;
+    return { counts: c, applicable, points, pct: applicable ? Math.round(points / applicable * 100) : null, total: reqs.length };
+  };
+  Q.isoForProcess = pid => Q.S.iso.filter(r => r.processes.some(p => Q.inProc(p, pid) || Q.inProc(pid, p)));
+
+  /* ---------------- Process statistics ---------------- */
+  Q.stats = pid => {
+    const inP = x => Q.inProc(x, pid);
+    const docs = Q.S.documents.filter(d => inP(d.process));
+    const risks = Q.S.risks.filter(r => inP(r.process) && Q.riskOpen(r));
+    const kpis = Q.S.kpis.filter(k => inP(k.process));
+    const ev = Q.S.evidence.filter(e => inP(e.process));
+    const findings = Q.S.findings.filter(f => inP(f.process) && f.status !== 'Closed');
+    const actions = Q.S.actions.filter(a => inP(a.process) && !Q.actionClosed(a));
+    const iso = Q.isoScore(Q.isoForProcess(pid));
+    const s = {
+      docs: docs.length, docsOverdue: docs.filter(Q.docOverdue).length, docsInWorkflow: docs.filter(d => Q.wfForDoc(d.id)).length,
+      highRisks: risks.filter(r => r.kind === 'Risk' && Q.riskLevel(r) === 'High').length, openRisks: risks.length,
+      kpis: kpis.length, kpisBelow: kpis.filter(k => !Q.kpiOk(k)).length,
+      evidence: ev.length, evGaps: ev.filter(Q.evGap).length,
+      findings: findings.length, majorFindings: findings.filter(f => f.type.startsWith('Major')).length,
+      actions: actions.length, actionsOverdue: actions.filter(Q.actionOverdue).length,
+      iso, isoGaps: iso.counts['Missing'] + iso.counts['At Risk']
+    };
+    const score = s.docsOverdue + s.highRisks + s.kpisBelow + s.evGaps + s.actionsOverdue * 2 + s.majorFindings * 2;
+    s.health = score >= 5 || s.majorFindings ? 'risk' : score >= 1 ? 'attn' : 'ok';
+    return s;
+  };
+  Q.health = h => ({
+    ok: `<span class="health ok">${Q.icon('circle-check')}On track</span>`,
+    attn: `<span class="health attn">${Q.icon('circle-dot')}Needs attention</span>`,
+    risk: `<span class="health risk">${Q.icon('triangle-alert')}At risk</span>`
+  })[h];
+  Q.miniProgress = pct => pct == null ? '<span class="muted">—</span>' : `<span class="mini-progress"><span class="track"><span class="fill" style="width:${pct}%"></span></span>${pct}%</span>`;
+  Q.num = (n, cls = 'attn') => n ? `<span class="${cls}">${n}</span>` : '<span class="zero">—</span>';
+
+  /* ---------------- Page chrome ---------------- */
+  Q.crumbs = items => `<nav class="crumbs" aria-label="Breadcrumb">${items.map((c, i) => i < items.length - 1 ? `<a href="${c[1]}">${esc(c[0])}</a>${Q.icon('chevron-right')}` : `<span aria-current="page">${esc(c[0])}</span>`).join('')}</nav>`;
+  Q.pageHead = ({ title, sub = '', actions = '', crumbs = null, pre = '', meta = '' }) =>
+    `${crumbs ? Q.crumbs(crumbs) : ''}<div class="page-head"><div>${pre}<h1 tabindex="-1">${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}${meta}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
+  Q.seg = (name, items, current) => `<div class="seg" role="group" aria-label="${esc(name)}">${items.map(([v, l, n]) => `<button type="button" data-seg="${v}" aria-pressed="${v === current}">${esc(l)}${n != null ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</div>`;
+  Q.sparkline = (vals, ok) => {
+    const w = 84, h = 24, min = Math.min(...vals), max = Math.max(...vals), rng = max - min || 1;
+    const pts = vals.map((v, i) => [2 + i * (w - 4) / (vals.length - 1), h - 3 - (v - min) / rng * (h - 6)]);
+    const last = pts[pts.length - 1];
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline fill="none" stroke="#9AA5A0" stroke-width="1.5" points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.8" fill="${ok ? 'var(--success)' : 'var(--danger)'}"/></svg>`;
+  };
+
+  /* ---------------- Toast ---------------- */
+  Q.toast = (title, msg = '') => {
+    const host = document.getElementById('toastHost');
+    const el = document.createElement('div');
+    el.className = 'toast'; el.setAttribute('role', 'status');
+    el.innerHTML = `${Q.icon('circle-check')}<div><b>${esc(title)}</b>${esc(msg)}</div>`;
+    host.append(el); Q.refreshIcons();
+    setTimeout(() => el.remove(), 4200);
+  };
+
+  /* ---------------- Modals (stackable, focus-trapped) ---------------- */
+  const stack = [];
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  Q.openModal = ({ size = 'm', title, sub = '', body, foot = '', headActions = '', onMount, label }) => {
+    const root = document.createElement('div');
+    root.className = 'modal-root';
+    const id = 'm' + Math.random().toString(36).slice(2, 8);
+    root.innerHTML = `<div class="modal ${size}" role="dialog" aria-modal="true" aria-labelledby="${id}">
+      <div class="modal-head"><div style="min-width:0"><h2 id="${id}">${title}</h2>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+      <div class="actions">${headActions}<button class="icon-btn" type="button" data-close aria-label="Close${label ? ' ' + esc(label) : ''}">${Q.icon('x')}</button></div></div>
+      ${body}${foot ? `<div class="modal-foot">${foot}</div>` : ''}</div>`;
+    const prev = document.activeElement;
+    document.getElementById('modalHost').append(root);
+    document.querySelector('.main').inert = true; document.getElementById('sidebar').inert = true;
+    stack.forEach(m => { m.root.inert = true; });
+    const entry = { root, prev };
+    stack.push(entry);
+    root.addEventListener('mousedown', e => { if (e.target === root) Q.closeModal(); });
+    root.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => Q.closeModal()));
+    Q.refreshIcons();
+    if (onMount) onMount(root.querySelector('.modal'));
+    const first = root.querySelector('[autofocus]') || root.querySelector('.modal-body ' + FOCUSABLE) || root.querySelector(FOCUSABLE);
+    first && first.focus();
+    return root.querySelector('.modal');
+  };
+  Q.closeModal = () => {
+    const entry = stack.pop(); if (!entry) return;
+    entry.root.remove();
+    if (stack.length) stack[stack.length - 1].root.inert = false;
+    else { document.querySelector('.main').inert = false; document.getElementById('sidebar').inert = false; }
+    if (entry.prev && document.contains(entry.prev)) entry.prev.focus();
+  };
+  Q.closeAllModals = () => { while (stack.length) Q.closeModal(); };
+  Q.modalOpen = () => stack.length > 0;
+  document.addEventListener('keydown', e => {
+    if (!stack.length) return;
+    const top = stack[stack.length - 1].root;
+    if (e.key === 'Escape') { e.preventDefault(); Q.closeModal(); return; }
+    if (e.key === 'Tab') {
+      const f = [...top.querySelectorAll(FOCUSABLE)].filter(el => el.getClientRects().length);
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { f[f.length - 1].focus(); e.preventDefault(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { f[0].focus(); e.preventDefault(); }
+    }
+  });
+  Q.confirm = ({ title, body, confirm = 'Confirm', danger = false, onConfirm }) => {
+    const m = Q.openModal({ size: 's', title, body: `<div class="modal-body">${body}</div>`,
+      foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn ${danger ? 'danger-solid' : 'primary'}" type="button" data-ok>${esc(confirm)}</button>` });
+    m.querySelector('[data-ok]').addEventListener('click', () => { Q.closeModal(); onConfirm(); });
+  };
+  Q.formValues = form => Object.fromEntries(new FormData(form).entries());
+  Q.validate = form => {
+    let ok = true;
+    form.querySelectorAll('[required]').forEach(el => {
+      const bad = !String(el.value || '').trim();
+      el.setAttribute('aria-invalid', bad ? 'true' : 'false');
+      el.style.borderColor = bad ? 'var(--danger)' : '';
+      if (bad && ok) { el.focus(); ok = false; }
+    });
+    return ok;
+  };
+
+  /* ---------------- Menus (kebab / add) ---------------- */
+  Q.closeMenus = except => document.querySelectorAll('.menu').forEach(m => { if (m !== except) { m.hidden = true; m.previousElementSibling?.setAttribute('aria-expanded', 'false'); } });
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-menu-toggle]');
+    if (t) {
+      const m = t.nextElementSibling; const open = m.hidden; Q.closeMenus(m); m.hidden = !open; t.setAttribute('aria-expanded', String(open)); menuOpenedAt = Date.now();
+      // Inside a scrolling table the menu would be clipped: float it in the viewport instead.
+      if (open && t.closest('.table-scroll, .table-tools, .vtabs')) {
+        const r = t.getBoundingClientRect(); m.classList.add('floating');
+        const w = m.offsetWidth, h = m.offsetHeight;
+        m.style.left = `${Math.max(8, Math.min(r.left < innerWidth / 2 ? r.left : r.right - w, innerWidth - w - 8))}px`;
+        m.style.top = `${r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4}px`;
+      }
+      if (open) m.querySelector('button:not([disabled])')?.focus({ preventScroll: true }); e.stopPropagation(); return;
+    }
+    if (!e.target.closest('.menu')) Q.closeMenus();
+  });
+  let menuOpenedAt = 0;
+  window.addEventListener('scroll', e => { if (Date.now() - menuOpenedAt > 250 && !e.target.closest?.('.menu')) Q.closeMenus(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !stack.length) { const open = [...document.querySelectorAll('.menu')].find(m => !m.hidden); if (open) { Q.closeMenus(); open.previousElementSibling?.focus(); } } });
+  Q.menu = (label, items, { icon = 'ellipsis', text = '', cls = 'btn sm', align = '' } = {}) =>
+    `<div class="menu-wrap"><button class="${cls}" type="button" data-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="${esc(label)}">${icon ? Q.icon(icon) : ''}${text ? esc(text) : ''}</button><div class="menu" role="menu" hidden style="${align}">${items.map(it => it === '-' ? '<hr>' : it.note ? `<p class="menu-note">${it.note}</p>` : `<button type="button" role="menuitem" ${it.disabled ? 'disabled' : ''} class="${it.cls || ''}" ${Object.entries(it.data || {}).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ')}${it.title ? ` title="${esc(it.title)}"` : ''}>${it.icon ? Q.icon(it.icon) : ''}${esc(it.label)}</button>`).join('')}</div></div>`;
+
+  /* ---------------- Global delegated actions ---------------- */
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (!el || el.disabled) return;
+    const fn = Q.actions[el.dataset.action];
+    if (fn) { e.preventDefault(); Q.closeMenus(); fn(el.dataset, el, e); }
+  });
+  Q.actions.toast = d => Q.toast(d.title || 'Not in this mock', d.msg || '');
+  Q.actions['export-selected'] = (d, el) => { const w = el.closest('.table-wrap'); if (w) Q.exportTable(w.id.slice(3)); };
+
+  /* ---------------- Table engine (v3 — 21st.dev data-table style) ----------------
+   * Click targets, one job each:
+   *   checkbox / row body → select      chevron → expand details
+   *   title link (cfg)    → open        ⋯ menu  → row actions
+   * Options: selectable, expand(r) → html, pageSize, selectionBar(keys) → buttons
+   * (shown in a "N selected ▾" toolbar menu), search, filters, segs, sort.      */
+  Q.table = cfg => {
+    // Filter state survives re-renders within the session; URL-provided filters win.
+    const prev = Q.tables[cfg.id];
+    const fresh = cfg.initialFilters || cfg.initialSeg;
+    const t = Q.tables[cfg.id] = prev && !fresh ? Object.assign(prev, { cfg }) : { q: '', filters: {}, sort: null, seg: cfg.segDefault || 'all', page: 1, cfg };
+    if (cfg.initialFilters) Object.assign(t.filters, cfg.initialFilters);
+    if (cfg.initialSeg) t.seg = cfg.initialSeg;
+    if ('initialSort' in cfg) t.sort = cfg.initialSort ? { ...cfg.initialSort } : null; // saved views own their sort
+    t.selected = new Set(); t.expanded = null; t.page = t.page || 1;
+    const exp = cfg.tools && cfg.exportable !== false ? `<button class="btn sm table-export" type="button" data-export title="Download the rows in this table as a CSV file (opens in Excel)">${Q.icon('download')}Export</button>` : '';
+    const tools = cfg.tools ? `<div class="table-tools">${cfg.tools}${exp}</div>` : '';
+    return `<div class="table-wrap${cfg.bare ? ' bare' : ''}" id="tw-${cfg.id}">${tools}<div id="tb-${cfg.id}"></div></div>`;
+  };
+  Q.tableRows = id => {
+    const t = Q.tables[id], c = t.cfg;
+    let rows = c.rows();
+    if (t.q && c.search) { const q = t.q.toLowerCase(); rows = rows.filter(r => c.search(r).toLowerCase().includes(q)); }
+    Object.entries(t.filters).forEach(([k, v]) => { if (v && v !== 'all' && c.filters?.[k]) rows = rows.filter(r => c.filters[k](r, v)); });
+    if (c.segs && t.seg && t.seg !== 'all') rows = rows.filter(r => c.segs[t.seg](r));
+    if (t.sort) { const col = c.columns.find(x => x.key === t.sort.key); if (col?.sort) rows = [...rows].sort((a, b) => { const x = col.sort(a), y = col.sort(b); return (x > y ? 1 : x < y ? -1 : 0) * t.sort.dir; }); }
+    return rows;
+  };
+  const pageRange = (page, total) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const out = [1], lo = Math.max(2, page - 1), hi = Math.min(total - 1, page + 1);
+    if (lo > 2) out.push('…');
+    for (let i = lo; i <= hi; i++) out.push(i);
+    if (hi < total - 1) out.push('…');
+    out.push(total); return out;
+  };
+  const SORT_IDLE = '<svg class="sort-ic idle" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>';
+  const SORT_UP = '<svg class="sort-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>';
+  const SORT_DOWN = '<svg class="sort-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  const CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path class="tick" d="m3.6 8.2 2.8 2.8 6-6"/><path class="dash" d="M4 8h8"/></svg>';
+  const checkbox = (checked, label, attrs = '', mixed = false) => `<label class="tcheck${checked ? ' on' : ''}${mixed ? ' mixed' : ''}"><input type="checkbox" class="row-check" ${checked ? 'checked' : ''} aria-label="${esc(label)}" ${attrs}>${CHECK}</label>`;
+
+  Q.renderTable = (id, { animate = false } = {}) => {
+    const t = Q.tables[id], c = t.cfg, host = document.getElementById('tb-' + id);
+    if (!host) return;
+    // FLIP: remember row positions so a re-sort can glide rows to their new place.
+    const before = animate && !matchMedia('(prefers-reduced-motion: reduce)').matches ? new Map([...host.querySelectorAll('tbody tr[data-key]')].map(tr => [tr.dataset.key, tr.getBoundingClientRect().top])) : null;
+    const all = Q.tableRows(id);
+    const key = c.key || (r => r.id);
+    [...t.selected].forEach(k => { if (!all.some(r => key(r) === k)) t.selected.delete(k); });
+    const pages = c.pageSize ? Math.max(1, Math.ceil(all.length / c.pageSize)) : 1;
+    t.page = Math.min(Math.max(1, t.page || 1), pages);
+    const rows = c.pageSize ? all.slice((t.page - 1) * c.pageSize, t.page * c.pageSize) : all;
+    const exp = typeof c.expand === 'function';
+    const nCols = c.columns.length + (c.selectable ? 1 : 0) + (exp ? 1 : 0);
+    const pageSel = rows.filter(r => t.selected.has(key(r))).length;
+    const head = `${c.selectable ? `<th class="c-check">${checkbox(rows.length && pageSel === rows.length, 'Select all rows on this page', 'data-check-all', pageSel > 0 && pageSel < rows.length)}</th>` : ''}${exp ? '<th class="c-exp"><span class="sr-only">Details</span></th>' : ''}${c.columns.map(col => {
+      const sorted = t.sort?.key === col.key;
+      const aria = col.sort ? ` aria-sort="${sorted ? (t.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : '';
+      return `<th class="${col.cls || ''}${col.sort ? ' sortable' : ''}${sorted ? ' sorted' : ''}"${aria}${col.width || col.min ? ` style="${col.width ? 'width:' + col.width + ';' : ''}${col.min ? 'min-width:' + col.min : ''}"` : ''} scope="col">${col.sort ? `<button type="button" class="th-sort" data-sort="${col.key}">${esc(col.label)}${sorted ? (t.sort.dir > 0 ? SORT_UP : SORT_DOWN) : SORT_IDLE}</button>` : esc(col.label)}</th>`;
+    }).join('')}`;
+    // With rows selected, the header row becomes the selection toolbar ("N selected ▾"),
+    // so nothing above the table moves. The column widths stay as they are.
+    const selHead = c.selectable && c.selectionBar && t.selected.size
+      ? `${head.split('</th>').slice(0, c.selectable ? 1 : 0).join('</th>')}${c.selectable ? '</th>' : ''}<th class="sel-head" colspan="${nCols - 1}" scope="col"><div class="sel-head-in"><div class="menu-wrap"><button type="button" class="btn sm sel-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false">${t.selected.size} selected${Q.icon('chevron-down')}</button><div class="menu sel-menu" role="menu" hidden>${c.selectionBar([...t.selected])}</div></div><button type="button" class="btn sm ghost" data-clear-sel>Clear selection</button><span class="small muted">${t.selected.size === 1 ? 'Actions for this document are in the menu' : 'Ctrl-click or use the checkboxes to add rows'}</span></div></th>`
+      : null;
+    const body = rows.map(r => {
+      const k = key(r), sel = t.selected.has(k), open = exp && t.expanded === k;
+      return `<tr class="${c.selectable ? 'selectable' : ''}${sel ? ' selected' : ''}${open ? ' expanded' : ''}${c.rowClass ? ' ' + c.rowClass(r) : ''}" data-key="${esc(k)}"${c.selectable ? ` aria-selected="${sel}"` : ''}>${c.selectable ? `<td class="c-check">${checkbox(sel, 'Select ' + (c.rowLabel ? c.rowLabel(r) : k))}</td>` : ''}${exp ? `<td class="c-exp"><button type="button" class="exp-btn" data-expand aria-expanded="${open}" aria-controls="x-${esc(id)}-${esc(k)}" aria-label="${open ? 'Hide' : 'Show'} details for ${esc(c.rowLabel ? c.rowLabel(r) : k)}">${Q.icon('chevron-down')}</button></td>` : ''}${c.columns.map(col => `<td class="${col.cls || ''}">${col.render(r)}</td>`).join('')}</tr>` +
+        (exp ? `<tr class="exp-row${open ? ' open' : ''}" id="x-${esc(id)}-${esc(k)}" aria-hidden="${!open}"><td colspan="${nCols}"><div class="exp-grid"><div class="exp-inner">${open ? c.expand(r) : ''}</div></div></td></tr>` : '');
+    }).join('');
+    const empty = typeof c.empty === 'function' ? c.empty(t) : c.empty;
+    const from = all.length ? (t.page - 1) * (c.pageSize || all.length) + 1 : 0, to = c.pageSize ? Math.min(t.page * c.pageSize, all.length) : all.length;
+    const pager = c.pageSize && pages > 1 ? `<nav class="pager" aria-label="Pagination"><button type="button" class="pg" data-page="${t.page - 1}" ${t.page <= 1 ? 'disabled' : ''} aria-label="Previous page">${Q.icon('chevron-right', 'flip-x')}</button>${pageRange(t.page, pages).map(p => p === '…' ? '<span class="pg-gap" aria-hidden="true">…</span>' : `<button type="button" class="pg" data-page="${p}" ${p === t.page ? 'aria-current="page"' : ''}>${p}</button>`).join('')}<button type="button" class="pg" data-page="${t.page + 1}" ${t.page >= pages ? 'disabled' : ''} aria-label="Next page">${Q.icon('chevron-right')}</button></nav>` : '';
+    const total = c.rows().length;
+    const foot = c.foot === false ? '' : `<div class="table-foot"><span>${c.pageSize && pages > 1 ? `Showing ${from} to ${to} of ${all.length}` : `${all.length} of ${total}`} ${esc(c.noun || 'records')}${c.pageSize && pages > 1 && all.length !== total ? ` <span class="muted">(filtered from ${total})</span>` : ''}</span>${c.footExtra ? c.footExtra() : ''}${pager}</div>`;
+    host.innerHTML = rows.length
+      ? `<div class="table-scroll"><table class="dt${c.tight ? ' tight' : ''}${exp ? ' has-exp' : ''}"><caption class="sr-only">${esc(c.caption || c.id)}</caption><thead><tr${selHead ? ' class="sel-mode"' : ''}>${selHead || head}</tr></thead><tbody>${body}</tbody></table></div>${foot}`
+      : `<div class="empty">${empty || '<h3>No matching records</h3><p>Try clearing a filter.</p>'}</div>`;
+    Q.refreshIcons();
+    if (before) host.querySelectorAll('tbody tr[data-key]').forEach(tr => {
+      const y0 = before.get(tr.dataset.key); if (y0 == null) { tr.classList.add('row-in'); return; }
+      const dy = y0 - tr.getBoundingClientRect().top; if (!dy) return;
+      tr.style.transform = `translateY(${dy}px)`; tr.style.transition = 'none';
+      requestAnimationFrame(() => { tr.style.transition = 'transform .36s cubic-bezier(.32,.72,0,1)'; tr.style.transform = ''; });
+    });
+    if (c.after) c.after(host);
+  };
+  Q.initTable = id => {
+    const t = Q.tables[id], c = t.cfg, wrap = document.getElementById('tw-' + id);
+    if (!wrap) return;
+    const key = c.key || (r => r.id);
+    const reset = () => { t.page = 1; Q.renderTable(id); };
+    wrap.querySelectorAll('[data-filter]').forEach(el => {
+      const k = el.dataset.filter;
+      if (t.filters[k]) el.value = t.filters[k];
+      el.addEventListener('change', () => { t.filters[k] = el.value; reset(); });
+    });
+    const s = wrap.querySelector('[data-search]');
+    if (s) {
+      s.value = t.q || '';
+      const box = s.closest('.search-input');
+      let clear = null;
+      if (box) { clear = document.createElement('button'); clear.type = 'button'; clear.className = 'search-clear'; clear.setAttribute('aria-label', 'Clear search'); clear.innerHTML = Q.icon('x'); clear.hidden = !s.value; box.append(clear); Q.refreshIcons();
+        clear.addEventListener('click', () => { s.value = ''; t.q = ''; clear.hidden = true; reset(); s.focus(); }); }
+      let timer;
+      s.addEventListener('input', () => { if (clear) clear.hidden = !s.value; clearTimeout(timer); timer = setTimeout(() => { t.q = s.value; reset(); }, 160); });
+    }
+    wrap.querySelectorAll('[data-seg]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.seg === t.seg)));
+    wrap.querySelectorAll('[data-seg]').forEach(b => b.addEventListener('click', () => {
+      t.seg = b.dataset.seg; wrap.querySelectorAll('[data-seg]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); reset();
+    }));
+    wrap.addEventListener('click', e => {
+      const sortBtn = e.target.closest('[data-sort]');
+      if (sortBtn) { const k = sortBtn.dataset.sort; t.sort = t.sort?.key === k ? (t.sort.dir > 0 ? { key: k, dir: -1 } : null) : { key: k, dir: 1 }; t.page = 1; Q.renderTable(id, { animate: true }); c.onSort?.(t.sort ? { ...t.sort } : null); wrap.querySelector(`[data-sort="${k}"]`)?.focus(); return; }
+      if (e.target.closest('[data-export]')) { Q.exportTable(id); return; }
+      const pg = e.target.closest('[data-page]');
+      if (pg && !pg.disabled) { t.page = +pg.dataset.page; Q.renderTable(id); wrap.querySelector('[data-page][aria-current]')?.focus(); return; }
+      if (e.target.closest('[data-clear-sel]')) { t.selected.clear(); Q.closeMenus(); Q.renderTable(id); return; }
+      const ex = e.target.closest('[data-expand]');
+      if (ex) { const k = ex.closest('tr').dataset.key; t.expanded = t.expanded === k ? null : k; Q.renderTable(id); document.querySelector(`#tb-${CSS.escape(id)} tr[data-key="${CSS.escape(k)}"] [data-expand]`)?.focus(); return; }
+      if (!c.selectable) return;
+      if (e.target.closest('[data-check-all]')) { const rows = pageRows(id); const allOn = rows.every(r => t.selected.has(key(r))); rows.forEach(r => allOn ? t.selected.delete(key(r)) : t.selected.add(key(r))); Q.renderTable(id); document.querySelector(`#tb-${CSS.escape(id)} [data-check-all]`)?.focus(); return; }
+      const tr = e.target.closest('tbody tr[data-key]');
+      if (!tr) return;
+      const onCheck = e.target.closest('.tcheck');
+      if (!onCheck && e.target.closest('button, a, select, .menu-wrap, input, label')) return;
+      if (onCheck && e.target.tagName !== 'INPUT') return; // the label forwards a click to its input
+      const k = tr.dataset.key;
+      // Checkbox or Ctrl/Cmd-click toggles multi-selection; a plain row click selects just that row.
+      if (onCheck || e.ctrlKey || e.metaKey) t.selected.has(k) ? t.selected.delete(k) : t.selected.add(k);
+      else if (t.selected.size === 1 && t.selected.has(k)) t.selected.clear();
+      else { t.selected.clear(); t.selected.add(k); }
+      Q.renderTable(id);
+      document.querySelector(`#tb-${CSS.escape(id)} tr[data-key="${CSS.escape(k)}"] .row-check`)?.focus();
+    });
+    Q.renderTable(id);
+  };
+  /* Export: every row that matches the current search / filters / view (all pages),
+   * in the current sort, with the visible columns — or only the selected rows. */
+  Q.exportTable = (id, keys = null) => {
+    const t = Q.tables[id], c = t.cfg, key = c.key || (r => r.id);
+    let rows = Q.tableRows(id);
+    const only = keys || (t.selected.size ? [...t.selected] : null);
+    if (only) rows = rows.filter(r => only.includes(key(r)));
+    const cols = c.columns.filter(col => col.label && !/c-actions|c-menu/.test(col.cls || ''));
+    const tmp = document.createElement('div');
+    const text = html => { tmp.innerHTML = String(html ?? '').replace(/(<\/[a-z0-9]+>)/gi, '$1 ').replace(/></g, '> <'); tmp.querySelectorAll('.sr-only, svg').forEach(n => n.remove()); tmp.querySelectorAll('.sub').forEach(n => n.prepend(' — ')); return tmp.textContent.replace(/\s+/g, ' ').trim(); };
+    const cell = v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    const csv = [cols.map(col => cell(col.label)), ...rows.map(r => cols.map(col => cell(col.exportText ? col.exportText(r) : text(col.render(r)))))].map(l => l.join(',')).join('\r\n');
+    const name = `${(c.noun || 'records').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Q.today()}.csv`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = name;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    Q.toast('Export ready', `${rows.length} ${c.noun || 'rows'}${only ? ' (selected)' : ''} · ${name}`);
+  };
+  const pageRows = id => { const t = Q.tables[id], c = t.cfg, all = Q.tableRows(id); return c.pageSize ? all.slice((t.page - 1) * c.pageSize, t.page * c.pageSize) : all; };
+
+  /* ---------------- Router ---------------- */
+  Q.route = () => {
+    const h = location.hash.replace(/^#\/?/, '');
+    const [path, qs] = h.split('?');
+    return { parts: path.split('/').filter(Boolean), q: Object.fromEntries(new URLSearchParams(qs || '')) };
+  };
+  Q.go = hash => { if (location.hash === hash) Q.render(); else location.hash = hash; };
+  let lastPath = null;
+  Q.render = (opts = {}) => {
+    const { parts, q } = Q.route();
+    let name = parts[0] || 'overview';
+    // v3 aliases: old v2 links keep working.
+    if (name === 'iso') { location.replace('#/evidence?view=clause'); return; }
+    if (name === 'kpis') { location.replace('#/qms/objectives' + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); return; }
+    if (name === 'audit' && parts[1] === 'actions') { location.replace('#/capa' + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); return; }
+    if (name === 'audit' && parts[1] === 'improvements') { location.replace('#/capa/improvements'); return; }
+    if (name === 'reports') { location.replace('#/mgmt-review/reports'); return; }
+    const view = Q.views[name] || Q.views.overview;
+    Q.closeMenus();
+    if (!opts.keepModals) Q.closeAllModals();
+    const out = view(parts.slice(1), q) || {};
+    const main = document.getElementById('main');
+    main.innerHTML = out.html || '';
+    main.className = out.full ? 'full' : 'page';
+    document.title = `${out.title || 'iQMS'} · iQMS`;
+    Q.refreshIcons();
+    if (out.after) out.after(main);
+    main.querySelectorAll('[id^="tw-"]').forEach(w => Q.initTable(w.id.slice(3)));
+    Q.syncSidebar?.(out.nav || name, parts);
+    const path = parts.slice(0, 2).join('/');
+    if (lastPath !== null && path !== lastPath && !opts.noFocus) { window.scrollTo(0, 0); main.querySelector('h1')?.focus({ preventScroll: true }); }
+    lastPath = path;
+    if (q.focus) setTimeout(() => {
+      const row = main.querySelector(`tr[data-key="${CSS.escape(q.focus)}"]`);
+      if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'center' }); }
+    }, 30);
+  };
+  window.addEventListener('hashchange', () => Q.render());
+})();

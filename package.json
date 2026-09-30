@@ -1,0 +1,9 @@
+{
+  "name": "iqms-v2-process-centric",
+  "version": "2.0.0",
+  "private": true,
+  "description": "iQMS process-centred UX mock (static, sample data)",
+  "scripts": {
+    "start": "node scripts/serve.cjs"
+  }
+}
