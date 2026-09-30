@@ -111,8 +111,8 @@
           <div class="cat-stats"><span><b class="tnum">${list.length}</b> process${list.length === 1 ? '' : 'es'}</span>${attn ? `<span class="attn"><b class="tnum">${attn}</b> need attention</span>` : list.length ? '<span class="ok">All on track</span>' : ''}</div></header>
         ${list.length ? `<div class="pc-grid">${list.map(card).join('')}</div>` : `<div class="cat-empty">No processes in this category yet. <a href="#/settings/processes">Add or move a process</a></div>`}</section>`;
     };
-    const map = `<div class="pmap">${Q.categories().map(band).join('')}${band(null)}
-      <p class="small muted" style="text-align:right">Categories are set per organization · <a href="#/settings/processes?cats=1">Manage categories</a></p></div>`;
+    // One grid of process cards in display order (no category grouping on this page).
+    const map = `<div class="pc-grid">${tops.map(card).join('')}</div>`;
     const table = Q.table({ id: 'qmsproc', rows: () => tops, key: r => r.id, noun: 'processes', caption: 'Process register',
       columns: [
         { key: 'name', label: 'Process', sort: r => r.display_order, render: r => `<a class="proc" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },
