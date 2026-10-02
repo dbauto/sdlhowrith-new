@@ -1,4 +1,4 @@
-/* iQMS v2 — shell: sidebar navigation (generated from the process structure) and global search. */
+/* iQMS — shell: sidebar navigation (generated from the process structure) and global search. */
 (() => {
   'use strict';
   const { esc, icon } = Q;
@@ -155,7 +155,13 @@
   sb.addEventListener('click', e => { if (e.target.closest('a.sb-item') && !desktop()) setDrawer(false); });
 
   /* Hover-expand + pin (desktop). */
-  const setExpanded = on => { sb.classList.toggle('expanded', on || document.body.classList.contains('sb-pinned') || !desktop()); if (!sb.classList.contains('expanded')) Q.closeFly?.(); };
+  const scrim = document.getElementById('sbScrim');
+  const setExpanded = on => {
+    sb.classList.toggle('expanded', on || document.body.classList.contains('sb-pinned') || !desktop());
+    if (!sb.classList.contains('expanded')) Q.closeFly?.();
+    // The hover-expanded sidebar floats over the page: dim the page so it reads as a layer.
+    scrim?.classList.toggle('on', desktop() && on && !document.body.classList.contains('sb-pinned'));
+  };
   const setPinned = on => {
     document.body.classList.toggle('sb-pinned', on);
     pin.setAttribute('aria-pressed', String(on));

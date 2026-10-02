@@ -40,14 +40,17 @@
     const openActions = S.actions.filter(a => !Q.actionClosed(a));
     const overdueActions = openActions.filter(Q.actionOverdue);
     const mineApprovals = approvals.filter(Q.assignedToMe).length;
-    const cell = (href, label, v, d, cls = 'bad', ic = '') => `<a href="${href}"><span class="k">${ic ? icon(ic) : ''}${label}</span><div class="v ${v ? cls : ''}">${v}</div><div class="d">${d}</div></a>`;
+    // Severity, not one red for everything: critical = act now, attention = plan it, clear = nothing open.
+    const SEV = { critical: ['triangle-alert', 'Critical'], attention: ['clock-alert', 'Needs attention'], clear: ['circle-check', 'All clear'] };
+    const cell = (href, label, v, d, sev) => { const k = v ? sev : 'clear'; return `<a href="${href}" class="sev-${k}" role="listitem"><span class="k">${icon(SEV[k][0])}${label}<span class="sr-only"> (${SEV[k][1]})</span></span><div class="v">${v}</div><div class="d">${d}</div></a>`; };
     const strip = `<div class="attention-strip" role="list" aria-label="What requires attention">
-      ${cell('#/documents?status=overdue', 'Overdue documents', docsOverdue.length, `review date passed · ${S.documents.filter(Q.docDueSoon).length} due in 30 days`)}
-      ${cell('#/review?show=all', 'Pending approvals', approvals.length, `${mineApprovals} assigned to you`, 'warn')}
-      ${cell('#/risks?level=High', 'High risks', high.length, `${S.risks.filter(r => Q.riskOpen(r)).length} open risks & opportunities`)}
-      ${cell('#/qms/objectives?status=below', 'KPIs below target', kpiBelow.length, `of ${S.kpis.length} KPIs measured`, 'warn')}
-      ${cell('#/evidence?status=gaps', 'Evidence gaps', gaps.length, `${S.evidence.filter(e => e.status === 'Pending verification').length} awaiting verification`)}
-      ${cell('#/capa?status=overdue', 'Overdue actions', overdueActions.length, `${openActions.length} corrective actions open`)}</div>`;
+      ${cell('#/risks?level=High', 'High risks', high.length, `${S.risks.filter(r => Q.riskOpen(r)).length} open risks & opportunities`, 'critical')}
+      ${cell('#/capa?status=overdue', 'Overdue actions', overdueActions.length, `${openActions.length} corrective actions open`, 'critical')}
+      ${cell('#/documents?status=overdue', 'Overdue documents', docsOverdue.length, `review date passed · ${S.documents.filter(Q.docDueSoon).length} due in 30 days`, 'attention')}
+      ${cell('#/review?show=all', 'Pending approvals', approvals.length, `${mineApprovals} assigned to you`, 'attention')}
+      ${cell('#/qms/objectives?status=below', 'KPIs below target', kpiBelow.length, `of ${S.kpis.length} KPIs measured`, 'attention')}
+      ${cell('#/evidence?status=gaps', 'Evidence gaps', gaps.length, `${S.evidence.filter(e => e.status === 'Pending verification').length} awaiting verification`, 'attention')}</div>
+    <p class="sev-key small muted">${icon('triangle-alert')}<span>Critical: act now</span>${icon('clock-alert')}<span>Needs attention: plan it</span>${icon('circle-check')}<span>All clear</span></p>`;
 
     // Needs your action
     const work = [
@@ -64,15 +67,14 @@
       tools: `${Q.seg('Show', [['all', 'All processes', procRows().length], ['attn', 'Needs attention', procRows().filter(r => r.s.health !== 'ok').length]], 'all')}<span class="right">Counts include subprocesses. Status reflects open items; ISO readiness is scored separately.</span>`,
       segs: { attn: r => r.s.health !== 'ok' },
       columns: [
-        { key: 'name', label: 'Process', cls: 'c-sticky', sort: r => r.display_order, render: r => `<a class="proc proc-link" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },
-        { key: 'owner', label: 'Owner', sort: r => Q.pname(r.owner), render: r => `<span class="nowrap">${esc(Q.pname(r.owner))}</span>` },
+        { key: 'name', label: 'Process', cls: 'c-sticky', sort: r => r.display_order, render: r => `<a class="proc proc-link" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a><span class="sub">${esc(Q.pname(r.owner))}</span>` },
         { key: 'health', label: 'Status', sort: r => ({ risk: 0, attn: 1, ok: 2 })[r.s.health], render: r => Q.health(r.s.health) },
         { key: 'docs', label: 'Docs overdue', cls: 'c-num', sort: r => r.s.docsOverdue, render: r => Q.num(r.s.docsOverdue) },
         { key: 'risks', label: 'High risks', cls: 'c-num', sort: r => r.s.highRisks, render: r => Q.num(r.s.highRisks) },
-        { key: 'kpi', label: 'KPIs off target', cls: 'c-num', sort: r => r.s.kpisBelow, render: r => Q.num(r.s.kpisBelow, 'warnv') },
+        { key: 'kpi', label: 'KPIs off',  cls: 'c-num', sort: r => r.s.kpisBelow, render: r => Q.num(r.s.kpisBelow, 'warnv') },
         { key: 'ev', label: 'Evidence gaps', cls: 'c-num', sort: r => r.s.evGaps, render: r => Q.num(r.s.evGaps) },
-        { key: 'ca', label: 'Open actions', cls: 'c-num', sort: r => r.s.actions, render: r => r.s.actions ? `${r.s.actions}${r.s.actionsOverdue ? ` <span class="attn">(${r.s.actionsOverdue} overdue)</span>` : ''}` : '<span class="zero">—</span>' },
-        { key: 'iso', label: 'ISO readiness', sort: r => r.s.iso.pct ?? -1, render: r => Q.miniProgress(r.s.iso.pct) }
+        { key: 'ca', label: 'Actions', cls: 'c-num', sort: r => r.s.actions, render: r => r.s.actions ? `${r.s.actions}${r.s.actionsOverdue ? ` <span class="attn">(${r.s.actionsOverdue} overdue)</span>` : ''}` : '<span class="zero">—</span>' },
+        { key: 'iso', label: 'ISO readiness', cls: 'c-iso', sort: r => r.s.iso.pct ?? -1, render: r => Q.miniProgress(r.s.iso.pct) }
       ]
     });
 

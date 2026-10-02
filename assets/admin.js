@@ -1,16 +1,30 @@
-/* iQMS v2 — Settings: organization, process structure, users & access, integrations; setup assistant. */
+/* iQMS — Settings: organization, process structure, users & access, integrations; setup assistant. */
 (() => {
   'use strict';
   const { esc, icon } = Q;
-  const SECTIONS = [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['workspace', 'Process Workspace', 'layout-dashboard'], ['pages', 'Page Layouts', 'layout-template'], ['users', 'Users & Access', 'users'], ['integrations', 'Integrations', 'plug']];
+  /* Settings are grouped so the list can grow without becoming one long column.
+   * Sections defined in settings-extra.js register themselves in Q.settingsViews. */
+  const GROUPS = [
+    ['Workspace', [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['workspace', 'Process Workspace', 'layout-dashboard'], ['pages', 'Page Layouts', 'layout-template'], ['regional', 'Regional', 'globe'], ['branding', 'Branding', 'sparkles']]],
+    ['People & access', [['users', 'Users & Access', 'users'], ['security', 'Security', 'shield-check'], ['notifications', 'Notifications', 'bell']]],
+    ['Connections', [['integrations', 'Integrations', 'plug'], ['api', 'API & Webhooks', 'code']]],
+    ['Trust & compliance', [['privacy', 'Data Privacy', 'lock-keyhole'], ['audit-log', 'Audit Log', 'scroll-text'], ['data', 'Data Export & Backup', 'hard-drive']]],
+    ['Account', [['billing', 'Billing & Plan', 'currency'], ['about', 'About System', 'info']]]
+  ];
+  const SECTIONS = GROUPS.flatMap(([, list]) => list);
+  Q.settingsViews = Q.settingsViews || {};
+  Q.settingsLabel = k => (SECTIONS.find(s => s[0] === k) || [])[1];
 
   Q.views.settings = (parts, q) => {
-    const sec = SECTIONS.find(s => s[0] === parts[0]) ? parts[0] : 'processes';
-    const nav = `<nav class="settings-nav" aria-label="Settings">${SECTIONS.map(([k, l, i]) => `<a href="#/settings/${k}" ${k === sec ? 'aria-current="page"' : ''}>${icon(i)}${l}</a>`).join('')}</nav>`;
-    const view = { organization, processes, workspace, pages, users, integrations }[sec](q);
-    return { title: `${SECTIONS.find(s => s[0] === sec)[1]} · Settings`, nav: 'settings',
-      html: Q.pageHead({ title: 'Settings', crumbs: [['Settings', '#/settings'], [SECTIONS.find(s => s[0] === sec)[1]]], sub: 'Organization-level configuration. Changes are saved in this browser only (mock).' }) + `<div class="settings-layout">${nav}<div>${view.html}</div></div>`,
-      after: view.after };
+    const sec = SECTIONS.find(s => s[0] === parts[0]) ? parts[0] : 'organization';
+    const label = Q.settingsLabel(sec);
+    const nav = `<nav class="settings-nav" aria-label="Settings">${GROUPS.map(([g, list]) => `<div class="sn-group"><h3>${esc(g)}</h3>${list.map(([k, l, i]) => `<a href="#/settings/${k}" ${k === sec ? 'aria-current="page"' : ''}>${icon(i)}${esc(l)}</a>`).join('')}</div>`).join('')}</nav>
+      <label class="settings-jump"><span class="sr-only">Settings section</span><select class="select" data-settings-jump>${GROUPS.map(([g, list]) => `<optgroup label="${esc(g)}">${list.map(([k, l]) => `<option value="${k}"${k === sec ? ' selected' : ''}>${esc(l)}</option>`).join('')}</optgroup>`).join('')}</select></label>`;
+    const fn = { organization, processes, workspace, pages, users, integrations }[sec] || Q.settingsViews[sec];
+    const view = fn(q);
+    return { title: `${label} · Settings`, nav: 'settings',
+      html: Q.pageHead({ title: 'Settings', crumbs: [['Settings', '#/settings'], [label]], sub: `Configuration for ${esc(Q.S.organization.name)}. Changes apply to everyone in the organization.` }) + `<div class="settings-layout">${nav}<div class="settings-main">${view.html}</div></div>`,
+      after: main => { main.querySelector('[data-settings-jump]')?.addEventListener('change', e => Q.go('#/settings/' + e.target.value)); view.after?.(main); } };
   };
 
   /* ---------- Organization ---------- */
@@ -25,10 +39,10 @@
         <div class="form-grid"><label class="field"><span>Level 1</span><select class="select" name="l1">${['Process', 'Process Area', 'Department', 'Business Unit'].map(x => `<option${x === o.hierarchyLabels[0] ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
         <label class="field"><span>Level 2</span><select class="select" name="l2">${['Subprocess', 'Process', 'Activity'].map(x => `<option${x === o.hierarchyLabels[1] ? ' selected' : ''}>${x}</option>`).join('')}</select></label></div></fieldset>
       </div><div style="display:flex;gap:8px;margin-top:20px"><button class="btn primary" type="submit">Save Changes</button></div></form></section>
-      <section class="panel section"><div class="panel-head"><h2>Sample data</h2></div><div class="panel-pad" style="display:flex;align-items:center;gap:16px"><p style="flex:1">All records are fictional. Reset to discard changes made in this browser (published revisions, new documents, process edits).</p><button class="btn danger" type="button" data-action="reset-data">Reset Sample Data</button></div></section>`,
+`,
       after: main => main.querySelector('#orgForm').addEventListener('submit', e => {
         e.preventDefault(); const f = e.target; if (!Q.validate(f)) return; const v = Q.formValues(f);
-        Object.assign(o, { name: v.name, industry: v.industry, standard: v.standard, hierarchyLabels: [v.l1, v.l2] }); Q.save(); Q.renderSidebar(); Q.toast('Organization saved');
+        Object.assign(o, { name: v.name, industry: v.industry, standard: v.standard, hierarchyLabels: [v.l1, v.l2] }); Q.save(); Q.audit?.('Settings', 'updated organization details'); Q.renderSidebar(); Q.toast('Organization saved');
       }) };
   }
   Q.actions['reset-data'] = () => Q.confirm({ title: 'Reset sample data?', body: '<p>All changes made in this browser will be discarded.</p>', confirm: 'Reset', danger: true, onConfirm: () => { Q.resetData(); Q.renderSidebar(); Q.go('#/overview'); Q.toast('Sample data reset'); } });
@@ -69,7 +83,7 @@
       <section class="panel section" id="cats"><div class="panel-head"><h3>Process categories</h3><span class="muted small">How processes are grouped on QMS → Processes — e.g. Management, Core, Support</span><div class="actions"><button class="btn sm" type="button" data-action="edit-category">${icon('plus')}Add Category</button></div></div>
         <ul class="cat-list">${Q.categories().map((c, i, all) => { const n = Q.topProcesses().filter(x => x.category === c.id).length; return `<li><span class="cat-ic" style="background:${c.color}">${icon(c.icon || 'folder')}</span><div class="ci-main"><b>${esc(c.name)}</b><span>${esc(c.description || '—')} · ${n} process${n === 1 ? '' : 'es'}</span></div>
           <button class="btn sm" type="button" data-cmove="${c.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(c.name)} up">${icon('arrow-up')}</button><button class="btn sm" type="button" data-cmove="${c.id}" data-dir="1" ${i === all.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(c.name)} down">${icon('arrow-down')}</button>
-          <button class="btn sm" type="button" data-action="edit-category" data-id="${c.id}">${icon('pencil')}Edit</button><button class="btn sm danger" type="button" data-action="delete-category" data-id="${c.id}" ${all.length === 1 ? 'disabled title="Keep at least one category"' : ''}>${icon('trash-2')}</button></li>`; }).join('')}</ul></section>`;
+          <button class="btn sm" type="button" data-action="edit-category" data-id="${c.id}">${icon('pencil')}Edit</button><button class="btn sm danger" type="button" data-action="delete-category" data-id="${c.id}" aria-label="Delete ${esc(c.name)}" title="${all.length === 1 ? 'Keep at least one category' : `Delete ${esc(c.name)}`}" ${all.length === 1 ? 'disabled' : ''}>${icon('trash-2')}</button></li>`; }).join('')}</ul></section>`;
     const after = main => {
       if (q.cats) setTimeout(() => main.querySelector('#cats')?.scrollIntoView({ block: 'start' }), 0);
       main.querySelectorAll('[data-cmove]').forEach(b => b.addEventListener('click', () => { const list = Q.S.processCategories, i = list.findIndex(c => c.id === b.dataset.cmove), j = i + Number(b.dataset.dir); [list[i], list[j]] = [list[j], list[i]]; Q.save(); Q.render({ noFocus: true }); }));
@@ -231,10 +245,8 @@
           <select class="select" data-filter="status" aria-label="Status"><option value="all">All statuses</option><option>Active</option><option>Invited</option><option>Deactivated</option></select>`,
         filters: { role: (u, v) => u.role === v, status: (u, v) => u.status === v },
         columns: [
-          { key: 'name', label: 'Name', sort: u => u.p.name, render: u => `<span style="display:inline-flex;align-items:center;gap:10px"><span class="avatar sm">${esc(Q.initials(u.id))}</span><span class="title nowrap">${esc(u.p.name)}</span></span>` },
-          { key: 'email', label: 'Email', sort: u => u.p.email, render: u => `<span class="small" style="display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle" title="${esc(u.p.email)}">${esc(u.p.email)}</span>` },
-          { key: 'role', label: 'Role', sort: u => u.role, render: u => `<span class="nowrap">${esc(u.role)}</span>` },
-          { key: 'dept', label: 'Department', cls: 'hide-lg', sort: u => u.p.dept, render: u => esc(u.p.dept) },
+          { key: 'name', label: 'Name', sort: u => u.p.name, render: u => `<span class="user-cell"><span class="avatar sm">${esc(Q.initials(u.id))}</span><span><span class="title">${esc(u.p.name)}</span><span class="sub">${esc(u.p.email)}</span></span></span>` },
+          { key: 'role', label: 'Role', sort: u => u.role, render: u => `<span class="nowrap">${esc(u.role)}</span><span class="sub">${esc(u.p.dept)}</span>` },
           { key: 'access', label: 'Process access', render: u => `<span class="small nowrap">${accessSummary(u)}</span>` },
           { key: 'status', label: 'Status', sort: u => u.status, render: u => Q.st(u.status, { Active: 'success', Invited: 'info', Deactivated: 'muted' }[u.status]) },
           { key: 'last', label: 'Last active', cls: 'c-date', sort: u => u.lastActive || '', render: u => u.lastActive ? Q.fmt(u.lastActive) : '<span class="muted">Never</span>' },

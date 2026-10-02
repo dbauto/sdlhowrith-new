@@ -15,7 +15,28 @@
   }
   Q.S = loadData();
   Q.save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify({ v: 4, data: Q.S })); } catch (_) { /* ignore */ } };
-  Q.resetData = () => { Q.S = clone(SEED); try { localStorage.removeItem(STORE_KEY); } catch (_) { /* ignore */ } };
+  /* "Today" is the real date in the organization's time zone (Settings → Regional).
+   * Sample records are written relative to the seed's date, so every date in the data
+   * moves forward by the same number of days: overdue items stay overdue by the same amount. */
+  Q.realToday = (tz = Q.S?.settings?.regional?.timeZone || 'Asia/Manila') => {
+    try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+    catch (_) { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); }
+  };
+  const DATE_RE = /^(\d{4}-\d{2}-\d{2})(?=$|[T ])/;
+  const shiftDates = (v, n) => {
+    if (typeof v === 'string') { const m = v.match(DATE_RE); if (!m) return v; const x = new Date(m[1] + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10) + v.slice(10); }
+    if (Array.isArray(v)) return v.map(x => shiftDates(x, n));
+    if (v && typeof v === 'object') { Object.keys(v).forEach(k => { v[k] = shiftDates(v[k], n); }); return v; }
+    return v;
+  };
+  const anchorToToday = () => {
+    const from = Q.S.organization.today, to = Q.realToday();
+    if (!from || from === to) return;
+    const n = Math.round((new Date(to) - new Date(from)) / 864e5);
+    if (n > 0) { shiftDates(Q.S, n); Q.S.organization.today = to; Q.save(); }
+  };
+  anchorToToday();
+  Q.resetData = () => { Q.S = clone(SEED); try { localStorage.removeItem(STORE_KEY); } catch (_) { /* ignore */ } anchorToToday(); };
   Q.UI = (() => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (_) { return {}; } })();
   Q.saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(Q.UI)); } catch (_) { /* ignore */ } };
 
@@ -30,7 +51,18 @@
   Q.initials = id => Q.pname(id).split(' ').map(s => s[0]).slice(0, 2).join('');
   Q.who = id => id === Q.me() ? `${esc(Q.pname(id))} <span class="muted">(you)</span>` : esc(Q.pname(id));
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  Q.fmt = d => { if (!d) return '—'; const [y, m, day] = d.slice(0, 10).split('-'); return `${Number(day)} ${MONTHS[Number(m) - 1]} ${y}`; };
+  /* Date format follows Settings → Regional (default "27 Sep 2026"). */
+  Q.DATE_FORMATS = { 'd MMM yyyy': '2 Oct 2026', 'dd/MM/yyyy': '02/10/2026', 'MM/dd/yyyy': '10/02/2026', 'yyyy-MM-dd': '2026-10-02' };
+  Q.fmt = d => {
+    if (!d) return '—';
+    const [y, m, day] = d.slice(0, 10).split('-');
+    switch (Q.S.settings?.regional?.dateFormat) {
+      case 'dd/MM/yyyy': return `${day}/${m}/${y}`;
+      case 'MM/dd/yyyy': return `${m}/${day}/${y}`;
+      case 'yyyy-MM-dd': return `${y}-${m}-${day}`;
+      default: return `${Number(day)} ${MONTHS[Number(m) - 1]} ${y}`;
+    }
+  };
   Q.days = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
   Q.addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
   Q.addYears = (d, n) => `${Number(d.slice(0, 4)) + n}${d.slice(4)}`;
@@ -577,6 +609,9 @@
     if (name === 'audit' && parts[1] === 'actions') { location.replace('#/capa' + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); return; }
     if (name === 'audit' && parts[1] === 'improvements') { location.replace('#/capa/improvements'); return; }
     if (name === 'reports') { location.replace('#/mgmt-review/reports'); return; }
+    // Signed out: only the sign-in page is reachable.
+    if (Q.UI.signedOut && name !== 'signin') { location.replace('#/signin'); return; }
+    if (!Q.UI.signedOut && name === 'signin') { location.replace('#/overview'); return; }
     const view = Q.views[name] || Q.views.overview;
     Q.closeMenus();
     if (!opts.keepModals) Q.closeAllModals();
@@ -585,6 +620,8 @@
     main.innerHTML = out.html || '';
     main.className = out.full ? 'full' : 'page';
     document.title = `${out.title || 'iQMS'} · iQMS`;
+    const tt = document.getElementById('topbarTitle'); if (tt) tt.textContent = (out.title || 'iQMS').split(' · ')[0];
+    document.body.classList.toggle('auth', !!out.auth);
     Q.refreshIcons();
     if (out.after) out.after(main);
     main.querySelectorAll('[id^="tw-"]').forEach(w => Q.initTable(w.id.slice(3)));
