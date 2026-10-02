@@ -10,7 +10,7 @@ cd QMS-v3-client-menu
 node scripts/serve.cjs
 ```
 
-Open <http://127.0.0.1:4173>. You can also open `index.html` directly. Changes are kept in this browser's `localStorage` under a new key (`iqms.v3.*`), so v2 and v3 don't overwrite each other. To start over, use **Settings → Organization → Reset Sample Data**.
+Open <http://127.0.0.1:4173>. You can also open `index.html` directly. Changes are kept in this browser's `localStorage` under a new key (`iqms.v3.*`), so v2 and v3 don't overwrite each other. To start over, use **Settings → About System → Reset Sample Data**. To see the sign-in screen, use **account menu → Sign out** (any password works; any 6 digits pass two-step verification).
 
 ## What changed: the client's menu
 
@@ -28,7 +28,7 @@ Open <http://127.0.0.1:4173>. You can also open `index.html` directly. Changes a
 | 5 | Internal Audit | `#/audit` | Programme, Findings, **Process coverage** (which processes aren't in the programme, 9.2.2) |
 | 6 | Management Review | `#/mgmt-review` | **9.3.2 inputs assembled live** (a–f), decisions and actions (9.3.3), meetings, reports |
 | 7 | Corrective Action | `#/capa` | Stage pipeline (root cause → action → effectiveness → closed), corrective actions, improvement opportunities; **Raise Corrective Action** form |
-| 8 | Settings | `#/settings` | Unchanged |
+| 8 | Settings | `#/settings` | Grouped: Workspace, People & access, Connections, Trust & compliance, Account (see Update 11) |
 
 Old v2 links (`#/iso`, `#/kpis`, `#/audit/actions`, `#/reports`) redirect to their new homes.
 
@@ -191,6 +191,43 @@ The four QMS pages (Organization & Scope, Policies, Processes, Objectives & KPIs
 - **Tables on these pages now work.** Sites covered and Interested parties sort, search, export to CSV, and have Add, Edit and Delete. Context issues can be edited. Other policies is a live table from Documented Information.
 - Not included: building a new component from scratch, adding a new page to the QMS menu, and per-user layouts (a layout is per organization).
 
+## Update 11: UI review fixes and SaaS settings
+
+**Fixes from the UI review**
+- **Phone layout:** Settings → Process Structure, Page Layouts and the process workspace no longer scroll sideways at 390 px. Long tab bars fade at the edge to show they scroll. The top bar shows the page title, and search collapses to an icon that opens across the bar.
+- **Tables:** Overview → Process status shows the owner under the process name, so ISO readiness fits at 1440 px. Users & Access shows the email under the name and the department under the role, so nothing is cut off and Department is visible again.
+- **Sidebar:** the QMS item no longer looks selected on every page. The hover-expanded sidebar dims the page behind it.
+- **Readability:** no text under 12 px (risk matrix scores, avatars, KPI history). The risk matrix cells show H/M/L and use patterns as well as colour, and the legend matches.
+- **Overview cards by severity:** *Critical* (red: high risks, overdue actions), *Needs attention* (amber), *All clear* (green, when the count is 0), with a key under the cards.
+- **Accessibility:** category delete buttons have labels; section titles no longer squeeze when the subtitle is long.
+- **Dates:** "today" is the real date in the organization's time zone. Sample dates move forward by the same number of days, so overdue items stay overdue by the same amount.
+
+**Top bar**
+- **Help** menu: search help, keyboard shortcuts (also **?**), what's new, contact support, system status.
+- **Notifications**: built from what's assigned to or owned by you (reviews, overdue documents and actions, high risks in your processes, open privacy breaches), with unread count and *Mark all as read*.
+- **Account menu**: My profile, Settings, Switch organization, Keyboard shortcuts, About, **Sign out**.
+- **Organization switcher** (account menu or the organization name in the expanded sidebar).
+- **Sign-in page**: email and password, Microsoft sign-in when SSO is set up, two-step verification, forgot password, privacy notice link, and the custom sign-in message from Branding.
+
+**Settings** (`#/settings/…`, grouped; on screens under 1024 px a dropdown replaces the side list)
+
+| Group | Section | What's there |
+|---|---|---|
+| Workspace | Regional | Time zone (default Asia/Manila), date format (applies everywhere), week start, language, currency (₱) |
+| | Branding | Colour theme (5 contrast-checked palettes, applied live), logo initials, sign-in message |
+| People & access | Security | Two-step verification policy, Microsoft Entra ID SSO, password and session rules, IP allowlist with validation, active sessions with sign-out |
+| | Notifications | Organization defaults per event (in iQMS / email), review reminders, email digest |
+| Connections | API & Webhooks | Create API keys (shown once), revoke, add HTTPS webhooks per event |
+| Trust & compliance | **Data Privacy** | Philippine Data Privacy Act (RA 10173): compliance checklist, controller/processor/DPO, personal data inventory (sensitive data flagged), **data access iQMS performs**, time-limited support access, sub-processors, data subject requests, breach log with the 72-hour clock, retention schedule, DPO details, privacy notice |
+| | Audit Log | Sign-ins, setting and access changes, exports and record activity; search, filter, export |
+| | Data Export & Backup | Full JSON export (works), backup schedule and history, close workspace (typed confirmation) |
+| Account | Billing & Plan | Plan, seats and storage usage, invoices, payment details (sample figures) |
+| | **About System** | Version and build, workspace details, what's new, support (copy diagnostic info), legal and licences, sample-data reset |
+
+**My Profile** (`#/profile`): personal details, time zone override, personal notification opt-outs, password change, two-step status, signed-in devices, **Download my data** (JSON) and **Request a correction** (logged as a data subject request).
+
+Mock limits: no real authentication, email, payments or backups; the Data Privacy page organizes compliance but is not legal advice.
+
 ## Files
 
 | File | Change |
@@ -203,7 +240,9 @@ The four QMS pages (Organization & Scope, Policies, Processes, Objectives & KPIs
 | `assets/views.js` | Overview links updated; Reassess action on risks; reports moved into Management Review; old cross-process pages removed |
 | `assets/core.js` | ISO clause helpers, v2 → v3 route redirects, new storage key |
 | `assets/data.js` | Added process categories, organization context & scope, quality policy, management reviews |
-| `assets/app.css` | Styles for the above. Still one stylesheet with no `!important` |
+| `assets/settings-extra.js` | **New.** Regional, Branding, Security, Notifications, API & Webhooks, Data Privacy, Audit Log, Data Export & Backup, Billing & Plan, About System |
+| `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
+| `assets/app.css` | Styles for the above |
 | `screenshots/` | v3 captures at 1440 px |
 
 ## Open questions for the client

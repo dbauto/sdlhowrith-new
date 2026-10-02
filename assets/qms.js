@@ -396,7 +396,7 @@
       grid += `<span class="ax">${l}</span>`;
       for (let i = 1; i <= 5; i++) {
         const n = risks.filter(r => r.likelihood === l && r.impact === i).length, sc = l * i, lv = levelOf(sc);
-        grid += `<button type="button" class="${{ High: 'hi', Medium: 'md', Low: 'lo' }[lv]}${n ? '' : ' empty'}" data-go="#/risks/matrix?cell=${l}x${i}" aria-pressed="${sel === `${l}x${i}`}" aria-label="Likelihood ${l} ${LIKE[l - 1]}, impact ${i} ${IMP[i - 1]}: ${n} risks, score ${sc} ${lv}"><span class="s">${sc}</span>${n || '·'}</button>`;
+        grid += `<button type="button" class="${{ High: 'hi', Medium: 'md', Low: 'lo' }[lv]}${n ? '' : ' empty'}" data-go="#/risks/matrix?cell=${l}x${i}" aria-pressed="${sel === `${l}x${i}`}" aria-label="Likelihood ${l} ${LIKE[l - 1]}, impact ${i} ${IMP[i - 1]}: ${n} risks, score ${sc} ${lv}"><span class="s">${sc}</span><span class="lv" aria-hidden="true">${{ High: 'H', Medium: 'M', Low: 'L' }[lv]}</span>${n || '·'}</button>`;
       }
     }
     grid += `<span></span>${[1, 2, 3, 4, 5].map(i => `<span class="ax">${i}</span>`).join('')}`;
@@ -406,7 +406,7 @@
     const opps = open.filter(r => r.kind === 'Opportunity');
     return { title: 'Risk matrix · Risks & Opportunities', nav: 'risks', html: head + t +
       `<div class="heat-wrap"><span class="heat-y">Likelihood →</span><div><div class="heat" role="group" aria-label="Risk matrix: likelihood by impact">${grid}</div><div class="heat-x">Impact →</div>
-        <div class="legend" style="margin-top:14px"><span><i style="background:#F8CFC9"></i>High ≥ 15</span><span><i style="background:#FBEBC7"></i>Medium 8–12</span><span><i style="background:#EEF3F0"></i>Low ≤ 6</span></div>
+        <div class="legend heat-legend" style="margin-top:14px"><span><i class="heat-key hi"></i><b>H</b> High ≥ 15</span><span><i class="heat-key md"></i><b>M</b> Medium 8–12</span><span><i class="heat-key lo"></i><b>L</b> Low ≤ 6</span></div>
         <p class="small muted" style="margin-top:8px">Open risks only. Select a cell to list its risks. ${opps.length} opportunities are tracked separately in the register.</p></div>
       ${list}</div>` };
   };

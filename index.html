@@ -14,7 +14,7 @@
   <aside class="sb" id="sidebar" aria-label="Main navigation">
     <div class="sb-top">
       <div class="org-mark" id="orgMark" aria-hidden="true">HS</div>
-      <div class="org-name"><b id="orgName">Organization</b><span id="orgMeta">QMS workspace</span></div>
+      <button class="org-name org-switch" id="orgSwitch" type="button" data-action="switch-org" aria-label="Switch organization" title="Switch organization"><b id="orgName">Organization</b><span id="orgMeta">QMS workspace</span></button>
       <button class="sb-pin" id="sbPin" type="button" aria-pressed="false" aria-label="Pin sidebar" title="Pin sidebar"><i data-lucide="pin"></i></button>
     </div>
     <nav class="sb-scroll" id="sbNav"></nav>
@@ -24,6 +24,7 @@
   <div class="main">
     <header class="topbar">
       <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><i data-lucide="menu"></i></button>
+      <span class="topbar-title" id="topbarTitle" aria-hidden="true"></span>
       <div class="search" id="search">
         <label class="search-box">
           <i data-lucide="search"></i>
@@ -35,14 +36,15 @@
       </div>
       <div class="topbar-right">
         <span class="sample-tag" title="All records in this mock are fictional sample data">Sample data</span>
-        <button class="icon-btn" type="button" aria-label="Help" data-action="toast" data-title="Help" data-msg="Help centre is not part of this mock."><i data-lucide="circle-help"></i></button>
-        <button class="icon-btn" type="button" aria-label="Notifications" data-action="toast" data-title="Notifications" data-msg="Assigned items appear under Documents in Review and on the Overview."><i data-lucide="bell"></i></button>
-        <button class="user-chip" type="button" data-action="toast" data-title="Account" data-msg="Profile settings are not part of this mock."><span class="avatar" id="meAvatar">MS</span><span class="who"><b id="meName">User</b><span id="meTitle"></span></span></button>
+        <div class="pop-wrap"><button class="icon-btn" id="helpBtn" type="button" aria-label="Help" aria-haspopup="true" aria-expanded="false" aria-controls="helpPop"><i data-lucide="circle-help"></i></button><div class="pop" id="helpPop" hidden></div></div>
+        <div class="pop-wrap"><button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notifPop"><i data-lucide="bell"></i><span class="notif-dot" id="notifDot" hidden></span></button><div class="pop pop-wide" id="notifPop" hidden></div></div>
+        <div class="pop-wrap"><button class="user-chip" id="userBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="userPop" aria-label="Account menu"><span class="avatar" id="meAvatar">MS</span><span class="who"><b id="meName">User</b><span id="meTitle"></span></span><i data-lucide="chevron-down" class="chev"></i></button><div class="pop" id="userPop" hidden></div></div>
       </div>
     </header>
     <main id="main" tabindex="-1"></main>
   </div>
 
+  <div class="sb-scrim" id="sbScrim" aria-hidden="true"></div>
   <div id="modalHost"></div>
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
@@ -56,6 +58,8 @@
   <script src="assets/pages.js"></script>
   <script src="assets/qms.js"></script>
   <script src="assets/admin.js"></script>
+  <script src="assets/settings-extra.js"></script>
+  <script src="assets/account.js"></script>
   <script>Q.boot();</script>
 </body>
 </html>
