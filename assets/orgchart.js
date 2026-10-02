@@ -7,9 +7,22 @@
   const { esc, icon } = Q;
   const SEED = window.QMS_DATA;
 
-  // Data saved in a browser by an earlier build has no reporting lines: take them from the sample.
-  if (Object.values(Q.S.people).some(p => !('reportsTo' in p))) {
-    Object.entries(Q.S.people).forEach(([id, p]) => { if (!('reportsTo' in p)) p.reportsTo = SEED.people[id]?.reportsTo ?? null; });
+  /* Upgrade old browser data to the realistic sample hierarchy. Earlier builds
+   * sometimes stored reportsTo:null for everyone, which made the first person
+   * look like the whole organization. Only fictional *.example sample people
+   * are updated; customer-created people and reporting lines are preserved. */
+  const ORG_SAMPLE_VERSION = 2;
+  Q.S.context = Q.S.context || {};
+  if ((Q.S.context.orgChartSampleVersion || 0) < ORG_SAMPLE_VERSION) {
+    Object.entries(SEED.people).forEach(([id, seed]) => {
+      const person = Q.S.people[id];
+      if (!person || !String(person.email || '').endsWith('.example')) return;
+      person.title = seed.title;
+      person.dept = seed.dept;
+      person.reportsTo = seed.reportsTo ?? null;
+    });
+    Q.S.context.orgChartSampleVersion = ORG_SAMPLE_VERSION;
+    delete Q.S.context.orgChartChanged;
     Q.save();
   }
 
