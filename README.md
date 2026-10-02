@@ -1,6 +1,6 @@
 # iQMS v3: client menu update
 
-This is a copy of `QMS-v2-process-centric`, reworked around the client's feedback on navigation. The v2 source folder was not modified.
+This is a copy of `QMS-v2-process-centric`, reworked around the client's feedback on navigation. The v2 folder was not modified, and nothing was committed or pushed.
 Everything shown is fictional **sample data** for "Helios Solar Installations".
 
 ## Run it
@@ -136,12 +136,68 @@ The tabs on **Documented Information → Library** are **saved views**. The view
 - **Each process has a Category field**: required when adding a top-level process and editable on the process form. Subprocesses inherit their parent's category, which the form shows as "inherited from 07".
 - **The Processes page has one section per category**: a coloured header with the category's icon, name and description, plus a count of processes and how many need attention. An empty category shows a prompt to add or move a process. Processes without a category appear under "Uncategorized". In the table view, category shows as a coloured chip.
 
+## Update 7: process workspace tabs and Risks on saved views
+
+- **One workspace template for every process, now configurable.** In **Settings → Process Workspace** you can show or hide tabs, rename them and reorder them. Overview is always first. The page shows a live preview and has a *Restore defaults* button. The ⚙ at the end of a process's tab bar links there.
+- **Counts on each tab**, e.g. *Documents 6 · 1 overdue*. Tabs with no records either show greyed out with "—", or are hidden, depending on a setting. An empty tab you open shows a short "Nothing recorded yet" note.
+- **Saved views inside the process.** The Documents, Risks & Opportunities and Objectives & KPIs tabs show the same saved views as their main pages, filtered to that process and its subprocesses. "By process" views are left out inside a process because they'd only have one group; "By ISO 9001 clause" works. Creating or editing a view there changes the same shared view. A "This process only" note shows that filter.
+- **Risks & Opportunities → Register** now uses saved views too. Defaults: *All, Risks, Opportunities, High risks, By process*. Clicking a row's title expands it to show the treatment, the rating broken down as likelihood × impact, and linked documents. The ⋯ menu has Reassess, open a linked document, Open process workspace, and Show on risk matrix. The Risk matrix tab is unchanged.
+- The Evidence and Audit & Actions tabs keep their current tables, because those registers don't have saved views yet.
+- Fixed: closed row details no longer leave a blank gap under each table row.
+
+## Update 8: ISO 9001:2026
+
+- The mock now follows **ISO 9001:2026** (published 16 September 2026). The edition label comes from one setting, **Settings → Organization → Management system standard**, and shows on the readiness panels, the clause trees and document references. ISO 9001:2015 stays selectable for organizations still in their transition period.
+- Clause **6.1** is split as in the 2026 edition: **6.1.2 Actions to address risks** and **6.1.3 Actions to address opportunities**. Readiness is now 19.5 of 32 applicable requirements (still 61%).
+- Data saved in a browser by an earlier build is upgraded once on load (edition label and the 6.1 split).
+- **Not yet checked against the published text:** the other clause titles and the management review input list (9.3.2 a–f) are carried over from the 2015 wording. Reported 2026 changes that aren't modelled as separate requirements include quality culture and ethical behaviour (5.1.1, 7.3) and the new item 5.2.1 e). Check these against the client's copy of the standard.
+
+## Update 9: classification, two ways to register a document, group by owner and department
+
+**Classification decides the registration method** (client rule):
+
+| Classification | How it is registered | What iQMS holds | Read by iQMS |
+|---|---|---|---|
+| Public, Internal | **Upload** the file | The file, shown in the document viewer | Yes, used in the readiness assessment |
+| Confidential, Highly Confidential | **SharePoint link + description** | The link and the owner's description only | No |
+
+- **Register Document** (was "Connect Document") is one form in three steps: classification, then the file *or* the link and description, then the details. Choosing a classification switches step 2.
+- Link-only documents need a description of at least 60 characters and a confirmed **disclaimer**: iQMS cannot open the document, it is counted in the assessment from the owner's description, and that description has not been checked against the document.
+- The disclaimer is repeated wherever the document is read or counted: the viewer (which shows the description instead of a preview), the Details panel, the review page, and a note on the ISO 9001 readiness panel saying how many supporting documents are counted from a description only.
+- A lock next to a document name marks link-only documents in every table. New columns and filters: **Classification**, **File** (uploaded / SharePoint link / access unavailable) and **Read by iQMS**. New default view: **Confidential**.
+- **Create Revision** asks for the revised file (uploaded documents) or an updated description (link-only documents).
+- **Department** is now stored on the document. It is asked at registration and follows the owner's department unless changed. Before this it was only read from the owner's profile.
+- **Group by Owner** and **Group by Department** are available in Edit view → Layout for Documents, Objectives & KPIs and Risks, and inside a process workspace.
+- Sample data: 3 Public, 53 Internal, 5 Confidential and 2 Highly Confidential documents. Data saved in a browser by an earlier build is upgraded once on load.
+- Mock limits: no file is sent anywhere (only its name and size are kept), and link checking only tests the address pattern.
+
+## Update 10: customizable QMS pages (pre-made components) and working tables
+
+The four QMS pages (Organization & Scope, Policies, Processes, Objectives & KPIs) are no longer fixed screens. Each one is a **layout of pre-made components**, in the way Zoho pages are assembled from components.
+
+- **Default setup:** every page ships with the layout it had before. Nothing changes until someone customizes it.
+- **Customize page** (button on each QMS page, or Settings → Page Layouts) opens the page in edit mode:
+  - drag a component to reorder it or move it to another area; the arrow and move buttons do the same from the keyboard
+  - four areas: full width top, main column, side column, full width bottom
+  - column presets: wide + side, two equal, one column
+  - **Add component** opens the library; ✕ removes a component; ⚙ renames it and sets its options
+  - **Save layout** applies it to everyone in the organization; **Restore default layout** brings the shipped layout back
+- **Library (20 components, all pre-made):**
+  - General: ISO 9001 readiness, Key figures, Upcoming document reviews, Management actions, Register view, Text note
+  - Organization & context: Register review alert, QMS scope, Sites covered, Context of the organization, Interested parties, Organization, Exclusions, Structure & responsibilities
+  - Policy: Quality Policy, Other policies, Communicated & understood
+  - Objectives & processes: Objectives on target, Processes, Objectives & KPIs register
+- **Register view** embeds any saved view from Documents, KPIs or Risks as a live table, and can be added more than once.
+- **Tables on these pages now work.** Sites covered and Interested parties sort, search, export to CSV, and have Add, Edit and Delete. Context issues can be edited. Other policies is a live table from Documented Information.
+- Not included: building a new component from scratch, adding a new page to the QMS menu, and per-user layouts (a layout is per organization).
+
 ## Files
 
 | File | Change |
 |---|---|
 | `assets/shell.js` | New sidebar (client menu), QMS parent/children, Documented Information hover list |
 | `assets/saved-views.js` | **New.** Field list, filter conditions, view storage, Edit view panel |
+| `assets/pages.js` | **New.** Page layouts: component registry, customize mode, component library, general components |
 | `assets/documents.js` | Documented Information page: Library (saved views + grouping) and Routing tabs |
 | `assets/qms.js` | **New.** QMS pages, risk matrix and assessment tool, Evidence views, Internal Audit, Management Review, Corrective Action |
 | `assets/views.js` | Overview links updated; Reassess action on risks; reports moved into Management Review; old cross-process pages removed |

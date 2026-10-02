@@ -2,12 +2,12 @@
 (() => {
   'use strict';
   const { esc, icon } = Q;
-  const SECTIONS = [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['users', 'Users & Access', 'users'], ['integrations', 'Integrations', 'plug']];
+  const SECTIONS = [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['workspace', 'Process Workspace', 'layout-dashboard'], ['pages', 'Page Layouts', 'layout-template'], ['users', 'Users & Access', 'users'], ['integrations', 'Integrations', 'plug']];
 
   Q.views.settings = (parts, q) => {
     const sec = SECTIONS.find(s => s[0] === parts[0]) ? parts[0] : 'processes';
     const nav = `<nav class="settings-nav" aria-label="Settings">${SECTIONS.map(([k, l, i]) => `<a href="#/settings/${k}" ${k === sec ? 'aria-current="page"' : ''}>${icon(i)}${l}</a>`).join('')}</nav>`;
-    const view = { organization, processes, users, integrations }[sec](q);
+    const view = { organization, processes, workspace, pages, users, integrations }[sec](q);
     return { title: `${SECTIONS.find(s => s[0] === sec)[1]} · Settings`, nav: 'settings',
       html: Q.pageHead({ title: 'Settings', crumbs: [['Settings', '#/settings'], [SECTIONS.find(s => s[0] === sec)[1]]], sub: 'Organization-level configuration. Changes are saved in this browser only (mock).' }) + `<div class="settings-layout">${nav}<div>${view.html}</div></div>`,
       after: view.after };
@@ -19,7 +19,7 @@
     return { html: `<section class="panel"><div class="panel-head"><h2>Organization</h2></div><form class="panel-pad" id="orgForm"><div class="form-grid">
       <label class="field"><span>Organization name <span class="req">*</span></span><input class="input" name="name" required value="${esc(o.name)}"></label>
       <label class="field"><span>Industry</span><input class="input" name="industry" value="${esc(o.industry)}"></label>
-      <label class="field"><span>Management system standard</span><select class="select" name="standard"><option>ISO 9001:2015</option></select></label>
+      <label class="field"><span>Management system standard</span><select class="select" name="standard">${['ISO 9001:2026', 'ISO 9001:2015'].map(x => `<option${x === o.standard ? ' selected' : ''}>${x}</option>`).join('')}</select><span class="help">ISO 9001:2026 is the current edition. Choose 2015 only while your certificate is still in its transition period.</span></label>
       <label class="field"><span>Started from template</span><input class="input" value="${esc(o.template)} (customized)" readonly><span class="help">Templates are a starting point only; the structure is fully editable.</span></label>
       <fieldset class="fieldset full" style="margin:8px 0 0"><legend>Process hierarchy labels</legend><p class="help">What your organization calls each level. Codes such as 01 or 07.1 are display order only.</p>
         <div class="form-grid"><label class="field"><span>Level 1</span><select class="select" name="l1">${['Process', 'Process Area', 'Department', 'Business Unit'].map(x => `<option${x === o.hierarchyLabels[0] ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
@@ -28,7 +28,7 @@
       <section class="panel section"><div class="panel-head"><h2>Sample data</h2></div><div class="panel-pad" style="display:flex;align-items:center;gap:16px"><p style="flex:1">All records are fictional. Reset to discard changes made in this browser (published revisions, new documents, process edits).</p><button class="btn danger" type="button" data-action="reset-data">Reset Sample Data</button></div></section>`,
       after: main => main.querySelector('#orgForm').addEventListener('submit', e => {
         e.preventDefault(); const f = e.target; if (!Q.validate(f)) return; const v = Q.formValues(f);
-        Object.assign(o, { name: v.name, industry: v.industry, hierarchyLabels: [v.l1, v.l2] }); Q.save(); Q.renderSidebar(); Q.toast('Organization saved');
+        Object.assign(o, { name: v.name, industry: v.industry, standard: v.standard, hierarchyLabels: [v.l1, v.l2] }); Q.save(); Q.renderSidebar(); Q.toast('Organization saved');
       }) };
   }
   Q.actions['reset-data'] = () => Q.confirm({ title: 'Reset sample data?', body: '<p>All changes made in this browser will be discarded.</p>', confirm: 'Reset', danger: true, onConfirm: () => { Q.resetData(); Q.renderSidebar(); Q.go('#/overview'); Q.toast('Sample data reset'); } });
@@ -128,6 +128,58 @@
       selected = id; Q.save(); Q.closeAllModals(); Q.renderSidebar(); Q.go('#/settings/processes'); Q.render({ noFocus: true }); Q.toast(`${L[parent ? 1 : 0]} added`, `${v.code} ${v.name} now appears in navigation.`);
     });
   };
+
+  /* ---------- Process Workspace (tabs every process shows) ---------- */
+  /* Page layouts: which pre-made components each QMS page shows, and where. Edited on the page itself. */
+  function pages() {
+    const rows = Object.values(Q.PAGES).map(p => { const L = Q.pageLayout(p.id), n = Object.values(L.zones).reduce((a, z) => a + z.length, 0), custom = Q.pageCustomized(p.id);
+      return `<li><span class="ic">${icon('layout-template')}</span><div class="i-main"><b>${esc(p.title)}</b><span>${n} component${n === 1 ? '' : 's'} · ${{ '2-1': 'wide + side columns', '1-1': 'two equal columns', '1': 'one column' }[L.layout]}</span></div>${Q.st(custom ? 'Customized' : 'Default layout', custom ? 'info' : 'neutral')}
+        <button class="btn sm" type="button" data-pl-reset="${p.id}" ${custom ? '' : 'disabled'}>Restore default</button><button class="btn sm primary" type="button" data-pl-edit="${p.id}">${icon('pencil')}Customize</button></li>`; }).join('');
+    const html = `<div class="section-head"><h2>Page Layouts</h2><span class="sub">Each QMS page is built from pre-made components. Choose which ones a page shows and where; the layout applies to everyone in the organization.</span></div>
+      <section class="panel"><ul class="integration-list page-layout-list">${rows}</ul></section>
+      <p class="small muted" style="margin-top:12px">${Object.keys(Q.COMPONENTS).length} components are available. You can also start from any QMS page with <b>Customize page</b>.</p>`;
+    const after = main => {
+      main.querySelectorAll('[data-pl-edit]').forEach(b => b.addEventListener('click', () => Q.pageCustomize(b.dataset.plEdit)));
+      main.querySelectorAll('[data-pl-reset]').forEach(b => b.addEventListener('click', () => Q.actions['pb-reset']({ page: b.dataset.plReset })));
+    };
+    return { html, after };
+  }
+
+  function workspace() {
+    const cfg = Q.wsConfig();
+    let draft = JSON.parse(JSON.stringify(cfg));
+    const row = (t, i) => `<li data-k="${t.key}"><span class="ws-move"><button class="icon-btn" type="button" data-wmove="${i}" data-dir="-1" ${i <= 1 ? 'disabled' : ''} aria-label="Move ${esc(t.label)} up">${icon('arrow-up')}</button><button class="icon-btn" type="button" data-wmove="${i}" data-dir="1" ${i === 0 || i === draft.tabs.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(t.label)} down">${icon('arrow-down')}</button></span>
+      <label class="checkbox"><input type="checkbox" data-wvis="${i}" ${t.visible || t.key === 'overview' ? 'checked' : ''} ${t.key === 'overview' ? 'disabled' : ''}><span class="sr-only">Show ${esc(t.label)}</span></label>
+      <input class="input" data-wlabel="${i}" value="${esc(t.label)}" maxlength="30" aria-label="Tab name for ${esc(Q.WS_TABS[t.key])}">
+      <span class="small muted">${t.key === 'overview' ? 'Always shown first' : `Default: ${esc(Q.WS_TABS[t.key])}`}</span></li>`;
+    const html = `<div class="section-head"><h2>Process Workspace</h2><span class="sub">Every process uses the same workspace. Choose which tabs it shows, their names and order.</span></div>
+      <section class="panel"><div class="panel-head"><h3>Tabs</h3><span class="muted small">Applies to all ${Q.topProcesses().length} processes and their subprocesses</span><div class="actions"><button class="btn sm ghost" type="button" data-wreset>Restore defaults</button></div></div>
+        <div class="panel-pad"><div class="ws-preview" aria-hidden="true"></div><ul class="ws-list"></ul>
+        <fieldset class="fieldset" style="margin:20px 0 0"><legend style="font-size:14px">When a process has nothing in a tab</legend>
+          <div class="radio-stack" style="margin-top:6px"><label class="radio"><input type="radio" name="emptyTabs" value="mute"><span><b>Show it greyed out with “—”</b><span>Keeps the same tabs on every process; users can still add the first record.</span></span></label>
+          <label class="radio"><input type="radio" name="emptyTabs" value="hide"><span><b>Hide it</b><span>Only tabs with records appear. Overview always shows.</span></span></label></div></fieldset>
+        <div style="display:flex;gap:8px;margin-top:20px"><button class="btn primary" type="button" data-wsave>Save Changes</button><a class="btn" href="#/process/${Q.topProcesses()[0]?.process_id}">Preview on a process</a></div></div></section>`;
+    const after = main => {
+      const list = main.querySelector('.ws-list'), prev = main.querySelector('.ws-preview');
+      const draw = focusSel => {
+        list.innerHTML = draft.tabs.map(row).join('');
+        prev.innerHTML = draft.tabs.filter(t => t.visible || t.key === 'overview').map((t, i) => `<span class="${i === 0 ? 'on' : ''}">${esc(t.label || Q.WS_TABS[t.key])}</span>`).join('');
+        main.querySelectorAll('[name="emptyTabs"]').forEach(r => { r.checked = r.value === draft.emptyTabs; });
+        Q.refreshIcons(); if (focusSel) main.querySelector(focusSel)?.focus();
+      };
+      list.addEventListener('click', e => { const b = e.target.closest('[data-wmove]'); if (!b) return; const i = +b.dataset.wmove, j = i + Number(b.dataset.dir); [draft.tabs[i], draft.tabs[j]] = [draft.tabs[j], draft.tabs[i]]; draw(`[data-wmove="${j}"][data-dir="${b.dataset.dir}"]:not([disabled])`); });
+      list.addEventListener('change', e => { if (e.target.dataset.wvis) { draft.tabs[+e.target.dataset.wvis].visible = e.target.checked; draw(); } });
+      list.addEventListener('input', e => { if (e.target.dataset.wlabel) { draft.tabs[+e.target.dataset.wlabel].label = e.target.value; prev.innerHTML = draft.tabs.filter(t => t.visible || t.key === 'overview').map((t, i) => `<span class="${i === 0 ? 'on' : ''}">${esc(t.label || Q.WS_TABS[t.key])}</span>`).join(''); } });
+      main.querySelectorAll('[name="emptyTabs"]').forEach(r => r.addEventListener('change', () => { draft.emptyTabs = r.value; }));
+      main.querySelector('[data-wreset]').addEventListener('click', () => { draft = JSON.parse(JSON.stringify(window.QMS_DATA.workspace)); draw(); Q.toast('Defaults restored', 'Save to apply.'); });
+      main.querySelector('[data-wsave]').addEventListener('click', () => {
+        draft.tabs.forEach(t => { t.label = (t.label || '').trim() || Q.WS_TABS[t.key]; if (t.key === 'overview') t.visible = true; });
+        Q.S.workspace = JSON.parse(JSON.stringify(draft)); Q.save(); draw(); Q.toast('Process workspace saved', `${draft.tabs.filter(t => t.visible).length} tabs · empty tabs ${draft.emptyTabs === 'hide' ? 'hidden' : 'greyed out'}`);
+      });
+      draw();
+    };
+    return { html, after };
+  }
 
   /* ---------- Process categories ---------- */
   Q.actions['edit-category'] = d => {
@@ -247,7 +299,7 @@
   function integrations() {
     const list = Q.S.integrations, m = list.find(i => i.id === 'm365');
     const st = s => Q.st(s, { Connected: 'success', Enabled: 'success', Planned: 'neutral', 'Not configured': 'muted', Disconnected: 'warning' }[s]);
-    const html = `<div class="section-head"><h2>Sources &amp; Integrations</h2><span class="sub">Where documents and evidence live. iQMS keeps metadata, workflow and relationships; files stay in the source.</span></div>
+    const html = `<div class="section-head"><h2>Sources &amp; Integrations</h2><span class="sub">Where documents and evidence live. Public and Internal documents are uploaded to iQMS; Confidential documents stay in SharePoint and are registered by link and description.</span></div>
       <div class="grid-halves integ-layout">
         <section class="panel"><div class="panel-head"><h3>Sources</h3></div><ul class="integration-list">${list.map(i => `<li><span class="ic">${icon(i.icon)}</span><div class="i-main"><b>${esc(i.name)}</b><span>${esc(i.kind)}</span></div>${st(i.status)}</li>`).join('')}</ul>
           <div class="panel-pad small muted" style="border-top:1px solid var(--border)">CRM, ERP and HRIS can already be referenced manually as evidence sources. Live connections are planned.</div></section>
@@ -259,17 +311,17 @@
             <dt>Document library</dt><dd>${esc(m.library || '—')}</dd>
             <dt>Allowed scope</dt><dd>${esc(m.scope || '—')}</dd>
             <dt>Last connection test</dt><dd>${esc(m.lastTest || '—')}</dd>
-            <dt>Linked documents</dt><dd>${m.status === 'Connected' ? Q.S.documents.filter(d => d.source.system === 'SharePoint').length : 0}</dd></dl>
-            <div class="callout" style="margin-top:16px">${icon('lock')}<span class="small">Least-privilege access: iQMS can only read the selected site and library, to validate links, show previews and read file metadata. Your administrator grants and can revoke this in Microsoft 365. Credentials are never shown or stored here.</span></div>
+            <dt>Link-only documents</dt><dd>${m.status === 'Connected' ? Q.S.documents.filter(d => d.source.system === 'SharePoint').length : 0}</dd></dl>
+            <div class="callout" style="margin-top:16px">${icon('lock')}<span class="small">Least-privilege access: iQMS only checks that a link points to the selected site and library. It does not open, copy or read Confidential files — those are assessed from the description their owner provides. Your administrator grants and can revoke this in Microsoft 365. Credentials are never shown or stored here.</span></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
               ${m.status === 'Connected' ? `<button class="btn primary" type="button" data-m365="test">Test Connection</button><button class="btn" type="button" data-m365="location">Change Location</button><button class="btn danger" type="button" data-m365="disconnect">Disconnect</button>` : `<button class="btn primary" type="button" data-m365="connect">Connect</button>`}
             </div></div></section></div>`;
     const after = main => main.querySelectorAll('[data-m365]').forEach(b => b.addEventListener('click', () => {
       const k = b.dataset.m365;
-      if (k === 'test') { m.lastTest = `${Q.today()} ${new Date().toTimeString().slice(0, 5)}`; Q.save(); Q.render({ noFocus: true }); Q.toast('Connection OK', `Helios QMS / Controlled Documents reachable · ${Q.S.documents.filter(d => d.source.state !== 'connected').length} link needs attention.`); }
+      if (k === 'test') { m.lastTest = `${Q.today()} ${new Date().toTimeString().slice(0, 5)}`; Q.save(); Q.render({ noFocus: true }); Q.toast('Connection OK', `Helios QMS / Restricted Documents reachable · ${Q.S.documents.filter(d => d.source.state !== 'connected').length} link needs attention.`); }
       if (k === 'location') Q.toast('Change location', 'An administrator would pick another site/library in Microsoft 365 here.');
-      if (k === 'connect') { Object.assign(m, { status: 'Connected', tenant: 'heliossolar.onmicrosoft.com', site: 'Helios QMS', library: 'Controlled Documents', scope: 'Selected site only (Helios QMS) — read metadata, open files, validate links', lastTest: Q.today() }); Q.save(); Q.render({ noFocus: true }); Q.toast('Microsoft 365 connected'); }
-      if (k === 'disconnect') Q.confirm({ title: 'Disconnect Microsoft 365?', danger: true, confirm: 'Disconnect', body: '<p>Document metadata, revisions and workflow history stay in iQMS. Previews and link validation stop until you reconnect. Files in SharePoint are not affected.</p>', onConfirm: () => { m.status = 'Disconnected'; Q.save(); Q.render({ noFocus: true }); Q.toast('Microsoft 365 disconnected'); } });
+      if (k === 'connect') { Object.assign(m, { status: 'Connected', tenant: 'heliossolar.onmicrosoft.com', site: 'Helios QMS', library: 'Restricted Documents', scope: 'Selected site only (Helios QMS) — validate links; file content is not read', lastTest: Q.today() }); Q.save(); Q.render({ noFocus: true }); Q.toast('Microsoft 365 connected'); }
+      if (k === 'disconnect') Q.confirm({ title: 'Disconnect Microsoft 365?', danger: true, confirm: 'Disconnect', body: '<p>Document metadata, revisions and workflow history stay in iQMS. Link validation stops until you reconnect. Files in SharePoint are not affected.</p>', onConfirm: () => { m.status = 'Disconnected'; Q.save(); Q.render({ noFocus: true }); Q.toast('Microsoft 365 disconnected'); } });
     }));
     return { html, after };
   }

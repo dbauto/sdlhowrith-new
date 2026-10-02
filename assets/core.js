@@ -43,6 +43,42 @@
   Q.children = (id, includeArchived = false) => Q.S.processes.filter(p => p.parent_process_id === id && (includeArchived || p.status === 'active')).sort(Q.byOrder);
   Q.rootId = id => { const p = Q.proc(id); return p && p.parent_process_id ? Q.rootId(p.parent_process_id) : id; };
   Q.inProc = (recordPid, pid) => { if (!pid || pid === 'all') return true; let cur = Q.proc(recordPid); while (cur) { if (cur.process_id === pid) return true; cur = Q.proc(cur.parent_process_id); } return false; };
+  /* Standard edition: the mock now follows ISO 9001:2026. Data saved in a browser by an
+   * earlier build is upgraded once (edition label + clause 6.1 split into 6.1.2 / 6.1.3). */
+  if (!Q.S.organization.edition2026) {
+    if (Q.S.organization.standard === 'ISO 9001:2015') Q.S.organization.standard = 'ISO 9001:2026';
+    const i = Q.S.iso.findIndex(r => r.clause === '6.1');
+    if (i >= 0 && !Q.S.iso.some(r => r.clause === '6.1.2')) Q.S.iso.splice(i, 1, ...JSON.parse(JSON.stringify(SEED.iso.filter(r => ['6.1.2', '6.1.3'].includes(r.clause)))));
+    Q.S.organization.edition2026 = true; Q.save();
+  }
+  Q.standard = () => Q.S.organization.standard || 'ISO 9001:2026';
+  /* Document classification decides how a document is registered and what iQMS can read.
+   *   upload → the file is stored in iQMS, shown in the viewer and read for the assessment.
+   *   link   → the file stays in SharePoint; iQMS keeps the link and the owner's description only. */
+  Q.CLASSES = [
+    { key: 'Public', mode: 'upload', icon: 'globe', tone: 'pub', hint: 'Can be shared outside the organization.' },
+    { key: 'Internal', mode: 'upload', icon: 'building-2', tone: 'int', hint: 'For employees. The usual level for controlled documents.' },
+    { key: 'Confidential', mode: 'link', icon: 'lock', tone: 'conf', hint: 'Limited to named roles or departments.' },
+    { key: 'Highly Confidential', mode: 'link', icon: 'lock-keyhole', tone: 'high', hint: 'Personal, commercial or legal data. Strictly need-to-know.' }
+  ];
+  Q.docClass = d => Q.CLASSES.find(c => c.key === d.classification) || Q.CLASSES[1];
+  Q.docRestricted = d => Q.docClass(d).mode === 'link';
+  Q.docDept = d => d.department || Q.person(d.owner).dept || 'No department';
+  Q.departments = () => [...new Set([...Object.values(Q.S.people).map(p => p.dept), ...Q.S.documents.map(d => d.department)].filter(Boolean))].sort();
+  Q.classChip = d => { const c = Q.docClass(d); return `<span class="cls-chip ${c.tone}" title="${esc(c.mode === 'link' ? 'Link only — iQMS keeps a description, not the file' : 'Uploaded to iQMS')}">${Q.icon(c.icon)}${esc(c.key)}</span>`; };
+  Q.RESTRICTED_NOTE = 'iQMS cannot open or read this document. It is counted in the ISO 9001 readiness assessment from the description its owner provided, and iQMS has not checked that description against the document itself. The owner is responsible for keeping the description accurate.';
+  // Data saved in a browser by an earlier build: give every document a classification and a source mode.
+  if (Q.S.documents.some(d => !d.classification)) {
+    Q.S.documents.forEach(d => {
+      if (d.classification) return;
+      const s = SEED.documents.find(x => x.id === d.id);
+      d.classification = s ? s.classification : 'Internal';
+      d.department = d.department || Q.person(d.owner).dept;
+      if (Q.docRestricted(d)) { d.source = { ...d.source, mode: 'link', library: 'Restricted Documents' }; d.declared = d.declared || { by: d.owner, date: d.updated }; if (s) d.description = s.description; }
+      else d.source = { ...d.source, mode: 'upload', system: 'iQMS', site: '', library: 'Document library', state: 'connected', size: s?.source.size || '240 KB', verified: d.updated };
+    });
+    Q.save();
+  }
   /* Process categories (organization configuration). Subprocesses inherit the parent's. */
   if (!Q.S.processCategories) {
     Q.S.processCategories = JSON.parse(JSON.stringify(SEED.processCategories));
@@ -195,7 +231,7 @@
 
   /* ---------------- Modals (stackable, focus-trapped) ---------------- */
   const stack = [];
-  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   Q.openModal = ({ size = 'm', title, sub = '', body, foot = '', headActions = '', onMount, label }) => {
     const root = document.createElement('div');
     root.className = 'modal-root';
@@ -214,6 +250,7 @@
     root.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => Q.closeModal()));
     Q.refreshIcons();
     if (onMount) onMount(root.querySelector('.modal'));
+    Q.enhanceSelects(root);
     const first = root.querySelector('[autofocus]') || root.querySelector('.modal-body ' + FOCUSABLE) || root.querySelector(FOCUSABLE);
     first && first.focus();
     return root.querySelector('.modal');
@@ -230,7 +267,7 @@
   document.addEventListener('keydown', e => {
     if (!stack.length) return;
     const top = stack[stack.length - 1].root;
-    if (e.key === 'Escape') { e.preventDefault(); Q.closeModal(); return; }
+    if (e.key === 'Escape') { if (openCombo) return; e.preventDefault(); Q.closeModal(); return; }
     if (e.key === 'Tab') {
       const f = [...top.querySelectorAll(FOCUSABLE)].filter(el => el.getClientRects().length);
       if (!f.length) return;
@@ -248,9 +285,10 @@
     let ok = true;
     form.querySelectorAll('[required]').forEach(el => {
       const bad = !String(el.value || '').trim();
-      el.setAttribute('aria-invalid', bad ? 'true' : 'false');
-      el.style.borderColor = bad ? 'var(--danger)' : '';
-      if (bad && ok) { el.focus(); ok = false; }
+      const shown = el._combo ? el._combo.btn : el; // styled dropdowns show the state on their button
+      shown.setAttribute('aria-invalid', bad ? 'true' : 'false');
+      shown.style.borderColor = bad ? 'var(--danger)' : '';
+      if (bad && ok) { shown.focus(); ok = false; }
     });
     return ok;
   };
@@ -383,7 +421,7 @@
     const reset = () => { t.page = 1; Q.renderTable(id); };
     wrap.querySelectorAll('[data-filter]').forEach(el => {
       const k = el.dataset.filter;
-      if (t.filters[k]) el.value = t.filters[k];
+      if (t.filters[k]) { el.value = t.filters[k]; el._combo?.sync(); }
       el.addEventListener('change', () => { t.filters[k] = el.value; reset(); });
     });
     const s = wrap.querySelector('[data-search]');
@@ -446,6 +484,82 @@
   };
   const pageRows = id => { const t = Q.tables[id], c = t.cfg, all = Q.tableRows(id); return c.pageSize ? all.slice((t.page - 1) * c.pageSize, t.page * c.pageSize) : all; };
 
+  /* ---------------- Styled dropdown (progressive enhancement of <select class="select">) ----------------
+   * The native <select> stays in the form (value, required, change events); a button
+   * and a listbox replace its look. Process codes ("07.1") and "Name — Title" labels
+   * get their own styling; indented options (subprocesses) are shown as children.
+   * Long lists get a search box. Keyboard: ↑ ↓ Home End Enter Esc, type to search.  */
+  let openCombo = null;
+  const closeCombo = (focusBtn = false) => { if (!openCombo) return; const c = openCombo; openCombo = null; c.pop.remove(); c.btn.setAttribute('aria-expanded', 'false'); if (focusBtn) c.btn.focus(); };
+  const optHtml = (o, i, selected) => {
+    const raw = o.textContent, sub = /^[   ]{2,}/.test(raw), t = raw.replace(/^[   ]+/, '');
+    const m = /^(\d{2}(?:\.\d+)*)\s+(.*)$/.exec(t), dash = t.split(' — ');
+    const label = m ? `<span class="oc">${esc(m[1])}</span><span class="ot">${esc(m[2])}</span>` : dash.length === 2 ? `<span class="ot">${esc(dash[0])}</span><span class="os">${esc(dash[1])}</span>` : `<span class="ot">${esc(t)}</span>`;
+    return `<li role="option" id="${o._cid}" data-i="${i}" class="${sub ? 'sub' : ''}${o.disabled ? ' dis' : ''}" aria-selected="${selected}" aria-disabled="${o.disabled}">${label}<span class="ck">${Q.icon('check')}</span></li>`;
+  };
+  const labelOf = sel => { const o = sel.options[sel.selectedIndex]; return o ? o.textContent.replace(/^[   ]+/, '') : ''; };
+  Q.enhanceSelects = root => {
+    root.querySelectorAll('select.select').forEach(sel => {
+      if (sel._combo || sel.hidden || sel.multiple || sel.closest('[hidden]') || sel.dataset.native != null) return;
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'select combo-btn'; btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+      const lab = sel.getAttribute('aria-label') || sel.closest('label')?.querySelector('span')?.textContent?.replace('*', '').trim() || '';
+      if (lab) btn.setAttribute('aria-label', lab);
+      btn.disabled = sel.disabled;
+      if (sel.style.width) btn.style.width = sel.style.width;
+      sel.classList.add('combo-native'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+      sel.after(btn);
+      const sync = () => { btn.innerHTML = `<span class="cb-label">${esc(labelOf(sel)) || '&nbsp;'}</span>`; btn.classList.toggle('placeholder', !sel.value); btn.disabled = sel.disabled; if (sel.style.borderColor) btn.style.borderColor = sel.style.borderColor; };
+      sel._combo = { btn, sync };
+      sync();
+      sel.addEventListener('change', sync);
+      new MutationObserver(sync).observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+      const open = (typed = '') => {
+        closeCombo(); Q.closeMenus?.();
+        const opts = [...sel.options]; opts.forEach((o, i) => { o._cid = o._cid || `cb${Math.random().toString(36).slice(2, 8)}`; });
+        const search = opts.length > 9;
+        const pop = document.createElement('div'); pop.className = 'combo-pop';
+        // "Select…" placeholders aren't real choices: keep them out of the list.
+        const isPh = o => o.value === '' && /^select/i.test(o.textContent.trim());
+        pop.innerHTML = `${search ? `<div class="cb-search">${Q.icon('search')}<input type="text" placeholder="Search…" aria-label="Search options" value="${esc(typed)}"></div>` : ''}<ul role="listbox" tabindex="-1" aria-label="${esc(lab || 'Options')}">${opts.map((o, i) => isPh(o) ? '' : optHtml(o, i, i === sel.selectedIndex)).join('')}</ul><p class="cb-none" hidden>No matches</p>`;
+        document.body.append(pop); Q.refreshIcons();
+        const r = btn.getBoundingClientRect(), w = Math.max(r.width, 240);
+        pop.style.width = `${w}px`; pop.style.left = `${Math.min(r.left, innerWidth - w - 8)}px`;
+        const h = Math.min(pop.offsetHeight, 340), below = innerHeight - r.bottom - 8;
+        pop.style.top = `${below >= h || below > r.top ? r.bottom + 4 : Math.max(8, r.top - h - 4)}px`;
+        const list = pop.querySelector('ul'), input = pop.querySelector('input');
+        let active = sel.selectedIndex;
+        const items = () => [...list.querySelectorAll('li:not([hidden]):not(.dis)')];
+        const setActive = li => { list.querySelectorAll('.active').forEach(x => x.classList.remove('active')); if (!li) return; li.classList.add('active'); active = +li.dataset.i; (input || list).setAttribute('aria-activedescendant', li.id); li.scrollIntoView({ block: 'nearest' }); };
+        const choose = li => { if (!li || li.classList.contains('dis')) return; sel.selectedIndex = +li.dataset.i; sel.dispatchEvent(new Event('change', { bubbles: true })); closeCombo(true); };
+        const filter = () => { const q = input.value.trim().toLowerCase(); let any = false; list.querySelectorAll('li').forEach(li => { const on = !q || li.textContent.toLowerCase().includes(q); li.hidden = !on; any = any || on; }); pop.querySelector('.cb-none').hidden = any; setActive(items()[0]); };
+        pop.addEventListener('mousedown', e => e.preventDefault());
+        pop.addEventListener('click', e => choose(e.target.closest('li')));
+        pop.addEventListener('mousemove', e => { const li = e.target.closest('li:not(.dis)'); if (li && !li.classList.contains('active')) setActive(li); });
+        const key = e => {
+          const its = items(), i = its.findIndex(li => +li.dataset.i === active);
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive(its[Math.min(its.length - 1, i + 1)] || its[0]); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(its[Math.max(0, i - 1)] || its[0]); }
+          else if (e.key === 'Home') { e.preventDefault(); setActive(its[0]); }
+          else if (e.key === 'End') { e.preventDefault(); setActive(its[its.length - 1]); }
+          else if (e.key === 'Enter') { e.preventDefault(); choose(its[i] || its[0]); }
+          else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCombo(true); }
+          else if (e.key === 'Tab') closeCombo();
+          else if (!input && e.key.length === 1) { const hit = its.find(li => li.textContent.replace(/^\d[\d.]*\s*/, '').toLowerCase().startsWith(e.key.toLowerCase())); if (hit) setActive(hit); }
+        };
+        openCombo = { btn, pop, sel };
+        btn.setAttribute('aria-expanded', 'true');
+        if (input) { input.addEventListener('input', filter); input.addEventListener('keydown', key); input.focus(); if (typed) filter(); else setActive(list.querySelector(`li[data-i="${active}"]`) || items()[0]); }
+        else { list.addEventListener('keydown', key); list.focus(); setActive(list.querySelector(`li[data-i="${active}"]`) || items()[0]); }
+      };
+      btn.addEventListener('click', () => openCombo?.btn === btn ? closeCombo(true) : open());
+      btn.addEventListener('keydown', e => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); open(); } else if (e.key.length === 1 && /\S/.test(e.key) && sel.options.length > 9) { e.preventDefault(); open(e.key); } });
+    });
+  };
+  document.addEventListener('mousedown', e => { if (openCombo && !openCombo.pop.contains(e.target) && e.target !== openCombo.btn && !openCombo.btn.contains(e.target)) closeCombo(); }, true);
+  window.addEventListener('scroll', e => { if (openCombo && !openCombo.pop.contains(e.target)) closeCombo(); }, true);
+  window.addEventListener('resize', () => closeCombo());
+
   /* ---------------- Router ---------------- */
   Q.route = () => {
     const h = location.hash.replace(/^#\/?/, '');
@@ -474,6 +588,7 @@
     Q.refreshIcons();
     if (out.after) out.after(main);
     main.querySelectorAll('[id^="tw-"]').forEach(w => Q.initTable(w.id.slice(3)));
+    Q.enhanceSelects(main);
     Q.syncSidebar?.(out.nav || name, parts);
     const path = parts.slice(0, 2).join('/');
     if (lastPath !== null && path !== lastPath && !opts.noFocus) { window.scrollTo(0, 0); main.querySelector('h1')?.focus({ preventScroll: true }); }

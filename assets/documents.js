@@ -3,6 +3,13 @@
   'use strict';
   const { esc, icon } = Q;
 
+  /* How the file reaches iQMS — see Q.CLASSES in core.js.
+   *   upload: stored in iQMS, shown in the viewer.   link: stays in SharePoint, description only. */
+  const uploaded = d => d.source.mode === 'upload';
+  Q.openLabel = d => uploaded(d) ? 'Download' : `Open in ${d.source.system}`;
+  const openBtn = (d, cls = 'btn sm') => `<button class="${cls}" type="button" data-action="open-source" data-id="${esc(d.id)}" ${d.source.state === 'connected' ? '' : 'disabled title="Source access unavailable"'}>${icon(uploaded(d) ? 'download' : 'external-link')}${esc(Q.openLabel(d))}</button>`;
+  const declaredBy = d => d.declared ? `Provided by ${esc(Q.pname(d.declared.by))} · ${Q.fmt(d.declared.date)}` : `Provided by ${esc(Q.pname(d.owner))}`;
+
   /* =================== Shared document table =================== */
   Q.docTable = (id, { process = null, initialFilters, initialSeg, hideProcess = false, compact = false, pageSize = 0, columns = null, where = null, initialSort, bare = false, extraTools = '' } = {}) => {
     if (columns) return docViewTable(id, { process, pageSize, columns, where, initialSort, bare, extraTools });
@@ -37,7 +44,7 @@
       rowLabel: d => d.title, search: d => `${d.id} ${d.title} ${Q.pname(d.owner)} ${d.type}`,
       filters: { process: (d, v) => Q.inProc(d.process, v), type: (d, v) => d.type === v }, segs,
       initialFilters, initialSeg, tools, pageSize, expand: Q.docExpand,
-      empty: t => `<h3>No documents match these filters</h3><p>${t.seg === 'overdue' ? 'No documents are overdue for review.' : 'Clear a filter or connect a document from its source.'}</p>`,
+      empty: t => `<h3>No documents match these filters</h3><p>${t.seg === 'overdue' ? 'No documents are overdue for review.' : 'Clear a filter or register a document.'}</p>`,
       selectionBar: keys => keys.length === 1 ? Q.docSelectionActions(Q.doc(keys[0]))
         : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button>
           <button class="btn sm" type="button" data-action="toast" data-title="Change owner" data-msg="An owner picker would reassign ${keys.length} documents.">${icon('user-check')}Change owner…</button>
@@ -70,16 +77,17 @@
     const ev = [...new Set([...d.evidence, ...Q.S.evidence.filter(e => e.doc === d.id).map(e => e.id)])].map(id => Q.S.evidence.find(e => e.id === id)).filter(Boolean);
     const iso = Q.docIso(d), risks = Q.S.risks.filter(r => r.links.includes(d.id));
     return `<div class="doc-exp">
-      <div><h4>About</h4><p>${esc(d.description)}</p>
+      <div><h4>${Q.docRestricted(d) ? "Owner's description" : 'About'}</h4><p>${esc(d.description)}</p>
+        <p style="margin-top:8px">${Q.classChip(d)}${Q.docRestricted(d) ? ' <span class="muted">iQMS has this description only — it does not read the file.</span>' : ''}</p>
         ${wr ? `<p style="margin-top:6px"><b style="color:var(--text)">Rev ${esc(d.rev || '—')} → ${esc(wr.rev)}:</b> ${esc(wr.summary || 'No change summary yet.')}</p>` : `<p style="margin-top:6px" class="muted">Active revision ${esc(d.rev ? 'Rev ' + d.rev : '—')}${d.effective ? ', effective ' + Q.fmt(d.effective) : ''}.</p>`}</div>
       <div><h4>Routing</h4>${w ? `<ul><li>${Q.st(Q.wfStatus(w))} · Rev ${esc(w.rev)}</li><li>Waiting on <b style="color:var(--text)">${esc(Q.wfAssignees(w).map(Q.pname).join(', ') || '—')}</b></li><li>Due ${Q.dueDate(w.due)}</li></ul>` : `<p class="muted">Not in routing.</p>`}
-        <h4 style="margin-top:10px">Source</h4><p>${d.source.state === 'connected' ? `${esc(d.source.system)} · ${esc(d.source.folder)}` : '<span class="src-bad">Access unavailable</span>'}</p></div>
+        <h4 style="margin-top:10px">File</h4><p>${d.source.state !== 'connected' ? '<span class="src-bad">Access unavailable</span>' : uploaded(d) ? `Stored in iQMS · ${esc(d.source.size || '')}` : `${esc(d.source.system)} link · ${esc(d.source.folder)}`}</p></div>
       <div><h4>Linked</h4><ul>
         <li>ISO 9001 ${iso.length ? iso.map(c => `<a href="#/documents?view=clause&c=${esc(c)}" class="clause">${esc(c)}</a>`).join(', ') : '<span class="muted">not mapped</span>'}</li>
         <li>${ev.length ? `${ev.length} evidence record${ev.length > 1 ? 's' : ''}${ev.some(Q.evGap) ? ` · <span class="date-overdue">${ev.filter(Q.evGap).length} gap</span>` : ''}` : '<span class="muted">No evidence linked</span>'}</li>
         ${risks.length ? `<li>${risks.length} linked risk${risks.length > 1 ? 's' : ''}</li>` : ''}
         <li>Owner ${esc(Q.pname(d.owner))}</li></ul></div>
-      <div class="acts"><button class="btn sm primary" type="button" data-action="open-doc" data-id="${esc(d.id)}">${icon('file-text')}Open Document</button>${w ? `<button class="btn sm" type="button" data-action="open-review" data-id="${w.id}">${icon('route')}Open Review</button>` : ''}<button class="btn sm" type="button" data-action="open-source" data-id="${esc(d.id)}">${icon('external-link')}Open in ${esc(d.source.system)}</button></div>
+      <div class="acts"><button class="btn sm primary" type="button" data-action="open-doc" data-id="${esc(d.id)}">${icon('file-text')}Open Document</button>${w ? `<button class="btn sm" type="button" data-action="open-review" data-id="${w.id}">${icon('route')}Open Review</button>` : ''}${openBtn(d)}</div>
     </div>`;
   };
 
@@ -115,7 +123,7 @@
       { label: 'Request Approval', icon: 'stamp', data: { action: 'request-approval', id: d.id }, disabled: !wfOk.ok, title: wfOk.why },
       ...(!wfOk.ok && wfOk.w ? [{ note: esc(wfOk.why) }] : []),
       '-',
-      { label: 'Open in SharePoint', icon: 'external-link', data: { action: 'open-source', id: d.id } }
+      { label: Q.openLabel(d), icon: uploaded(d) ? 'download' : 'external-link', data: { action: 'open-source', id: d.id }, disabled: d.source.state !== 'connected', title: d.source.state !== 'connected' ? 'Source access unavailable' : '' }
     ], { align: 'min-width:240px' });
   };
 
@@ -128,13 +136,13 @@
       <a role="tab" href="${Q.UI.docsView && Q.UI.docsView.startsWith('#/documents') ? Q.UI.docsView : '#/documents'}" aria-selected="${cur === 'library'}">${icon('library')}Library<span class="muted small tnum">${Q.S.documents.length}</span></a>
       <a role="tab" href="#/review" aria-selected="${cur === 'routing'}">${icon('route')}Routing<span class="muted small tnum">${all}</span>${mine ? `<span class="tab-note" style="color:var(--accent)">${mine} for you</span>` : ''}</a></div>`;
   };
-  const docHead = (crumbs = null) => Q.pageHead({ crumbs, title: 'Documented Information', sub: 'Controlled documents (ISO 9001 clause 7.5). Files stay in their source system; iQMS controls metadata, revisions and routing.',
-    actions: `<button class="btn primary" type="button" data-action="connect-doc">${icon('link')}Connect Document</button>` });
+  const docHead = (crumbs = null) => Q.pageHead({ crumbs, title: 'Documented Information', sub: 'Controlled documents (ISO 9001 clause 7.5). Public and Internal documents are uploaded to iQMS; Confidential documents stay in SharePoint and are registered by link and description.',
+    actions: `<button class="btn primary" type="button" data-action="connect-doc">${icon('file-plus')}Register Document</button>` });
   /* ---------- Saved views on the Library ----------
    * One card holds the view tabs, the toolbar and the table (see Q.viewPage in
    * saved-views.js). The views the mock shipped with are seeded defaults.        */
   const T = 'documents';
-  Q.viewPage(T, { route: '#/documents', noun: 'documents', groups: [['none', 'None'], ['process', 'Process'], ['clause', 'ISO 9001 clause']],
+  Q.viewPage(T, { route: '#/documents', noun: 'documents', groups: [['none', 'None'], ['process', 'Process'], ['clause', 'ISO 9001 clause'], ['owner', 'Owner'], ['department', 'Department']],
     // Old links (?view=, ?status=, ?process=, ?group=) open the matching default view.
     legacy: q => {
       const group = q.group || (['process', 'clause'].includes(q.view) ? q.view : null);
@@ -145,6 +153,7 @@
       return null;
     } });
   const hashFor = (v, extra) => Q.vwHash(T, v, extra);
+  Q.docGroupFlag = { test: d => Q.docOverdue(d), title: 'overdue for review' };
   Q.views.documents = (_, q) => {
     const r = Q.vwResolve(T, q);
     if (r.redirect) { location.replace(r.redirect); return { title: 'Documented Information', nav: 'documents', html: '' }; }
@@ -153,6 +162,7 @@
     let body, leaf = null;
     if (v.group === 'process') { const p = Q.proc(q.p) || Q.topProcesses().find(x => Q.S.documents.some(d => where(d) && Q.inProc(d.process, x.process_id))) || Q.topProcesses()[0]; leaf = `${p.process_code} ${p.name}`; body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(T, v)}</div>${docsByProcess(v, v, where, p.process_id)}</div>`; }
     else if (v.group === 'clause') { const c = q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0]; leaf = c === 'none' ? 'Not mapped to a clause' : `${c} ${c.includes('.') ? Q.S.iso.find(x => x.clause === c)?.title || '' : Q.clauseTitle(c)}`; body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(T, v)}</div>${docsByClause(v, v, where, c)}</div>`; }
+    else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(T, v, where, q, Q.docTable, { flag: Q.docGroupFlag }); leaf = g.leaf; body = g.html; }
     else body = Q.docTable(Q.vwTableId(T, v), { columns: v.columns, where, pageSize: 10, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(T, v) });
     const crumbs = [['Documented Information', '#/documents?view=list'], ...(leaf ? [[v.name, hashFor(v)], [leaf]] : [[v.name]])];
     return { title: `${leaf || v.name} · Documented Information`, nav: 'documents', html: docHead(crumbs) + Q.docTabs('library') + Q.vwCard(T, v, body), after: main => Q.vwAfter(T, main) };
@@ -167,10 +177,11 @@
     const parent = Q.proc(p.parent_process_id), mine = docs.filter(d => Q.inProc(d.process, pid));
     const head = `<div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2>
       <p class="sub">${parent ? `Subprocess of ${esc(parent.name)} · ` : ''}Owner ${esc(Q.pname(p.owner))} · ISO 9001 ${esc(p.iso.join(', '))} · ${mine.length} documents${dr.filters.length ? ' in this view' : ''}${mine.filter(Q.docOverdue).length ? ` · <span class="date-overdue">${mine.filter(Q.docOverdue).length} overdue</span>` : ''}</p></div>
-      <div class="actions"><a class="btn sm" href="#/process/${pid}">${icon('workflow')}Open process workspace</a><button class="btn sm" type="button" data-action="connect-doc" data-process="${pid}">${icon('link')}Connect Document</button></div></div>`;
+      <div class="actions"><a class="btn sm" href="#/process/${pid}">${icon('workflow')}Open process workspace</a><button class="btn sm" type="button" data-action="connect-doc" data-process="${pid}">${icon('file-plus')}Register Document</button></div></div>`;
     return `<div class="browse">${tree}<section>${head}${Q.docTable(Q.vwTableId(T, v, pid), { process: pid, columns: dr.columns, where, initialSort: dr.sort })}</section></div>`;
   }
 
+  Q.docsByClause = (...a) => docsByClause(...a);
   function docsByClause(v, dr, where, sel) {
     const S = Q.S;
     const top = Q.CLAUSES.find(c => c[0] === Q.clauseTop(sel || '')) ? Q.clauseTop(sel) : '4';
@@ -178,7 +189,7 @@
     const inView = list => list.filter(where);
     const unmapped = inView(S.documents.filter(d => !Q.docIso(d).length));
     const worst = reqs => reqs.some(r => ['Missing', 'At Risk'].includes(r.status)) ? 'bad' : reqs.some(r => r.status === 'Partially Complete') ? 'warn' : 'ok';
-    const tree = `<nav class="browse-tree" aria-label="ISO 9001 clauses"><h3>ISO 9001:2015 clauses</h3>${Q.CLAUSES.map(([c, t]) => {
+    const tree = `<nav class="browse-tree" aria-label="ISO 9001 clauses"><h3>${esc(Q.standard())} clauses</h3>${Q.CLAUSES.map(([c, t]) => {
       const reqs = Q.reqsIn(c);
       return `<a href="${hashFor(v, { c })}" ${c === top && !focus && sel !== 'none' ? 'aria-current="true"' : ''}><span class="code">${c}</span><span class="nm">${esc(t)}</span><i class="flag ${worst(reqs)}" title="Requirement status"></i><span class="n">${inView(Q.docsForClause(c)).length}</span></a>` +
         (c === top ? `<div class="child">${reqs.map(r => `<a href="${hashFor(v, { c: r.clause })}" ${focus === r.clause ? 'aria-current="true"' : ''}><span class="code">${esc(r.clause)}</span><span class="nm">${esc(r.title)}</span><span class="n">${inView(Q.docsForClause(r.clause)).length}</span></a>`).join('')}</div>` : '');
@@ -206,7 +217,18 @@
   }
 
   /* =================== Document viewer modal =================== */
+  /* Link-only documents: iQMS never has the content, so the preview is the owner's description plus the disclaimer. */
+  Q.restrictedPanel = (d, rev, draft = false) => `<article class="paper restricted" aria-label="Document content is not available in iQMS">
+      <div class="rs-top"><span class="rs-icon">${icon(Q.docClass(d).icon)}</span><div><h2>This document is not stored in iQMS</h2>
+        <p>${Q.classChip(d)} It stays in ${esc(d.source.system)}. iQMS keeps the link, the revision and routing records, and the description below.</p></div></div>
+      ${draft ? `<p class="callout warning">${icon('file-text')}<span>${Q.wfForDoc(d.id) ? `<b>Draft for ${esc(Q.wfForDoc(d.id).stage)} — Rev ${esc(rev)}</b>Open the file in ${esc(d.source.system)} to check its content. iQMS records your decision; it cannot show the file.` : `<b>Draft — Rev ${esc(rev)}</b>Not a controlled copy. The active controlled version is ${d.rev ? 'Rev ' + esc(d.rev) : 'not yet published'}.`}</span></p>` : ''}
+      <section class="rs-desc"><h3>Description of the document</h3><p>${esc(d.description)}</p><p class="rs-by">${declaredBy(d)}</p></section>
+      <div class="callout warning rs-note">${icon('triangle-alert')}<div><b>Disclaimer — assessed from the description only</b><p>${esc(Q.RESTRICTED_NOTE)}</p></div></div>
+      <div class="rs-open">${openBtn(d, 'btn primary')}<span class="muted small">${d.source.state === 'connected' ? `Opens with your own ${esc(d.source.system)} permission.` : 'The link could not be reached at the last check.'}</span></div>
+      <div class="foot"><span>${esc(d.id)} · Rev ${esc(rev || '—')}</span><span>${esc(d.classification)}</span><span>${esc(d.source.library)} / ${esc(d.source.folder)}</span></div>
+    </article>`;
   Q.paper = (d, rev, draft = false) => {
+    if (Q.docRestricted(d)) return Q.restrictedPanel(d, rev, draft);
     const p = Q.proc(d.process), root = Q.proc(Q.rootId(d.process));
     const els = (root?.elements || []).filter(e => e.kind !== 'Activity');
     const recs = (root?.elements || []).filter(e => ['Record', 'Form', 'Register'].includes(e.kind));
@@ -221,13 +243,15 @@
       <h3>3. Responsibilities</h3><table class="resp"><tr><th>Role</th><th>Responsibility</th></tr><tr><td>Process Owner (${esc(Q.person(root?.owner).title)})</td><td>Maintains this document and ensures it is followed.</td></tr>${(root?.roles || []).slice(1).map(r => `<tr><td>${esc(r)}</td><td>Perform the activities described and retain the required records.</td></tr>`).join('')}</table>
       <h3>4. Method</h3><ol>${els.slice(0, 6).map(e => `<li>${esc(e.name)} — perform and record as described in the related ${esc(e.kind.toLowerCase())}.</li>`).join('')}</ol>
       <h3>5. Records</h3><ul>${recs.map(e => `<li>${esc(e.name)}</li>`).join('') || '<li>As defined by the process owner.</li>'}</ul>
-      <h3>6. References</h3><ul>${[...d.refs.map(r => `${r} ${Q.doc(r)?.title || ''}`), ...isoList.map(c => `ISO 9001:2015 clause ${c}`)].map(x => `<li>${esc(x)}</li>`).join('') || '<li>—</li>'}</ul>
+      <h3>6. References</h3><ul>${[...d.refs.map(r => `${r} ${Q.doc(r)?.title || ''}`), ...isoList.map(c => `${Q.standard()} clause ${c}`)].map(x => `<li>${esc(x)}</li>`).join('') || '<li>—</li>'}</ul>
       <div class="foot"><span>${esc(d.id)} · Rev ${esc(rev || '—')}</span><span>Controlled copy only when viewed in iQMS</span><span>Page 1 of 1</span></div>
     </article>`;
   };
-  Q.sourceBlock = d => d.source.state === 'connected'
-    ? `<span class="src-ok">${icon('circle-check')}Connected</span><span>${esc(d.source.system)} · ${esc(d.source.library)} / ${esc(d.source.folder)}</span><span class="file">${esc(d.source.file)}</span><span class="muted">Verified ${Q.fmt(d.source.verified)}</span>`
-    : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span><span class="file">${esc(d.source.file)}</span><span class="muted">Last verified ${Q.fmt(d.source.verified)}</span>`;
+  Q.sourceBlock = d => Q.classChip(d) + (uploaded(d)
+    ? `<span class="src-ok">${icon('circle-check')}Stored in iQMS</span><span class="file">${esc(d.source.file)}</span><span class="muted">${esc(d.source.size || '')} · uploaded ${Q.fmt(d.source.verified)}</span>`
+    : d.source.state === 'connected'
+      ? `<span class="src-lock">${icon('lock')}Link only</span><span>${esc(d.source.system)} · ${esc(d.source.library)} / ${esc(d.source.folder)}</span><span class="file">${esc(d.source.file)}</span><span class="muted">Link checked ${Q.fmt(d.source.verified)} · not read by iQMS</span>`
+      : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span><span class="file">${esc(d.source.file)}</span><span class="muted">Link last checked ${Q.fmt(d.source.verified)}</span>`);
 
   Q.revList = d => {
     const list = [...(Q.S.revisions[d.id] || [])].reverse();
@@ -258,17 +282,25 @@
         ${d.workingRev ? `<dt>Working revision</dt><dd class="tnum">Rev ${esc(d.workingRev)} · ${esc(d.status)}</dd>` : ''}
         <dt>Status</dt><dd>${Q.docStatus(d)}</dd>
         <dt>Owner</dt><dd>${esc(Q.pname(d.owner))}</dd>
-        <dt>Department</dt><dd>${esc(Q.person(d.owner).dept)}</dd>
+        <dt>Department</dt><dd>${esc(Q.docDept(d))}</dd>
+        <dt>Classification</dt><dd>${Q.classChip(d)}</dd>
         <dt>Effective</dt><dd>${Q.fmt(d.effective)}</dd>
         <dt>Next review</dt><dd>${Q.reviewDate(d.nextReview, Q.docOverdue(d), Q.docDueSoon(d))}</dd>
       </dl></div>
-      <div class="side-section"><h3>Description</h3><p class="small">${esc(d.description)}</p></div>
-      <div class="side-section"><h3>Source file</h3><dl class="dl-list">
-        <dt>Status</dt><dd>${d.source.state === 'connected' ? `<span class="src-ok">${icon('circle-check')}Connected</span>` : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span>`}</dd>
+      <div class="side-section"><h3>${Q.docRestricted(d) ? 'Description of the document' : 'Description'}</h3><p class="small">${esc(d.description)}</p>
+        ${Q.docRestricted(d) ? `<p class="small muted" style="margin-top:6px">${declaredBy(d)}</p><div class="callout warning small" style="margin-top:10px">${icon('triangle-alert')}<span><b>Assessed from the description only</b>${esc(Q.RESTRICTED_NOTE)}</span></div>` : ''}</div>
+      <div class="side-section"><h3>File</h3>${uploaded(d) ? `<dl class="dl-list">
+        <dt>Status</dt><dd><span class="src-ok">${icon('circle-check')}Stored in iQMS</span></dd>
+        <dt>File</dt><dd>${esc(d.source.file)}</dd>
+        <dt>Size</dt><dd>${esc(d.source.size || '—')}</dd>
+        <dt>Uploaded</dt><dd>${Q.fmt(d.source.verified)}</dd>
+        <dt>Read by iQMS</dt><dd>Yes — shown in the viewer and used in the assessment</dd></dl>` : `<dl class="dl-list">
+        <dt>Status</dt><dd>${d.source.state === 'connected' ? `<span class="src-lock">${icon('lock')}Link only</span>` : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span>`}</dd>
         <dt>Location</dt><dd>${esc(d.source.system)} · ${esc(d.source.site)} / ${esc(d.source.library)} / ${esc(d.source.folder)}</dd>
         <dt>File</dt><dd>${esc(d.source.file)}</dd>
-        <dt>Last verified</dt><dd>${Q.fmt(d.source.verified)}</dd></dl>
-        ${d.source.state === 'connected' ? '' : `<button class="btn sm" type="button" data-action="check-connection" data-id="${esc(d.id)}" style="margin-top:10px">Check Connection</button>`}</div>
+        <dt>Link checked</dt><dd>${Q.fmt(d.source.verified)}</dd>
+        <dt>Read by iQMS</dt><dd>No — description only</dd></dl>
+        ${d.source.state === 'connected' ? '' : `<button class="btn sm" type="button" data-action="check-connection" data-id="${esc(d.id)}" style="margin-top:10px">Check Connection</button>`}`}</div>
       <div class="side-section"><h3>Revision control</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn sm" type="button" data-action="create-revision" data-id="${esc(d.id)}" ${rev.ok ? '' : 'disabled'}>${icon('git-branch-plus')}Create Revision</button>
@@ -293,7 +325,7 @@
       size: 'viewer', label: 'document',
       title: `${esc(d.title)}`,
       sub: `<span class="tnum">${esc(d.id)} · ${d.rev ? `Rev ${esc(d.rev)} active` : 'Not yet published'}</span> · ${d.workingRev && d.status !== 'Published' ? `Rev ${esc(d.workingRev)} ` : ''}${Q.docStatus(d)} · ${esc(Q.plabel(d.process))}`,
-      headActions: `${w ? `<button class="btn" type="button" data-action="open-review" data-id="${w.id}">${icon('file-check')}Open Review</button>` : ''}<button class="btn" type="button" data-action="open-source" data-id="${esc(d.id)}" ${d.source.state === 'connected' ? '' : 'disabled title="Source access unavailable"'}>${icon('external-link')}Open in ${esc(d.source.system)}</button>`,
+      headActions: `${w ? `<button class="btn" type="button" data-action="open-review" data-id="${w.id}">${icon('file-check')}Open Review</button>` : ''}${openBtn(d, 'btn')}`,
       body: `<div class="source-bar">${Q.sourceBlock(d)}</div>
         <div class="viewer-body"><div class="viewer-preview">${Q.paper(d, d.rev || d.workingRev, !d.rev)}</div>
         <div class="viewer-side"><div class="tabs" role="tablist" aria-label="Document information">
@@ -320,8 +352,8 @@
     return m;
   };
   Q.actions['open-doc'] = d => Q.openDocument(d.id, 'details', d.stack === '1');
-  Q.actions['open-source'] = d => { const doc = Q.doc(d.id); Q.toast(`Open in ${doc.source.system}`, `${doc.source.file} would open in ${doc.source.system} (${doc.source.library}). Not available in this mock.`); };
-  Q.actions['check-connection'] = d => Q.toast('Connection checked', `${Q.doc(d.id).source.file} is no longer at the linked location. Ask the owner to relink it (Connect Document).`);
+  Q.actions['open-source'] = d => { const doc = Q.doc(d.id); uploaded(doc) ? Q.toast('Download', `${doc.source.file} would download from iQMS. Not available in this mock.`) : Q.toast(`Open in ${doc.source.system}`, `${doc.source.file} would open in ${doc.source.system} (${doc.source.library}) with your own permission. Not available in this mock.`); };
+  Q.actions['check-connection'] = d => Q.toast('Connection checked', `${Q.doc(d.id).source.file} is no longer at the linked location. Ask the owner to update the link.`);
   Q.actions['open-review'] = d => { Q.closeAllModals(); Q.go(`#/review/${d.id}`); };
 
   /* =================== Revision & workflow modals =================== */
@@ -337,13 +369,18 @@
           <label class="field"><span>Reason for change <span class="req">*</span></span><select class="select" name="reason" required><option value="">Select…</option><option>Periodic review</option><option>Process change</option><option>Corrective action</option><option>Audit finding</option><option>Regulatory change</option><option>Customer requirement</option></select></label>
           <label class="field"><span>Related record</span><input class="input" name="ref" placeholder="e.g. CA-2026-09"></label>
           <label class="field full"><span>Change summary <span class="req">*</span></span><textarea class="textarea" name="summary" required placeholder="What will change in this revision and why"></textarea><span class="help">Shown in revision history and to reviewers.</span></label>
+          ${Q.docRestricted(doc) ? `<label class="field full"><span>Description of the document <span class="req">*</span></span><textarea class="textarea" name="description" rows="4" required>${esc(doc.description)}</textarea><span class="help">${icon('lock')} Link only — revise the file in ${esc(doc.source.system)}. Update this description if Rev ${esc(next)} changes what the document covers; iQMS assesses the document from it.</span></label>`
+            : `<label class="field full"><span>Revised file</span><input class="input file-input" type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><span class="help">Upload the revised file now, or add it before sending Rev ${esc(next)} for review. Rev ${esc(doc.rev)} stays available.</span></label>`}
         </div></form>`,
       foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Create Rev ${esc(next)}</button>` });
     m.querySelector('[data-ok]').addEventListener('click', () => {
       const f = m.querySelector('form'); if (!Q.validate(f)) return;
       const v = Q.formValues(f);
       doc.workingRev = next; doc.status = 'Draft'; doc.updated = Q.today();
-      doc.source.file = doc.source.file.replace(/Rev \w+\.docx$/, `Rev ${next}.docx`);
+      const up = f.querySelector('[name="file"]')?.files[0];
+      if (up) { doc.source.file = up.name; doc.source.size = fileSizeLabel(up.size); doc.source.verified = Q.today(); }
+      else doc.source.file = doc.source.file.replace(/Rev \w+\.docx$/, `Rev ${next}.docx`);
+      if (Q.docRestricted(doc)) { doc.description = v.description.trim(); doc.declared = { by: Q.me(), date: Q.today() }; }
       Q.S.revisions[doc.id].push({ rev: next, summary: v.summary, author: v.author, date: Q.today(), reviewers: [], approval: '', published: null, state: 'Draft' });
       Q.S.activity.unshift({ date: Q.today(), who: Q.me(), process: doc.process, text: `created Rev ${next} of ${doc.title}`, ref: doc.id });
       Q.save(); Q.closeAllModals(); Q.render({ noFocus: true }); Q.renderSidebar();
@@ -383,45 +420,107 @@
   Q.actions['request-review'] = d => startWorkflow(d, 'review');
   Q.actions['request-approval'] = d => startWorkflow(d, 'approval');
 
-  /* Connect Document (register metadata + source link; no upload required) */
+  /* Register Document — the classification decides the method:
+   *   Public / Internal                  → upload the file (iQMS shows it and reads it)
+   *   Confidential / Highly Confidential → SharePoint link + description + disclaimer (iQMS never opens it) */
+  const fileSizeLabel = n => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+  const MIN_DESC = 60;
   Q.actions['connect-doc'] = d => {
     const pre = d.process || 'all';
     const types = ['Procedure', 'Work Instruction', 'Form', 'Checklist', 'Policy', 'Plan', 'Register', 'Standard', 'Record'];
-    const m = Q.openModal({ size: 'l', title: 'Connect Document', sub: 'Register a controlled document that lives in Microsoft 365. iQMS stores metadata, revision state and workflow — not a copy of the file.',
-      body: `<form class="modal-body"><div class="form-grid">
-        <label class="field full"><span>Source link <span class="req">*</span></span><div style="display:flex;gap:8px"><input class="input" name="url" required placeholder="https://heliossolar.sharepoint.com/sites/HeliosQMS/…" autofocus><button class="btn" type="button" data-check>Check Link</button></div><span class="help" id="linkState">Only locations inside the allowed scope (Helios QMS / Controlled Documents) can be connected.</span></label>
-        <label class="field full"><span>Document name <span class="req">*</span></span><input class="input" name="title" required></label>
-        <label class="field"><span>Process <span class="req">*</span></span><select class="select" name="process" required><option value="">Select…</option>${Q.processOptions(pre, { all: '' })}</select></label>
-        <label class="field"><span>Type <span class="req">*</span></span><select class="select" name="type" required><option value="">Select…</option>${types.map(t => `<option>${t}</option>`).join('')}</select></label>
-        <label class="field"><span>Owner</span><select class="select" name="owner">${Q.peopleOptions(Q.me())}</select></label>
-        <label class="field"><span>Current state</span><select class="select" name="state"><option value="draft">New draft (Rev 00)</option><option value="published">Already approved — import as published</option></select><span class="help">Imports keep their existing revision; no new approval is created.</span></label>
-      </div></form>`,
-      foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Connect Document</button>` });
-    const state = m.querySelector('#linkState');
-    let verified = false;
-    const check = () => {
-      const url = m.querySelector('[name="url"]').value.trim();
-      verified = /^https:\/\/[a-z0-9-]+\.sharepoint\.com\/sites\/HeliosQMS\//i.test(url);
-      state.innerHTML = !url ? 'Paste a SharePoint or OneDrive link first.' : verified ? `<span class="src-ok">${icon('circle-check')}Connected</span> File found in Helios QMS / Controlled Documents.` : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span> This location is outside the allowed scope or the file can't be reached.`;
-      Q.refreshIcons();
-      if (verified && !m.querySelector('[name="title"]').value) { const name = decodeURIComponent(url.split('/').pop() || '').replace(/\.(docx|xlsx|pdf)$/i, '').replace(/ Rev \d+$/i, ''); m.querySelector('[name="title"]').value = name; }
+    const st = { file: null, verified: false, deptTouched: false };
+    const modeLine = c => c.mode === 'upload' ? `${icon('upload')}Upload the file` : `${icon('link')}SharePoint link + description`;
+    const m = Q.openModal({ size: 'l', title: 'Register Document', sub: 'The classification decides how a document is registered: uploaded to iQMS, or linked from SharePoint with a description.',
+      body: `<form class="modal-body reg" novalidate>
+        <fieldset class="fieldset reg-step"><legend><span class="step-n">1</span>Classification <span class="req">*</span></legend>
+          <div class="class-grid" role="radiogroup" aria-label="Classification">${Q.CLASSES.map(c => `<label class="class-opt ${c.tone}"><input type="radio" name="classification" value="${esc(c.key)}" ${c.key === 'Internal' ? 'checked' : ''}><span class="co-top">${icon(c.icon)}<b>${esc(c.key)}</b></span><span class="co-hint">${esc(c.hint)}</span><span class="co-mode">${modeLine(c)}</span></label>`).join('')}</div></fieldset>
+        <fieldset class="fieldset reg-step"><legend><span class="step-n">2</span><span data-method-title></span></legend><div data-method></div></fieldset>
+        <fieldset class="fieldset reg-step"><legend><span class="step-n">3</span>Details</legend><div class="form-grid">
+          <label class="field full"><span>Document name <span class="req">*</span></span><input class="input" name="title" required></label>
+          <label class="field"><span>Process <span class="req">*</span></span><select class="select" name="process" required><option value="">Select…</option>${Q.processOptions(pre, { all: '' })}</select></label>
+          <label class="field"><span>Type <span class="req">*</span></span><select class="select" name="type" required><option value="">Select…</option>${types.map(t => `<option>${t}</option>`).join('')}</select></label>
+          <label class="field"><span>Owner <span class="req">*</span></span><select class="select" name="owner" required>${Q.peopleOptions(Q.me())}</select></label>
+          <label class="field"><span>Department <span class="req">*</span></span><select class="select" name="department" required>${Q.departments().map(x => `<option${x === Q.person(Q.me()).dept ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select><span class="help">Follows the owner's department unless you change it.</span></label>
+          <label class="field full"><span>Current state</span><select class="select" name="state"><option value="draft">New draft (Rev 00)</option><option value="published">Already approved — import as published</option></select><span class="help">Imports keep their existing revision; no new approval is created.</span></label>
+        </div></fieldset></form>`,
+      foot: `<span class="left" data-foot-note></span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Register Document</button>` });
+    const form = m.querySelector('form'), box = m.querySelector('[data-method]');
+    const cls = () => Q.CLASSES.find(c => c.key === form.querySelector('[name="classification"]:checked').value);
+    const setTitle = name => { const t = form.querySelector('[name="title"]'); if (!t.value) t.value = name.replace(/\.(docx?|xlsx?|pptx?|pdf)$/i, '').replace(/[ _-]+Rev[ _-]?\d+$/i, ''); };
+    const fileRow = () => st.file
+      ? `<div class="file-row">${icon('file-text')}<div><b>${esc(st.file.name)}</b><span>${esc(st.file.size)} · ready to upload</span></div><button class="btn sm" type="button" data-file-clear>Remove</button></div>`
+      : `<div class="dropzone" data-drop tabindex="-1">${icon('upload')}<div><b>Drop the file here or <button type="button" class="linklike" data-pick>choose a file</button></b><span>PDF, Word, Excel or PowerPoint · up to 50 MB</span></div></div>`;
+    const drawMethod = () => {
+      const c = cls(), keep = form.querySelector('[name="description"]')?.value || '', url = form.querySelector('[name="url"]')?.value || '';
+      m.querySelector('[data-method-title]').textContent = c.mode === 'upload' ? 'File' : 'Link and description';
+      m.querySelector('[data-foot-note]').textContent = c.mode === 'upload' ? 'iQMS stores and reads the file.' : 'iQMS stores the link and description only.';
+      box.innerHTML = c.mode === 'upload'
+        ? `<input type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" hidden><div data-file>${fileRow()}</div>
+          <p class="help reg-help">${icon('eye')}${esc(c.key)} documents are stored in iQMS, shown in the document viewer and read for the ISO 9001 readiness assessment.</p>
+          <label class="field" style="margin-top:12px"><span>Description</span><textarea class="textarea" name="description" rows="2" placeholder="Optional — a short summary helps people find the document.">${esc(keep)}</textarea></label>`
+        : `<label class="field"><span>SharePoint link <span class="req">*</span></span><div style="display:flex;gap:8px"><input class="input" name="url" required value="${esc(url)}" placeholder="https://heliossolar.sharepoint.com/sites/HeliosQMS/…"><button class="btn" type="button" data-check>Check Link</button></div><span class="help" id="linkState">iQMS stores the link only. It does not open, copy or read the file.</span></label>
+          <label class="field" style="margin-top:12px"><span>Description of the document <span class="req">*</span></span><textarea class="textarea" name="description" rows="4" required placeholder="What the document is for, what it covers, the controls or records it defines, and the ISO 9001 clauses it supports.">${esc(keep)}</textarea><span class="help"><b class="tnum" data-count>${keep.trim().length}</b> of at least ${MIN_DESC} characters. Describe the document — do not paste confidential content.</span></label>
+          <div class="callout warning reg-note">${icon('triangle-alert')}<div><b>Disclaimer — ${esc(c.key)} documents are assessed from the description only</b><p>${esc(Q.RESTRICTED_NOTE)}</p>
+            <label class="checkbox"><input type="checkbox" name="ack"><span>I confirm the description is accurate and contains no confidential content.</span></label></div></div>`;
+      st.verified = false; Q.refreshIcons();
     };
-    m.querySelector('[data-check]').addEventListener('click', check);
+    const setFile = f => { if (!f) return; st.file = { name: f.name, size: fileSizeLabel(f.size) }; box.querySelector('[data-file]').innerHTML = fileRow(); Q.refreshIcons(); setTitle(f.name); };
+    const check = () => {
+      const url = form.querySelector('[name="url"]').value.trim(), state = m.querySelector('#linkState');
+      st.verified = /^https:\/\/[a-z0-9-]+\.sharepoint\.com\/sites\/HeliosQMS\//i.test(url);
+      state.innerHTML = !url ? 'Paste a SharePoint link first.' : st.verified ? `<span class="src-ok">${icon('circle-check')}Link recognized</span> Helios QMS on SharePoint. iQMS did not open the file.` : `<span class="src-bad">${icon('triangle-alert')}Not accepted</span> Only links inside the Helios QMS SharePoint site can be registered.`;
+      Q.refreshIcons();
+      if (st.verified) setTitle(decodeURIComponent(url.split('/').pop() || ''));
+      return st.verified;
+    };
+    form.addEventListener('change', e => {
+      const t = e.target;
+      if (t.name === 'classification') drawMethod();
+      else if (t.name === 'file') setFile(t.files[0]);
+      else if (t.name === 'department') st.deptTouched = true;
+      else if (t.name === 'owner' && !st.deptTouched) { const sel = form.querySelector('[name="department"]'), dept = Q.person(t.value).dept; if ([...sel.options].some(o => o.value === dept)) { sel.value = dept; sel._combo?.sync(); } }
+    });
+    form.addEventListener('input', e => { if (e.target.name === 'description') { const c = form.querySelector('[data-count]'); if (c) c.textContent = e.target.value.trim().length; } });
+    form.addEventListener('click', e => {
+      if (e.target.closest('[data-pick]')) form.querySelector('[name="file"]').click();
+      else if (e.target.closest('[data-file-clear]')) { st.file = null; form.querySelector('[name="file"]').value = ''; box.querySelector('[data-file]').innerHTML = fileRow(); Q.refreshIcons(); }
+      else if (e.target.closest('[data-check]')) check();
+    });
+    form.addEventListener('dragover', e => { const z = e.target.closest('[data-drop]'); if (z) { e.preventDefault(); z.classList.add('over'); } });
+    form.addEventListener('dragleave', e => e.target.closest('[data-drop]')?.classList.remove('over'));
+    form.addEventListener('drop', e => { const z = e.target.closest('[data-drop]'); if (z) { e.preventDefault(); setFile(e.dataTransfer.files[0]); } });
+    drawMethod();
     m.querySelector('[data-ok]').addEventListener('click', () => {
-      const f = m.querySelector('form'); if (!Q.validate(f)) return;
-      check(); if (!verified) { m.querySelector('[name="url"]').focus(); return; }
-      const v = Q.formValues(f);
+      const c = cls(), link = c.mode === 'link';
+      // Problems are shown next to the field they belong to.
+      form.querySelectorAll('.field-err').forEach(x => x.remove()); form.querySelectorAll('.invalid').forEach(x => x.classList.remove('invalid'));
+      const fail = (anchor, msg, focus = anchor) => { anchor.insertAdjacentHTML('afterend', `<p class="field-err" role="alert">${icon('triangle-alert')}${esc(msg)}</p>`); Q.refreshIcons(); focus.focus(); return false; };
+      if (!link && !st.file) { const z = box.querySelector('[data-drop]'); z.classList.add('invalid'); return fail(z, `Choose the file to upload. ${c.key} documents are stored in iQMS.`, box.querySelector('[data-pick]')); }
+      if (link && !check()) return form.querySelector('[name="url"]').focus();
+      if (link) {
+        const desc = form.querySelector('[name="description"]');
+        if (desc.value.trim().length < MIN_DESC) { desc.setAttribute('aria-invalid', 'true'); desc.style.borderColor = 'var(--danger)'; return fail(desc.nextElementSibling, `Write at least ${MIN_DESC} characters so the document can be considered in the assessment.`, desc); }
+        desc.removeAttribute('aria-invalid'); desc.style.borderColor = '';
+        const ack = form.querySelector('[name="ack"]');
+        if (!ack.checked) { ack.closest('.checkbox').classList.add('invalid'); return fail(ack.closest('.checkbox'), 'Confirm this to register a link-only document.', ack); }
+      }
+      if (!Q.validate(form)) return;
+      const v = Q.formValues(form);
       const prefix = (Q.S.documents.find(x => Q.rootId(x.process) === Q.rootId(v.process))?.id.split('-')[0]) || 'DOC';
       const code = { 'Procedure': 'PRO', 'Work Instruction': 'WI', 'Form': 'FRM', 'Checklist': 'CHK', 'Policy': 'POL', 'Plan': 'PLN', 'Register': 'REG', 'Standard': 'STD', 'Record': 'REC' }[v.type];
       const n = Q.S.documents.filter(x => x.id.startsWith(prefix + '-')).length + 1;
       const id = `${prefix}-${code}-${String(n).padStart(3, '0')}`;
-      const pub = v.state === 'published';
-      const doc = { id, organization_id: Q.S.organization.organization_id, title: v.title, process: v.process, type: v.type, rev: pub ? '00' : null, workingRev: pub ? null : '00', status: pub ? 'Published' : 'Draft', owner: v.owner, updated: Q.today(), nextReview: pub ? Q.addYears(Q.today(), 1) : null, effective: pub ? Q.today() : null, description: `Controlled ${v.type.toLowerCase()} connected from Microsoft 365.`, iso: null, refs: [], related: [], evidence: [],
-        source: { system: 'SharePoint', site: 'Helios QMS', library: 'Controlled Documents', folder: Q.plabel(Q.rootId(v.process)), file: decodeURIComponent(v.url.split('/').pop()), state: 'connected', verified: Q.today() } };
+      const pub = v.state === 'published', folder = Q.plabel(Q.rootId(v.process));
+      const doc = { id, organization_id: Q.S.organization.organization_id, title: v.title, process: v.process, type: v.type, rev: pub ? '00' : null, workingRev: pub ? null : '00', status: pub ? 'Published' : 'Draft', owner: v.owner,
+        classification: c.key, department: v.department, updated: Q.today(), nextReview: pub ? Q.addYears(Q.today(), 1) : null, effective: pub ? Q.today() : null,
+        description: (v.description || '').trim() || `Controlled ${v.type.toLowerCase()} uploaded to iQMS.`, declared: link ? { by: Q.me(), date: Q.today() } : null, iso: null, refs: [], related: [], evidence: [],
+        source: link ? { mode: 'link', system: 'SharePoint', site: 'Helios QMS', library: 'Restricted Documents', folder, file: decodeURIComponent(v.url.split('/').pop()), state: 'connected', verified: Q.today() }
+          : { mode: 'upload', system: 'iQMS', site: '', library: 'Document library', folder, file: st.file.name, size: st.file.size, state: 'connected', verified: Q.today() } };
       Q.S.documents.push(doc);
       Q.S.revisions[id] = [{ rev: '00', summary: pub ? 'Imported as the current approved revision.' : 'Initial draft.', author: v.owner, date: Q.today(), reviewers: [], approval: pub ? 'Imported' : '', published: pub ? Q.today() : null, state: pub ? 'Published' : 'Draft' }];
+      Q.S.activity.unshift({ date: Q.today(), who: Q.me(), process: doc.process, text: `registered ${doc.title} (${c.key})`, ref: doc.id });
       Q.save(); Q.closeAllModals(); Q.render({ noFocus: true });
-      Q.toast('Document connected', `${id} · ${v.title}`);
+      Q.toast('Document registered', `${id} · ${v.title} — ${link ? 'link and description saved' : 'file uploaded'}.`);
     });
   };
 
@@ -497,7 +596,7 @@
           <div class="review-left-inner">
             ${w.stage !== 'review' || w.changesRequested ? Q.lockCallout(w) : ''}
             <ol class="stepper" aria-label="Workflow stages">${steps.map(([k, l, s], i) => `<li class="${w.changesRequested && i === 0 ? 'changes' : i < idx ? 'done' : i === idx ? 'current' : ''}" ${i === idx ? 'aria-current="step"' : ''}><span class="dot">${i < idx ? icon('check') : i + 1}</span><span><b>${l}</b><span>${w.changesRequested && i === 0 ? 'Changes requested' : s}</span></span></li>`).join('')}</ol>
-            <section class="panel"><div class="panel-head"><h2>Change summary</h2></div><div class="panel-pad"><p>${esc(rev.summary || 'No summary provided.')}</p><dl class="dl-list" style="margin-top:12px"><dt>Started by</dt><dd>${Q.who(w.startedBy)} · ${Q.fmt(w.started)}</dd><dt>Due</dt><dd>${Q.dueDate(w.due)}</dd><dt>Effective</dt><dd>On publication</dd><dt>Source file</dt><dd>${d.source.state === 'connected' ? `<span class="src-ok">${icon('circle-check')}Connected</span> ` : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span> `}${esc(d.source.file)}</dd></dl></div></section>
+            <section class="panel"><div class="panel-head"><h2>Change summary</h2></div><div class="panel-pad"><p>${esc(rev.summary || 'No summary provided.')}</p><dl class="dl-list" style="margin-top:12px"><dt>Started by</dt><dd>${Q.who(w.startedBy)} · ${Q.fmt(w.started)}</dd><dt>Due</dt><dd>${Q.dueDate(w.due)}</dd><dt>Effective</dt><dd>On publication</dd><dt>Classification</dt><dd>${Q.classChip(d)}</dd><dt>File</dt><dd>${d.source.state !== 'connected' ? `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span> ` : uploaded(d) ? `<span class="src-ok">${icon('circle-check')}Stored in iQMS</span> ` : `<span class="src-lock">${icon('lock')}Link only</span> `}${esc(d.source.file)}</dd></dl></div></section>
             <section class="panel"><div class="panel-head"><h2>Reviewers &amp; approvers</h2></div><ul class="people-list">${w.reviewers.map(x => person(x, 'Reviewer')).join('')}${w.approvers.map(x => person(x, 'Approver')).join('')}<li><span class="avatar sm">${esc(Q.initials(w.publisher))}</span><div class="p-main">${Q.who(w.publisher)}<span>Publisher · ${esc(Q.person(w.publisher).title)}</span></div>${Q.st(w.stage === 'publication' ? 'Pending' : 'Not started', w.stage === 'publication' ? 'info' : 'neutral')}</li></ul></section>
             <section class="panel"><div class="panel-head"><h2>Comments</h2><span class="muted small">${w.comments.length}</span></div>
               <ul class="comments">${w.comments.map(c => `<li><span class="avatar sm">${esc(Q.initials(c.who))}</span><div class="c-body"><div class="c-meta">${Q.who(c.who)} · ${Q.fmt(c.date)}</div>${esc(c.text)}</div></li>`).join('') || '<li class="muted small">No comments yet.</li>'}</ul>

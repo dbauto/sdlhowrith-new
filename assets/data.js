@@ -22,7 +22,7 @@
     template: 'Solar Installation Company',
     // Level names are configurable per organization (e.g. Department → Process).
     hierarchyLabels: ['Process', 'Subprocess'],
-    standard: 'ISO 9001:2015',
+    standard: 'ISO 9001:2026',
     today: '2026-09-27'
   };
 
@@ -211,18 +211,47 @@
     'TST-PRO-001': { evidence: ['E-015', 'E-016'], iso: ['8.6'], refs: ['EQP-PRO-002'] }
   };
 
+  /* Classification decides how a document is registered and what iQMS can read:
+   *   Public · Internal                  → file uploaded to iQMS (shown in the viewer, read for assessment)
+   *   Confidential · Highly Confidential → SharePoint link only; iQMS keeps the owner's description.
+   * Anything not listed here is Internal.                                                   */
+  const docClass = {
+    'QMS-POL-001': 'Public', 'QMS-MAN-001': 'Public', 'HND-POL-003': 'Public',
+    'QMS-REG-003': 'Confidential', 'SAL-PRO-003': 'Confidential', 'ENG-STD-005': 'Confidential', 'PRC-PRO-004': 'Confidential', 'PRC-FRM-003': 'Confidential',
+    'PRC-REG-002': 'Highly Confidential', 'HR-MAT-002': 'Highly Confidential'
+  };
+  // Descriptions the owners gave for link-only documents: what the document covers, without its content.
+  const restrictedDesc = {
+    'QMS-REG-003': 'Register of internal and external issues and of interested parties with their requirements. Reviewed yearly by top management and used as an input to risk assessment and management review. Covers clauses 4.1 and 4.2.',
+    'SAL-PRO-003': 'Procedure for reviewing customer contracts before acceptance: requirement checks, capability and capacity confirmation, commercial approval limits and how contract changes are recorded. Covers clause 8.2.',
+    'ENG-STD-005': 'Company drawing standard for PV layouts and single-line diagrams: title blocks, symbols, layer naming, revision marking and the checks a drawing must pass before release. Referenced by the Design Procedure. Covers clause 8.3.',
+    'PRC-PRO-004': 'Procedure for monitoring supplier performance: delivery, quality and responsiveness scoring, review frequency, thresholds for re-evaluation and removal from the approved list. Covers clause 8.4.',
+    'PRC-FRM-003': 'Form used to evaluate a new or existing supplier against selection criteria (quality system, capacity, pricing terms, references) and to record the approval decision. Covers clause 8.4.',
+    'PRC-REG-002': 'List of approved suppliers with their approved scope, evaluation date, performance rating and commercial terms. Updated after every evaluation; checked before each purchase order. Covers clause 8.4.',
+    'HR-MAT-002': 'Matrix of each employee against the competencies required for their role, with qualification, licence and training status and expiry dates. Used to plan training and to assign licensed work. Covers clause 7.2.'
+  };
+  const fileSize = id => `${120 + (id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 7) % 880} KB`;
+
   const documents = D.map(([id, title, process, type, rev, status, owner, updated, nextReview, workingRev = null]) => {
     const x = docExtras[id] || {};
     const fileRev = workingRev && status !== 'Published' ? workingRev : rev;
+    const classification = docClass[id] || 'Internal';
+    const link = ['Confidential', 'Highly Confidential'].includes(classification);
+    const file = `${title.replace(/[—/]/g, '-')} Rev ${fileRev || '00'}.docx`;
     return {
       id, organization_id: ORG, title, process, type, rev, workingRev, status, owner, updated, nextReview,
+      classification, department: people[owner].dept,
       effective: rev ? updated : null,
-      description: x.description || `Controlled ${type.toLowerCase()} for the ${title.toLowerCase()} activities of this process.`,
+      description: restrictedDesc[id] || x.description || `Controlled ${type.toLowerCase()} for the ${title.toLowerCase()} activities of this process.`,
+      // Link-only documents: who described the content and accepted the disclaimer.
+      declared: link ? { by: owner, date: updated } : null,
       iso: x.iso || null,
       refs: x.refs || [], related: x.related || [], evidence: x.evidence || [],
-      source: { system: 'SharePoint', site: 'Helios QMS', library: 'Controlled Documents', folder: folderFor(process),
-        file: `${title.replace(/[—/]/g, '-')} Rev ${fileRev || '00'}.docx`, state: x.sourceState || 'connected',
-        verified: x.sourceState === 'unavailable' ? '2026-09-02' : '2026-09-26' }
+      source: link
+        ? { mode: 'link', system: 'SharePoint', site: 'Helios QMS', library: 'Restricted Documents', folder: folderFor(process), file,
+          state: x.sourceState || 'connected', verified: x.sourceState === 'unavailable' ? '2026-09-02' : '2026-09-26' }
+        : { mode: 'upload', system: 'iQMS', site: '', library: 'Document library', folder: folderFor(process), file, size: fileSize(id),
+          state: 'connected', verified: updated }
     };
   });
 
@@ -381,7 +410,9 @@
     I('5.1', 'Leadership and commitment', ['p14'], ['MR-PRO-001'], ['E-025'], 'Complete'),
     I('5.2', 'Quality policy', ['p01'], ['QMS-POL-001'], [], 'Complete'),
     I('5.3', 'Roles, responsibilities and authorities', ['p01'], ['QMS-PRO-002'], [], 'At Risk', 'Rev 04 review overdue; commissioning team roles not yet defined.'),
-    I('6.1', 'Actions to address risks and opportunities', ['p12'], ['RSK-PRO-001'], [], 'Partially Complete', 'Three high risks with treatment due in October.'),
+    // ISO 9001:2026 separates risks (6.1.2) and opportunities (6.1.3); 2015 had one clause 6.1.
+    I('6.1.2', 'Actions to address risks', ['p12'], ['RSK-PRO-001'], [], 'Partially Complete', 'Three high risks with treatment due in October.'),
+    I('6.1.3', 'Actions to address opportunities', ['p12'], ['RSK-PRO-001'], [], 'Partially Complete', 'Three opportunities recorded; expected benefit not yet evaluated.'),
     I('6.2', 'Quality objectives and planning to achieve them', ['p12'], ['QOB-PLN-001', 'KPI-PRO-003'], ['E-026'], 'Partially Complete', 'Q3 monitoring evidence awaiting verification.'),
     I('7.1.3', 'Infrastructure', ['p11'], ['EQP-REG-001', 'EQP-PLN-003'], [], 'Complete'),
     I('7.1.5', 'Monitoring and measuring resources', ['p11', 'p08'], ['EQP-PRO-002'], ['E-022', 'E-023'], 'At Risk', 'Clamp meter CM-07 calibration expired 12 Sep 2026.'),
@@ -493,7 +524,7 @@
 
   const integrations = [
     { id: 'm365', name: 'Microsoft 365', kind: 'Document storage — SharePoint & OneDrive', status: 'Connected', icon: 'cloud',
-      tenant: 'heliossolar.onmicrosoft.com', site: 'Helios QMS', library: 'Controlled Documents', scope: 'Selected site only (Helios QMS) — read metadata, open files, validate links', lastTest: '2026-09-26 16:40', linked: 64 },
+      tenant: 'heliossolar.onmicrosoft.com', site: 'Helios QMS', library: 'Restricted Documents', scope: 'Selected site only (Helios QMS) — validate links; file content is not read', lastTest: '2026-09-26 16:40', linked: 64 },
     { id: 'crm', name: 'CRM', kind: 'Customer records, contracts, feedback, complaints', status: 'Planned', icon: 'handshake' },
     { id: 'erp', name: 'ERP', kind: 'Purchasing, suppliers, goods receipts', status: 'Planned', icon: 'package' },
     { id: 'hris', name: 'HRIS', kind: 'Training records, competencies', status: 'Planned', icon: 'users' },
@@ -568,16 +599,25 @@
    * filters: [{ field, op, value }] — all must match. group: none | process | clause. */
   const DOC_COLS = ['id', 'title', 'process', 'type', 'rev', 'status', 'owner', 'updated', 'nextReview'];
   const KPI_COLS = ['name', 'process', 'target', 'actual', 'trend', 'owner', 'period', 'status'];
+  const RISK_COLS = ['id', 'title', 'process', 'kind', 'rating', 'owner', 'due', 'status'];
   const V = (id, name, filters = [], extra = {}) => ({ id, name, seed: true, scope: 'shared', owner: 'maria', filters, columns: DOC_COLS, group: 'none', sort: null, ...extra });
   const savedViews = {
     documents: [
-      V('v-all', 'All documents'),
+      V('v-all', 'All documents', [], { columns: ['id', 'title', 'process', 'type', 'classification', 'rev', 'status', 'owner', 'nextReview'] }),
       V('v-published', 'Published', [{ field: 'status', op: 'in', value: ['Published'] }]),
       V('v-workflow', 'In workflow', [{ field: 'inRouting', op: 'is_true' }]),
       V('v-overdue', 'Review overdue', [{ field: 'overdue', op: 'is_true' }], { sort: { key: 'nextReview', dir: 1 } }),
       V('v-draft', 'Draft', [{ field: 'status', op: 'in', value: ['Draft'] }]),
+      V('v-restricted', 'Confidential', [{ field: 'classification', op: 'in', value: ['Confidential', 'Highly Confidential'] }], { columns: ['id', 'title', 'classification', 'process', 'owner', 'department', 'source', 'nextReview'] }),
       V('v-process', 'By process', [], { group: 'process', columns: ['id', 'title', 'type', 'rev', 'status', 'owner', 'nextReview'] }),
       V('v-clause', 'By ISO 9001 clause', [], { group: 'clause', columns: ['id', 'title', 'process', 'rev', 'status', 'nextReview'] })
+    ],
+    risks: [
+      V('r-all', 'All', [], { columns: RISK_COLS }),
+      V('r-risks', 'Risks', [{ field: 'kind', op: 'in', value: ['Risk'] }], { columns: RISK_COLS }),
+      V('r-opps', 'Opportunities', [{ field: 'kind', op: 'in', value: ['Opportunity'] }], { columns: RISK_COLS }),
+      V('r-high', 'High risks', [{ field: 'kind', op: 'in', value: ['Risk'] }, { field: 'level', op: 'in', value: ['High'] }], { columns: RISK_COLS, sort: { key: 'rating', dir: -1 } }),
+      V('r-process', 'By process', [], { group: 'process', columns: ['id', 'title', 'kind', 'rating', 'owner', 'due', 'status'] })
     ],
     kpis: [
       V('k-all', 'All KPIs', [], { columns: KPI_COLS }),
@@ -587,5 +627,14 @@
     ]
   };
 
-  window.QMS_DATA = { organization, people, currentUser, processes, documents, revisions, workflows, risks, kpis, evidence, iso, audits, findings, actions, improvements, managementActions, activity, users, roles, integrations, templates, context, policies, managementReviews, savedViews, processCategories };
+  /* ---------- v3: process workspace tabs (organization configuration) ----------
+   * Same template for every process; the organization chooses which tabs show,
+   * their names and order. emptyTabs: 'mute' shows empty tabs greyed, 'hide' hides them. */
+  const workspace = {
+    emptyTabs: 'mute',
+    tabs: [['overview', 'Overview'], ['documents', 'Documents'], ['risks', 'Risks & Opportunities'], ['kpis', 'Objectives & KPIs'], ['evidence', 'Evidence'], ['audit', 'Audit & Actions'], ['iso', 'ISO Mapping']]
+      .map(([key, label]) => ({ key, label, visible: true }))
+  };
+
+  window.QMS_DATA = { organization, people, currentUser, processes, documents, revisions, workflows, risks, kpis, evidence, iso, audits, findings, actions, improvements, managementActions, activity, users, roles, integrations, templates, context, policies, managementReviews, savedViews, processCategories, workspace };
 })();

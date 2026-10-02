@@ -12,17 +12,20 @@
   /* =================== Readiness summary (used on Overview, ISO page, process) =================== */
   Q.readinessBlock = (reqs, { link = '#/evidence?view=clause', compact = false } = {}) => {
     const s = Q.isoScore(reqs), c = s.counts, a = s.applicable || 1;
+    // Link-only documents that support these requirements: assessed from a description, not from content.
+    const locked = Q.S.documents.filter(d => Q.docRestricted(d) && Q.docIso(d).some(cl => reqs.some(r => r.clause === cl)));
     const seg = (k, cls) => c[k] ? `<span class="${cls}" style="width:${c[k] / a * 100}%" title="${k}: ${c[k]}"></span>` : '';
     const leg = (k, color, filter) => `<button type="button" data-go="${link}${link.includes('?') ? '&' : '?'}status=${filter}"><i style="background:${color}"></i>${k} <b class="tnum">${c[k]}</b></button>`;
     return `<div class="readiness">
       <div><div class="pct">${s.pct ?? '—'}<small>%</small></div><div class="small muted">${s.points} of ${s.applicable} applicable requirements</div></div>
       <div><div class="stack-bar" role="img" aria-label="Complete ${c['Complete']}, partially complete ${c['Partially Complete']}, at risk ${c['At Risk']}, missing ${c['Missing']}">${seg('Complete', 'b-complete')}${seg('Partially Complete', 'b-partial')}${seg('At Risk', 'b-atrisk')}${seg('Missing', 'b-missing')}</div>
       <div class="legend">${leg('Complete', 'var(--success)', 'complete')}${leg('Partially Complete', '#E0A43A', 'partial')}${leg('At Risk', 'var(--orange)', 'atrisk')}${leg('Missing', 'var(--danger)', 'missing')}<span class="muted">Not applicable ${c['Not Applicable']}</span></div>
+      ${locked.length ? `<p class="rd-note">${icon('lock')}<span><b>${locked.length} supporting document${locked.length === 1 ? ' is' : 's are'} Confidential.</b> ${compact ? 'Counted from the owner’s description only.' : 'They are counted from the description their owner provided; iQMS has not read their content.'} <a href="#/documents?v=v-restricted">View them</a></span></p>` : ''}
       ${compact ? '' : `<details class="explain"><summary>${icon('chevron-right')}How is this calculated?</summary><div class="explain-body">
         Each ISO 9001 requirement is mapped to the processes, controls and evidence that satisfy it and given a status by the QMS Manager.<br>
         <span class="formula">Readiness = (Complete × 1 + Partially complete × 0.5 + At risk × 0 + Missing × 0) ÷ applicable requirements</span><br>
         <span class="formula">= (${c['Complete']} + ${c['Partially Complete']} × 0.5) ÷ ${s.applicable} = ${s.points} ÷ ${s.applicable} = <b>${s.pct}%</b></span><br>
-        Not-applicable requirements (${c['Not Applicable']}) are excluded. This is a readiness indicator, not a certification result.</div></details>`}</div></div>`;
+        Not-applicable requirements (${c['Not Applicable']}) are excluded. Confidential and Highly Confidential documents are not read by iQMS; they count through the description their owner provided. This is a readiness indicator, not a certification result.</div></details>`}</div></div>`;
   };
   document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) Q.go(b.dataset.go); });
 
@@ -96,29 +99,6 @@
   };
 
   /* =================== Shared registers =================== */
-  Q.riskTable = (id, { process = null, initialFilters } = {}) => {
-    const rows = () => Q.S.risks.filter(r => !process || Q.inProc(r.process, process));
-    const all = rows();
-    return Q.table({ id, rows, noun: 'risks & opportunities', caption: 'Risks and opportunities', search: r => `${r.id} ${r.title} ${r.treatment} ${Q.pname(r.owner)}`, initialFilters,
-      tools: `${searchBox('risks')}${procFilter(process)}<select class="select" data-filter="kind" aria-label="Type"><option value="all">Risks & opportunities</option><option>Risk</option><option>Opportunity</option></select>
-        <select class="select" data-filter="level" aria-label="Rating"><option value="all">All ratings</option><option>High</option><option>Medium</option><option>Low</option></select>
-        <select class="select" data-filter="cell" aria-label="Matrix cell" hidden><option value="all">All cells</option>${[1,2,3,4,5].flatMap(l => [1,2,3,4,5].map(i => `<option value="${l}x${i}">L${l} × I${i}</option>`)).join('')}</select>
-`, footExtra: () => '<span style="margin-left:auto">Rating = likelihood × impact (1–5 each). High ≥ 15 · Medium 8–12 · Low ≤ 6</span>',
-      filters: { process: (r, v) => Q.inProc(r.process, v), kind: (r, v) => r.kind === v, level: (r, v) => Q.riskLevel(r) === v, cell: (r, v) => `${r.likelihood}x${r.impact}` === v },
-      columns: [
-        { key: 'id', label: 'ID', cls: 'c-id', sort: r => r.id, render: r => esc(r.id) },
-        { key: 'title', label: 'Risk / opportunity', sort: r => r.title, render: r => `<span class="title">${esc(r.title)}</span><span class="sub">${esc(r.treatment)}</span>` },
-        ...procCol(process),
-        { key: 'kind', label: 'Type', sort: r => r.kind, render: r => esc(r.kind) },
-        { key: 'l', label: 'L', cls: 'c-num', render: r => r.likelihood },
-        { key: 'i', label: 'I', cls: 'c-num', render: r => r.impact },
-        { key: 'rating', label: 'Rating', sort: r => Q.riskScore(r), render: r => { const l = Q.riskLevel(r); return `<span class="tnum" style="display:inline-block;width:22px;font-weight:600">${Q.riskScore(r)}</span>${Q.st(r.kind === 'Opportunity' ? l + ' benefit' : l, r.kind === 'Opportunity' ? 'info' : { High: 'danger', Medium: 'warning', Low: 'neutral' }[l])}`; } },
-        { key: 'owner', label: 'Owner', sort: r => Q.pname(r.owner), render: r => `<span class="nowrap">${esc(Q.pname(r.owner))}</span>` },
-        { key: 'due', label: 'Treatment due', cls: 'c-date', sort: r => r.due, render: r => Q.dueDate(r.due, r.status === 'Monitoring') },
-        { key: 'status', label: 'Status', sort: r => r.status, render: r => Q.st(r.status, { 'Open': 'warning', 'In treatment': 'info', 'Monitoring': 'success', 'Evaluating': 'neutral', 'Closed': 'muted' }[r.status]) },
-        { key: 'act', label: 'Actions', cls: 'c-actions', render: r => `<button class="btn sm" type="button" data-action="assess-risk" data-id="${r.id}">${icon('gauge')}Reassess</button>` }
-      ], empty: '<h3>No risks or opportunities recorded</h3><p>Add risks that could affect this process achieving its outputs.</p>' });
-  };
   Q.evTable = (id, { process = null, initialSeg } = {}) => {
     const rows = () => Q.S.evidence.filter(e => !process || Q.inProc(e.process, process));
     const all = rows();
@@ -226,35 +206,68 @@
   };
 
   /* =================== Process Workspace =================== */
-  const TABS = [['overview', 'Overview'], ['documents', 'Documents'], ['risks', 'Risks & Opportunities'], ['kpis', 'Objectives & KPIs'], ['evidence', 'Evidence'], ['audit', 'Audit & Actions'], ['iso', 'ISO Mapping']];
-  Q.views.process = parts => {
-    const pid = parts[0], tab = parts[1] || 'overview';
+  /* One template for every process. Tabs come from Settings → Process Workspace
+   * (show/hide, rename, reorder); each tab shows how many records it holds, and empty
+   * tabs are muted or hidden. Documents, Risks and KPIs tabs use the same saved views
+   * as their main pages, filtered to this process (and its subprocesses).          */
+  Q.WS_TABS = { overview: 'Overview', documents: 'Documents', risks: 'Risks & Opportunities', kpis: 'Objectives & KPIs', evidence: 'Evidence', audit: 'Audit & Actions', iso: 'ISO Mapping' };
+  Q.wsConfig = () => {
+    if (!Q.S.workspace) { Q.S.workspace = JSON.parse(JSON.stringify(window.QMS_DATA.workspace)); Q.save(); }
+    return Q.S.workspace;
+  };
+  const tabCount = (k, s) => ({ documents: s.docs, risks: Q.S.risks.filter(r => Q.inProc(r.process, s.pid)).length, kpis: s.kpis, evidence: s.evidence,
+    audit: Q.S.findings.filter(f => Q.inProc(f.process, s.pid)).length + Q.S.actions.filter(a => Q.inProc(a.process, s.pid)).length + Q.S.improvements.filter(i => Q.inProc(i.process, s.pid)).length, iso: s.iso.total })[k];
+  Q.views.process = (parts, q = {}) => {
+    const pid = parts[0];
     const p = Q.proc(pid);
     if (!p) return { title: 'Process not found', html: Q.pageHead({ title: 'Process not found', sub: 'It may have been archived or removed from the process structure.' }) + '<a class="btn" href="#/settings/processes">Open Process Structure</a>' };
-    const s = Q.stats(pid), parent = Q.proc(p.parent_process_id), kids = Q.children(pid);
+    const cfg = Q.wsConfig(), s = { ...Q.stats(pid), pid }, parent = Q.proc(p.parent_process_id), kids = Q.children(pid);
+    const shown = cfg.tabs.filter(t => t.key === 'overview' || t.visible);
+    let tab = parts[1] || 'overview';
+    if (!shown.some(t => t.key === tab)) { location.replace(`#/process/${pid}`); return { title: p.name, nav: 'process', html: '' }; }
+    const label = k => (cfg.tabs.find(t => t.key === k)?.label) || Q.WS_TABS[k];
     const note = { documents: s.docsOverdue ? `${s.docsOverdue} overdue` : '', risks: s.highRisks ? `${s.highRisks} high` : '', kpis: s.kpisBelow ? `${s.kpisBelow} below` : '', evidence: s.evGaps ? `${s.evGaps} missing` : '', audit: s.actionsOverdue ? `${s.actionsOverdue} overdue` : '', iso: s.isoGaps ? `${s.isoGaps} gaps` : '' };
-    const tabs = `<div class="tabs" role="tablist" aria-label="Process workspace">${TABS.map(([k, l]) => `<a role="tab" href="#/process/${pid}${k === 'overview' ? '' : '/' + k}" aria-selected="${k === tab}">${l}${note[k] ? `<span class="tab-note">${note[k]}</span>` : ''}</a>`).join('')}</div>`;
-    const crumbs = [['QMS', '#/qms/scope'], ['Processes', '#/qms/processes'], ...(parent ? [[`${parent.process_code} ${parent.name}`, `#/process/${parent.process_id}`]] : []), [`${p.process_code} ${p.name}`, `#/process/${pid}`], ...(tab !== 'overview' ? [[TABS.find(t => t[0] === tab)[1]]] : [])];
+    const tabsHtml = `<div class="tabs ws-tabs" role="tablist" aria-label="Process workspace">${shown.map(t => {
+      const n = t.key === 'overview' ? null : tabCount(t.key, s), empty = n === 0;
+      if (empty && cfg.emptyTabs === 'hide' && t.key !== tab) return '';
+      return `<a role="tab" href="#/process/${pid}${t.key === 'overview' ? '' : '/' + t.key}" aria-selected="${t.key === tab}" class="${empty ? 'empty' : ''}" ${empty ? 'title="Nothing recorded for this process yet"' : ''}>${esc(t.label || Q.WS_TABS[t.key])}${n != null ? `<span class="tab-n">${empty ? '—' : n}</span>` : ''}${note[t.key] ? `<span class="tab-note">${note[t.key]}</span>` : ''}</a>`;
+    }).join('')}<a class="ws-config" href="#/settings/workspace" title="Choose which tabs every process shows">${icon('settings')}<span class="sr-only">Configure process workspace tabs</span></a></div>`;
+    const crumbs = [['QMS', '#/qms/scope'], ['Processes', '#/qms/processes'], ...(parent ? [[`${parent.process_code} ${parent.name}`, `#/process/${parent.process_id}`]] : []), [`${p.process_code} ${p.name}`, `#/process/${pid}`], ...(tab !== 'overview' ? [[label(tab)]] : [])];
     const head = Q.pageHead({ crumbs, title: `<span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}`,
       meta: `<div class="meta-line"><span>Process Owner <b>${esc(Q.pname(p.owner))}</b> · ${esc(Q.person(p.owner).title)}</span><span>Department <b>${esc(p.department)}</b></span><span>ISO 9001 <b>${p.iso.join(', ')}</b></span>${kids.length ? `<span>${kids.length} subprocesses</span>` : ''}${parent ? `<span>Subprocess of <a href="#/process/${parent.process_id}">${esc(parent.name)}</a></span>` : ''}</div>`,
       actions: Q.menu('Add to this process', [
-        { label: 'Connect Document', icon: 'file-plus', data: { action: 'connect-doc', process: pid } },
+        { label: 'Register Document', icon: 'file-plus', data: { action: 'connect-doc', process: pid } },
         { label: 'Link Evidence', icon: 'paperclip', data: { action: 'link-evidence', process: pid } },
         { label: 'Add Risk or Opportunity', icon: 'shield-alert', data: { action: 'assess-risk', process: pid } },
         { label: 'Add KPI', icon: 'target', data: { action: 'toast', title: 'Add KPI', msg: 'KPI entry form is not part of this mock.' } },
         { label: 'Record Improvement Opportunity', icon: 'route', data: { action: 'add-improvement', process: pid } }
       ], { icon: 'plus', text: 'Add', cls: 'btn' }) + `<a class="btn" href="#/settings/processes?select=${pid}">${icon('pencil')}Edit Process</a>` });
-    let body = '';
+    // Saved views inside the process: same views as the main page, filtered to this process.
+    const viewTab = (type, tableFn, extraBody = null) => {
+      const ctx = { route: `#/process/${pid}/${tab}`, base: r => Q.inProc(r.process, pid), hide: ['process'] };
+      const r = Q.vwResolve(type, q, ctx);
+      if (r.redirect) return { redirect: r.redirect };
+      const v = r.v, where = Q.vwWhere(type, v);
+      const flag = { documents: Q.docGroupFlag, kpis: Q.kpiGroupFlag, risks: Q.riskGroupFlag }[type];
+      const inner = (extraBody && extraBody(v, where)) || (Q.vwFieldGroup(v.group) ? Q.vwGrouped(type, v, where, q, tableFn, { process: pid, flag }).html
+        : tableFn(Q.vwTableId(type, v, 'in-' + pid), { process: pid, columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(type, v) }));
+      return { html: Q.vwCard(type, v, inner), after: main => Q.vwAfter(type, main) };
+    };
+    let body = '', after = null, res = null;
     if (tab === 'overview') body = processOverview(p, s, kids);
-    else if (tab === 'documents') body = Q.docTable('p-docs', { process: pid, hideProcess: true });
-    else if (tab === 'risks') body = Q.riskTable('p-risks', { process: pid });
-    else if (tab === 'kpis') body = Q.kpiTable('p-kpis', { process: pid });
+    else if (tab === 'documents') res = viewTab('documents', Q.docTable, (v, where) => v.group === 'clause' ? `<div class="vc-body"><div class="vc-summary">${Q.vwSummary('documents', v)}</div>${Q.docsByClause(v, v, where, q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0])}</div>` : null);
+    else if (tab === 'risks') res = viewTab('risks', Q.riskTable);
+    else if (tab === 'kpis') res = viewTab('kpis', Q.kpiTable);
     else if (tab === 'evidence') body = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" type="button" data-action="link-evidence" data-process="${pid}">${icon('link')}Link Evidence</button></div>` + Q.evTable('p-ev', { process: pid });
     else if (tab === 'audit') body = `<section class="section"><div class="section-head"><h2>Audit findings</h2></div>${Q.findingTable('p-find', { process: pid })}</section>
       <section class="section"><div class="section-head"><h2>Corrective actions</h2><span class="sub">Finding → root cause → action → effectiveness</span></div>${Q.actionTable('p-ca', { process: pid })}</section>
       <section class="section"><div class="section-head"><h2>Improvement opportunities</h2><span class="sub">Including bottlenecks that could be automated in future</span><div class="actions"><button class="btn sm" type="button" data-action="add-improvement" data-process="${pid}">${icon('plus')}Record Opportunity</button></div></div>${Q.improvementTable('p-imp', { process: pid })}</section>`;
     else if (tab === 'iso') body = `<section class="panel" style="margin-bottom:20px"><div class="panel-pad">${Q.readinessBlock(Q.isoForProcess(pid), { link: `#/process/${pid}/iso` })}</div></section>` + Q.isoTable('p-iso', { process: pid });
-    return { title: `${p.name}${tab !== 'overview' ? ' · ' + TABS.find(t => t[0] === tab)[1] : ''}`, nav: 'process', html: head + tabs + body };
+    if (res?.redirect) { location.replace(res.redirect); return { title: p.name, nav: 'process', html: '' }; }
+    if (res) { body = res.html; after = res.after; }
+    const empty = tab !== 'overview' && tabCount(tab, s) === 0;
+    const emptyNote = empty ? `<div class="callout" style="margin-bottom:16px">${icon('info')}<span><b>Nothing recorded for ${esc(p.name)} yet</b>This tab is part of every process. Add the first record with <b>Add</b> above, or hide empty tabs in <a href="#/settings/workspace">Settings → Process Workspace</a>.</span></div>` : '';
+    return { title: `${p.name}${tab !== 'overview' ? ' · ' + label(tab) : ''}`, nav: 'process', html: head + tabsHtml + emptyNote + body, after };
   };
 
   function processOverview(p, s, kids) {

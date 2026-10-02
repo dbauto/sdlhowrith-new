@@ -23,6 +23,15 @@
   // Earlier mock builds described "In workflow" as "Routing stage is not Not in routing"; use the clearer field.
   (Q.S.savedViews.documents || []).forEach(v => { if (v.id === 'v-workflow' && v.seed && JSON.stringify(v.filters) === '[{"field":"routing","op":"not_in","value":["Not in routing"]}]') v.filters = [{ field: 'inRouting', op: 'is_true' }]; });
 
+  // Views saved before classification existed: show the new column in "All documents" and add the Confidential default view.
+  Q.S.flags = Q.S.flags || {};
+  if (!Q.S.flags.classViews) {
+    const list = Q.S.savedViews.documents || [], all = list.find(v => v.id === 'v-all' && v.seed);
+    if (all && !all.columns.includes('classification')) all.columns.splice(Math.max(0, all.columns.indexOf('type')) + 1, 0, 'classification');
+    if (!list.some(v => v.id === 'v-restricted')) { const seed = window.QMS_DATA.savedViews.documents.find(v => v.id === 'v-restricted'), at = list.findIndex(v => v.group !== 'none'); list.splice(at < 0 ? list.length : at, 0, clone(seed)); }
+    Q.S.flags.classViews = true; Q.save();
+  }
+
   const OPS = {
     text: [['contains', 'contains'], ['not_contains', 'does not contain']],
     enum: [['in', 'is'], ['not_in', 'is not']],
@@ -39,18 +48,20 @@
   const docRouting = d => { const w = Q.wfForDoc(d.id); return !w ? 'Not in routing' : w.changesRequested ? 'Changes requested' : { review: 'Review', approval: 'Approval', publication: 'Publication' }[w.stage]; };
   const docEvidence = d => new Set([...d.evidence, ...Q.S.evidence.filter(e => e.doc === d.id).map(e => e.id)]).size;
   const uniq = arr => [...new Set(arr)].sort();
+  const docSource = d => d.source.state !== 'connected' ? 'Access unavailable' : d.source.mode === 'upload' ? 'Uploaded to iQMS' : `${d.source.system} link`;
   Q.FIELDS = {
     documents: [
       { key: 'id', label: 'Document ID', type: 'text', cls: 'c-id', get: d => d.id, sort: d => d.id, render: d => esc(d.id) },
       { key: 'title', label: 'Document name', type: 'text', locked: true, min: '200px', get: d => d.title, sort: d => d.title,
-        render: d => `<button type="button" class="doc-link" data-action="open-doc" data-id="${esc(d.id)}" title="Open ${esc(d.id)}">${esc(d.title)}</button>` },
+        render: d => `<button type="button" class="doc-link" data-action="open-doc" data-id="${esc(d.id)}" title="Open ${esc(d.id)}${Q.docRestricted(d) ? ` · ${esc(d.classification)} — iQMS has the description only, not the file` : ''}">${esc(d.title)}${Q.docRestricted(d) ? `<span class="lock-mark">${icon('lock')}</span>` : ''}</button>` },
       { key: 'process', label: 'Process', type: 'process', get: d => d.process, sort: d => Q.proc(d.process)?.process_code, render: d => Q.pcell(d.process) },
       { key: 'type', label: 'Type', type: 'enum', options: () => uniq(Q.S.documents.map(d => d.type)), get: d => d.type, sort: d => d.type, render: d => esc(d.type) },
       { key: 'rev', label: 'Rev', type: 'text', cls: 'c-rev', get: d => d.rev || '', sort: d => d.rev || '',
         render: d => `${d.rev ? esc(d.rev) : '<span class="muted" title="Not yet published">—</span>'}${d.workingRev && d.status !== 'Published' ? ` <span class="rev-next" title="Rev ${esc(d.workingRev)} in progress">→ ${esc(d.workingRev)}</span>` : ''}` },
       { key: 'status', label: 'Status', type: 'enum', options: () => ['Draft', 'In Review', 'Changes Requested', 'Approval in Progress', 'Approved', 'Published', 'Superseded', 'Obsolete'], get: d => d.status, sort: d => d.status, render: d => Q.docStatus(d) },
       { key: 'owner', label: 'Owner', type: 'person', get: d => d.owner, sort: d => Q.pname(d.owner), render: d => `<span class="nowrap">${esc(Q.pname(d.owner))}</span>` },
-      { key: 'department', label: 'Department', type: 'enum', options: () => uniq(Q.S.documents.map(d => Q.person(d.owner).dept)), get: d => Q.person(d.owner).dept, sort: d => Q.person(d.owner).dept, render: d => esc(Q.person(d.owner).dept) },
+      { key: 'department', label: 'Department', type: 'enum', options: () => Q.departments(), get: d => Q.docDept(d), sort: d => Q.docDept(d), render: d => esc(Q.docDept(d)) },
+      { key: 'classification', label: 'Classification', type: 'enum', options: () => Q.CLASSES.map(c => c.key), get: d => Q.docClass(d).key, sort: d => Q.CLASSES.indexOf(Q.docClass(d)), render: d => Q.classChip(d) },
       { key: 'updated', label: 'Last updated', type: 'date', cls: 'c-date', get: d => d.updated, sort: d => d.updated, render: d => Q.fmt(d.updated) },
       { key: 'effective', label: 'Effective', type: 'date', cls: 'c-date', get: d => d.effective, sort: d => d.effective || '', render: d => Q.fmt(d.effective) },
       { key: 'nextReview', label: 'Next review', type: 'date', cls: 'c-date', get: d => d.nextReview, sort: d => d.nextReview || '9999', render: d => Q.reviewDate(d.nextReview, Q.docOverdue(d), Q.docDueSoon(d)) },
@@ -61,8 +72,10 @@
       { key: 'waiting', label: 'Waiting on', type: 'person', get: d => Q.wfAssignees(Q.wfForDoc(d.id)), sort: d => Q.wfAssignees(Q.wfForDoc(d.id)).map(Q.pname).join(), render: d => { const a = Q.wfAssignees(Q.wfForDoc(d.id)); return a.length ? `<span class="nowrap">${a.map(x => Q.who(x)).join(', ')}</span>` : '<span class="muted">—</span>'; } },
       { key: 'iso', label: 'ISO 9001 clauses', type: 'clause', get: d => Q.docIso(d), sort: d => Q.docIso(d).map(Q.clauseSort).sort()[0] || '99', render: d => { const c = Q.docIso(d); return c.length ? `<span class="clause small">${c.map(esc).join(', ')}</span>` : '<span class="muted">—</span>'; } },
       { key: 'evidence', label: 'Evidence records', type: 'number', cls: 'c-num', get: docEvidence, sort: docEvidence, render: d => docEvidence(d) || '<span class="zero">—</span>' },
-      { key: 'source', label: 'Source link', type: 'enum', options: () => ['Connected', 'Access unavailable'], get: d => d.source.state === 'connected' ? 'Connected' : 'Access unavailable', sort: d => d.source.state,
-        render: d => d.source.state === 'connected' ? `<span class="small">${esc(d.source.system)}</span>` : '<span class="src-bad small">Unavailable</span>' }
+      { key: 'source', label: 'File', type: 'enum', options: () => ['Uploaded to iQMS', 'SharePoint link', 'Access unavailable'], get: docSource, sort: docSource,
+        render: d => d.source.state !== 'connected' ? '<span class="src-bad small">Link unavailable</span>' : `<span class="small">${esc(docSource(d))}</span>` },
+      { key: 'readable', label: 'Read by iQMS', type: 'bool', yes: 'Content read by iQMS', no: 'Description only', get: d => !Q.docRestricted(d), sort: d => Q.docRestricted(d) ? 1 : 0,
+        render: d => Q.docRestricted(d) ? '<span class="small">Description only</span>' : '<span class="small muted">Yes</span>' }
     ]
   };
   Q.RECORDS = { documents: () => Q.S.documents };
@@ -139,7 +152,7 @@
   /* ---------------- Edit view panel ----------------
    * One place to change everything a view saves: name, who can see it,
    * filters, columns (and their order), grouping and default sort.          */
-  Q.openViewEditor = (type, { view = null, base = null, onSave, onDelete, noun = 'records', groups = [['none', 'None'], ['process', 'Process'], ['clause', 'ISO 9001 clause']] }) => {
+  Q.openViewEditor = (type, { view = null, base = null, onSave, onDelete, noun = 'records', groups = [['none', 'None'], ['process', 'Process'], ['clause', 'ISO 9001 clause'], ['owner', 'Owner'], ['department', 'Department']] }) => {
     const fields = Q.FIELDS[type];
     const st = clone(view ? { name: view.name, scope: view.scope, filters: view.filters, columns: view.columns, group: view.group, sort: view.sort }
       : { name: '', scope: 'personal', filters: [], columns: fields.slice(0, 7).map(f => f.key), group: 'none', sort: null, ...(base || {}) });
@@ -186,8 +199,8 @@
         sec('layout', 'Layout', '', `<div class="ve-grid"><div class="field"><span>Group by</span>${Q.seg('Group by', groups, st.group).replace(/data-seg=/g, 'data-grp=')}</div>
           <div class="field"><span>Default sort</span><div class="sort-pick"><select class="select" name="sortKey" aria-label="Sort by"><option value="">No default sort</option>${sortable.map(f => `<option value="${f.key}" ${st.sort?.key === f.key ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select>
           <select class="select" name="sortDir" aria-label="Direction" ${st.sort ? '' : 'disabled'}><option value="1" ${st.sort?.dir !== -1 ? 'selected' : ''}>Ascending</option><option value="-1" ${st.sort?.dir === -1 ? 'selected' : ''}>Descending</option></select></div></div></div>`);
-      Q.refreshIcons();
-      if (focusSel) form.querySelector(focusSel)?.focus();
+      Q.refreshIcons(); Q.enhanceSelects(form);
+      if (focusSel) { const el = form.querySelector(focusSel); (el?._combo?.btn || el)?.focus(); }
     };
     const updCount = () => { const c = form.querySelector('[data-count]'); if (c) c.textContent = count(); };
     form.addEventListener('input', e => { if (e.target.name === 'vname') st.name = e.target.value; });
@@ -225,42 +238,75 @@
    * delete/restore actions. A page registers once:
    *   Q.viewPage(type, { route, noun, groups, legacy(q) → viewId|null })       */
   const PAGES = {};
-  Q.viewPage = (type, cfg) => { PAGES[type] = { groups: [['none', 'None'], ['process', 'Process']], ...cfg }; };
+  Q.viewPage = (type, cfg) => { PAGES[type] = { groups: [['none', 'None'], ['process', 'Process'], ['owner', 'Owner'], ['department', 'Department']], ...cfg }; };
   const pg = type => PAGES[type];
-  Q.vwHash = (type, v, extra = {}) => `${pg(type).route}?v=${v.id}${Object.entries(extra).filter(([, x]) => x).map(([k, x]) => `&${k}=${encodeURIComponent(x)}`).join('')}`;
-  const uiKey = type => 'view:' + type;
+  // Context: the same views can be shown inside a process workspace, filtered to it.
+  //   ctx = { route: '#/process/p04/documents', base: rec => bool, hide: ['process'] }
+  const CTX = {};
+  const ctxOf = type => CTX[type] || null;
+  const visible = type => Q.viewList(type).filter(v => !(ctxOf(type)?.hide || []).includes(v.group));
+  Q.vwHash = (type, v, extra = {}) => `${ctxOf(type)?.route || pg(type).route}?v=${v.id}${Object.entries(extra).filter(([, x]) => x).map(([k, x]) => `&${k}=${encodeURIComponent(x)}`).join('')}`;
+  const uiKey = type => 'view:' + type + (ctxOf(type) ? ':in-process' : '');
   // Returns { v } for a canonical URL, or { v, redirect: hash } for old/partial links.
-  Q.vwResolve = (type, q) => {
+  Q.vwResolve = (type, q, ctx = null) => {
+    CTX[type] = ctx;
     if (!Q.viewList(type).length) Q.viewRestoreDefaults(type);
-    const byId = id => Q.viewGet(type, id), list = Q.viewList(type);
+    const list = visible(type), byId = id => list.find(v => v.id === id);
     if (q.v && byId(q.v)) return { v: byId(q.v) };
     const legacy = pg(type).legacy?.(q) || {};
     const remembered = (/[?&]v=([^&]+)/.exec(Q.UI[uiKey(type)] || '') || [])[1];
     const v = (legacy.id && byId(legacy.id)) || (legacy.group && list.find(x => x.group === legacy.group)) || (legacy.fallback && byId(legacy.fallback)) || byId(remembered) || list[0];
-    const keep = { ...(legacy.extra || {}) }; ['p', 'c', 'focus'].forEach(k => { if (q[k] && !keep[k]) keep[k] = q[k]; });
+    const keep = { ...(legacy.extra || {}) }; ['p', 'c', 'o', 'd', 'focus'].forEach(k => { if (q[k] && !keep[k]) keep[k] = q[k]; });
     return { v, redirect: Q.vwHash(type, v, keep) };
   };
   Q.vwRemember = type => { Q.UI[uiKey(type)] = location.hash; Q.saveUI(); };
   Q.vwLast = type => Q.UI[uiKey(type)] && Q.UI[uiKey(type)].startsWith(pg(type).route) ? Q.UI[uiKey(type)] : pg(type).route;
-  const countOf = (type, v) => Q.RECORDS[type]().filter(Q.matcher(type, v.filters)).length;
-  const groupIcon = { process: 'workflow', clause: 'badge-check' };
-  const groupLabel = { process: 'process', clause: 'ISO clause' };
+  const countOf = (type, v) => { const base = ctxOf(type)?.base; return Q.RECORDS[type]().filter(r => (!base || base(r)) && Q.matcher(type, v.filters)(r)).length; };
+  Q.vwWhere = (type, v) => { const base = ctxOf(type)?.base, m = Q.matcher(type, v.filters); return r => (!base || base(r)) && m(r); };
+  const groupIcon = { process: 'workflow', clause: 'badge-check', owner: 'user', department: 'building-2' };
+  const groupLabel = { process: 'process', clause: 'ISO clause', owner: 'owner', department: 'department' };
+
+  /* Group by a person or a department — works for any register whose records have an owner.
+   * Left: the groups that have records in this view. Right: the same table, for the chosen group. */
+  const ownerOf = (type, r) => Q.field(type, 'owner').get(r);
+  const FIELD_GROUPS = {
+    owner: { param: 'o', heading: 'Owners', key: ownerOf, name: k => Q.pname(k), code: k => Q.initials(k),
+      sub: k => [Q.person(k).title, Q.person(k).dept].filter(Boolean).join(' · ') },
+    department: { param: 'd', heading: 'Departments', key: (type, r) => Q.field(type, 'department')?.get(r) || Q.person(ownerOf(type, r)).dept || 'No department', name: k => k, code: null,
+      sub: (k, type, recs) => { const o = [...new Set(recs.map(r => ownerOf(type, r)))]; return `${o.length} owner${o.length === 1 ? '' : 's'}: ${o.map(Q.pname).join(', ')}`; } }
+  };
+  Q.vwFieldGroup = g => FIELD_GROUPS[g] || null;
+  // → { leaf, html }.  flag = { test: rec => bool, title: 'overdue for review' } marks groups that need attention.
+  Q.vwGrouped = (type, v, where, q, tableFn, { process = null, flag = null, actions = '' } = {}) => {
+    const g = FIELD_GROUPS[v.group], noun = pg(type).noun, count = n => `${n} ${n === 1 ? ({ documents: 'document', KPIs: 'KPI' }[noun] || noun) : noun}`;
+    const recs = Q.RECORDS[type]().filter(r => (!process || Q.inProc(r.process, process)) && where(r));
+    const keys = [...new Set(recs.map(r => g.key(type, r)))].sort((a, b) => g.name(a).localeCompare(g.name(b)));
+    const sel = keys.includes(q[g.param]) ? q[g.param] : keys[0];
+    const of = k => recs.filter(r => g.key(type, r) === k), bad = k => flag ? of(k).filter(flag.test).length : 0;
+    const summary = `<div class="vc-summary">${Q.vwSummary(type, v)}</div>`;
+    if (!keys.length) return { leaf: null, html: `<div class="vc-body">${summary}<div class="empty panel"><h3>No ${esc(noun)} match this view</h3><p>Change the filters to see ${esc(noun)} grouped by ${groupLabel[v.group]}.</p></div></div>` };
+    const row = k => `<a href="${Q.vwHash(type, v, { [g.param]: k })}" ${k === sel ? 'aria-current="true"' : ''}>${g.code ? `<span class="avatar sm">${esc(g.code(k))}</span>` : ''}<span class="nm">${esc(g.name(k))}</span>${bad(k) ? `<i class="flag bad" title="${bad(k)} ${esc(flag.title)}"></i>` : ''}<span class="n">${of(k).length}</span></a>`;
+    const mine = of(sel);
+    return { leaf: g.name(sel), html: `<div class="vc-body">${summary}<div class="browse"><nav class="browse-tree by-field" aria-label="${g.heading}"><h3>${g.heading}</h3>${keys.map(row).join('')}</nav><section>
+      <div class="browse-head"><div><h2>${g.code ? `<span class="avatar">${esc(g.code(sel))}</span>` : ''}${esc(g.name(sel))}</h2><p class="sub">${esc(g.sub(sel, type, mine))} · ${esc(count(mine.length))}${v.filters.length ? ' in this view' : ''}${bad(sel) ? ` · <span class="date-overdue">${bad(sel)} ${esc(flag.title)}</span>` : ''}</p></div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>
+      ${tableFn(Q.vwTableId(type, v, `${v.group}-${String(sel).replace(/[^a-z0-9]+/gi, '_')}${process ? '-in-' + process : ''}`), { process, columns: v.columns, where: r => where(r) && g.key(type, r) === sel, initialSort: v.sort })}</section></div></div>` };
+  };
 
   Q.vwTabs = (type, active) => {
-    const list = Q.viewList(type), n = list.length;
+    const list = visible(type), n = list.length;
     const menu = (v, i) => Q.menu(`Options for view ${v.name}`, [
       { label: 'Edit view…', icon: 'sliders-horizontal', data: { action: 'vw-edit', type, id: v.id } },
       { label: 'Duplicate', icon: 'copy', data: { action: 'vw-dup', type, id: v.id } },
       { label: 'Move left', icon: 'arrow-left', data: { action: 'vw-move', type, id: v.id, dir: '-1' }, disabled: i === 0 },
       { label: 'Move right', icon: 'arrow-right', data: { action: 'vw-move', type, id: v.id, dir: '1' }, disabled: i === n - 1 },
       '-',
-      { label: 'Delete view', icon: 'trash-2', cls: 'danger', data: { action: 'vw-delete', type, id: v.id }, disabled: n === 1, title: n === 1 ? 'Keep at least one view' : '' },
+      { label: 'Delete view', icon: 'trash-2', cls: 'danger', data: { action: 'vw-delete', type, id: v.id }, disabled: Q.viewList(type).length === 1, title: Q.viewList(type).length === 1 ? 'Keep at least one view' : '' },
       '-',
       { label: 'Restore default views', icon: 'history', data: { action: 'vw-restore', type } }
     ], { icon: 'ellipsis', cls: 'vtab-more', align: 'min-width:220px' });
     return `<div class="vtabs" role="tablist" aria-label="Saved views" data-type="${type}">${list.map((v, i) =>
       `<div class="vtab${v.id === active.id ? ' on' : ''}" draggable="true" data-vid="${v.id}" title="Drag to reorder"><a role="tab" draggable="false" href="${Q.vwHash(type, v)}" aria-selected="${v.id === active.id}" title="${esc(v.name)}${v.scope === 'personal' ? ' (only you)' : ''}">${groupIcon[v.group] ? icon(groupIcon[v.group]) : ''}<span class="vt-name">${esc(v.name)}</span>${v.group === 'none' ? `<span class="n">${countOf(type, v)}</span>` : ''}${v.scope === 'personal' ? icon('lock', 'vt-lock') : ''}</a>${menu(v, i)}</div>`).join('')}
-      <button type="button" class="vt-new" data-action="vw-new" data-type="${type}">${icon('plus')}New view</button></div>`;
+      <button type="button" class="vt-new" data-action="vw-new" data-type="${type}">${icon('plus')}New view</button>${ctxOf(type) ? `<span class="vt-ctx" title="Views are shared with the ${esc(pg(type).noun)} page; here they only show this process">${icon('workflow')}This process only</span>` : ''}</div>`;
   };
   Q.vwSummary = (type, v) => `<button type="button" class="view-summary" data-action="vw-edit" data-type="${type}" data-id="${v.id}" title="Edit view">${v.filters.length ? v.filters.map(r => `<span class="fchip">${esc(Q.describeRule(type, r))}</span>`).join('') : `<span class="muted">All ${esc(pg(type).noun)}</span>`}${v.group !== 'none' ? `<span class="fchip neutral">Grouped by ${groupLabel[v.group] || v.group}</span>` : ''}<span class="vs-edit">${icon('sliders-horizontal')}Edit view</span></button>`;
   Q.vwCard = (type, v, body) => `<section class="view-card" aria-label="${esc(pg(type).noun)} — ${esc(v.name)}">${Q.vwTabs(type, v)}${body}</section>`;
@@ -285,7 +331,7 @@
     bar.addEventListener('dragleave', e => { if (!bar.contains(e.relatedTarget)) bar.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); });
     bar.addEventListener('drop', e => {
       const t = e.target.closest('.vtab'); if (!dragId || !t) return; e.preventDefault();
-      const list = Q.viewList(type), from = list.findIndex(v => v.id === dragId), moved = list.splice(from, 1)[0];
+      const list = Q.viewList(type), from = list.findIndex(v => v.id === dragId), moved = list.splice(from, 1)[0]; // full list: hidden views keep their place
       let to = list.findIndex(v => v.id === t.dataset.vid); if (t.classList.contains('drop-after')) to += 1;
       list.splice(Math.max(0, to), 0, moved); dragId = null; clear();
       if (list.indexOf(moved) !== from) { Q.save(); Q.render({ noFocus: true }); }
@@ -305,12 +351,13 @@
   A['vw-edit'] = d => editor(d.type, Q.viewGet(d.type, d.id));
   A['vw-new'] = d => { const first = Q.viewList(d.type)[0]; editor(d.type, null, { columns: [...(first?.columns || [])] }); };
   A['vw-dup'] = d => { const s = Q.viewGet(d.type, d.id); const v = Q.viewCreate(d.type, { name: `${s.name} (copy)`, scope: 'personal', filters: s.filters, columns: s.columns, group: s.group, sort: s.sort }); Q.go(Q.vwHash(d.type, v)); Q.toast('View duplicated', `${v.name} — only you can see it.`); };
-  A['vw-move'] = d => { const list = Q.viewList(d.type), v = Q.viewGet(d.type, d.id), i = list.indexOf(v), j = i + Number(d.dir); if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; Q.save(); rerender(); document.querySelector(`.vtab[data-vid="${v.id}"] a`)?.focus(); };
+  A['vw-move'] = d => { const list = Q.viewList(d.type), vis = visible(d.type), v = Q.viewGet(d.type, d.id), k = vis.indexOf(v), w = vis[k + Number(d.dir)]; if (!w) return; const i = list.indexOf(v), j = list.indexOf(w); [list[i], list[j]] = [list[j], list[i]]; Q.save(); rerender(); document.querySelector(`.vtab[data-vid="${v.id}"] a`)?.focus(); };
   A['vw-delete'] = d => { const type = d.type, v = Q.viewGet(type, d.id); if (!v) return; Q.confirm({ title: `Delete “${v.name}”?`, body: `<p>${v.seed ? 'This is a default view. You can bring it back later with <b>Restore default views</b>.' : v.scope === 'shared' ? 'This view will be removed for everyone in the organization.' : 'This personal view will be removed.'} The ${esc(pg(type).noun)} themselves are not affected.</p>`, confirm: 'Delete View', danger: true, onConfirm: () => {
-    const list = Q.viewList(type), i = list.indexOf(v); list.splice(i, 1); dropTables(type, v.id); Q.save();
-    if (curId(type) === v.id) { Q.UI[uiKey(type)] = ''; Q.go(Q.vwHash(type, list[Math.max(0, i - 1)])); } else rerender();
+    const vis = visible(type), k = vis.indexOf(v), list = Q.viewList(type); list.splice(list.indexOf(v), 1); dropTables(type, v.id); Q.save();
+    const next = vis.filter(x => x !== v)[Math.max(0, k - 1)] || Q.viewList(type)[0];
+    if (curId(type) === v.id) { Q.UI[uiKey(type)] = ''; Q.go(Q.vwHash(type, next)); } else rerender();
     Q.toast('View deleted', v.name); } }); };
   A['vw-restore'] = d => { const type = d.type, names = (window.QMS_DATA.savedViews[type] || []).map(v => v.name).join(', '); Q.confirm({ title: 'Restore default views?', body: `<p>The default views (${esc(names)}) are put back with their original settings. Views you created are kept.</p>`, confirm: 'Restore', onConfirm: () => {
     Q.viewList(type).filter(x => x.seed).forEach(x => dropTables(type, x.id)); Q.viewRestoreDefaults(type);
-    const keep = Q.viewGet(type, curId(type)) || Q.viewList(type)[0]; Q.go(Q.vwHash(type, keep)); rerender(); Q.toast('Default views restored'); } }); };
+    const keep = Q.viewGet(type, curId(type)) || visible(type)[0]; Q.go(Q.vwHash(type, keep)); rerender(); Q.toast('Default views restored'); } }); };
 })();

@@ -18,65 +18,138 @@
     return fn(q);
   };
 
+  /* The four QMS pages are layouts of pre-made components (see pages.js). The functions
+   * below only set the page header; what the page shows comes from its layout.         */
+  const P = (type, extra = {}) => ({ id: `d-${type}`, type, ...extra });
+  Q.page('scope', { title: 'Organization & Scope', route: '#/qms/scope', layout: { layout: '2-1', zones: {
+    top: [P('context-review-alert')], main: [P('scope-statement'), P('sites'), P('context-issues'), P('parties')], side: [P('org-facts'), P('exclusions'), P('structure-docs')] } } });
+  Q.page('policies', { title: 'Policies', route: '#/qms/policies', layout: { layout: '2-1', zones: {
+    main: [P('quality-policy'), P('other-policies')], side: [P('policy-ack'), P('objectives-health')] } } });
+  Q.page('processes', { title: 'Processes', route: '#/qms/processes', layout: { layout: '1', zones: { top: [P('process-map')] } } });
+  Q.page('objectives', { title: 'Objectives & KPIs', route: '#/qms/objectives', layout: { layout: '1', zones: { top: [P('kpi-views')] } } });
+
   function scopePage() {
-    const S = Q.S, c = S.context, o = S.organization;
-    const scopeDoc = Q.doc(c.scopeDoc), ctxDoc = Q.doc(c.contextDoc);
-    return { title: 'Organization & Scope', nav: 'qms', html:
-      Q.pageHead({ crumbs: qmsCrumbs('Organization & Scope'), title: 'Organization & Scope', sub: 'Who we are, what the QMS covers, and the context it operates in — ISO 9001 clauses 4.1–4.4.',
-        actions: `<a class="btn" href="#/settings/organization">${icon('pencil')}Edit Organization</a>` }) +
-      (Q.docOverdue(ctxDoc) ? `<div class="callout warning" style="margin-bottom:20px">${icon('calendar-clock')}<span><b>Context & Interested Parties Register review is overdue</b>Was due ${Q.fmt(ctxDoc.nextReview)}. Issues and interested parties below may be out of date — this is also an input to the next management review.</span><button class="btn sm" type="button" data-action="create-revision" data-id="${ctxDoc.id}" style="margin-left:auto">Create Revision</button></div>` : '') +
-      `<div class="grid-2">
-        <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-          <section class="panel"><div class="panel-head"><h2>QMS scope</h2><span class="clause small muted">4.3</span><div class="actions"><button class="btn sm" type="button" data-action="open-doc" data-id="${scopeDoc.id}">${icon('file-text')}Open ${esc(scopeDoc.id)}</button></div></div>
-            <div class="panel-pad"><p class="scope-statement">${esc(c.scope)}</p><p class="small muted" style="margin-top:10px">Source: ${docChip(scopeDoc.id)}</p></div></section>
-          <section class="panel"><div class="panel-head"><h2>Sites covered</h2><span class="muted small">${c.sites.length}</span></div>
-            <div class="table-scroll"><table class="dt"><thead><tr><th>Site</th><th>Location</th><th>Activities in scope</th></tr></thead><tbody>${c.sites.map(x => `<tr><td><span class="title">${esc(x.name)}</span></td><td>${esc(x.address)}</td><td class="small">${esc(x.activities)}</td></tr>`).join('')}</tbody></table></div></section>
-          <section class="panel"><div class="panel-head"><h2>Context of the organization</h2><span class="clause small muted">4.1</span><div class="actions"><button class="btn sm ghost" type="button" data-action="open-doc" data-id="${ctxDoc.id}">Open register</button></div></div>
-            <div class="panel-pad grid-halves" style="gap:24px"><div><h3 style="font-size:14px;margin-bottom:8px">Internal issues</h3><ul class="bullets">${c.issues.internal.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
-            <div><h3 style="font-size:14px;margin-bottom:8px">External issues</h3><ul class="bullets">${c.issues.external.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div></div></section>
-          <section class="panel"><div class="panel-head"><h2>Interested parties</h2><span class="clause small muted">4.2</span></div>
-            <div class="table-scroll"><table class="dt"><thead><tr><th>Interested party</th><th>Relevant needs & expectations</th><th>How we monitor</th></tr></thead><tbody>${c.parties.map(x => `<tr><td><span class="title">${esc(x.party)}</span></td><td class="small">${esc(x.needs)}</td><td class="small">${esc(x.monitoring)}</td></tr>`).join('')}</tbody></table></div></section>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-          <section class="panel"><div class="panel-head"><h2>Organization</h2></div><div class="panel-pad"><dl class="dl-list">
-            <dt>Name</dt><dd><b>${esc(o.name)}</b></dd><dt>Industry</dt><dd>${esc(o.industry)}</dd><dt>Standard</dt><dd>${esc(o.standard)}</dd>
-            <dt>Processes</dt><dd><a href="#/qms/processes">${Q.topProcesses().length} processes</a> · ${S.processes.filter(p => p.parent_process_id && p.status === 'active').length} subprocesses</dd>
-            <dt>People</dt><dd>${S.users.filter(u => u.status === 'Active').length} active users</dd>
-            <dt>Top management</dt><dd>${esc(Q.pname('eric'))}, ${esc(Q.person('eric').title)}</dd>
-            <dt>QMS representative</dt><dd>${esc(Q.pname('maria'))}, ${esc(Q.person('maria').title)}</dd></dl></div></section>
-          <section class="panel"><div class="panel-head"><h2>Exclusions</h2><span class="muted small">justified in scope</span></div>
-            <ul class="worklist">${c.exclusions.map(x => `<li><div class="w-main"><div class="w-title"><span class="clause">${esc(x.clause)}</span> ${esc(x.title)}</div><div class="w-meta">${esc(x.reason)}</div></div></li>`).join('')}</ul></section>
-          <section class="panel"><div class="panel-head"><h2>Structure & responsibilities</h2><span class="clause small muted">5.3</span></div>
-            <ul class="link-list" style="padding:4px 20px">${[c.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(id => { const d = Q.doc(id); return `<li>${icon('file-text')}<div class="ll-main"><b>${esc(d.title)}</b><span>${esc(d.id)} · Rev ${esc(d.rev)}${d.workingRev && d.status !== 'Published' ? ` → ${esc(d.workingRev)} ${esc(d.status.toLowerCase())}` : ''}</span></div><button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open</button></li>`; }).join('')}</ul></section>
-        </div></div>` };
+    return Q.pageView('scope', { title: 'Organization & Scope', nav: 'qms', crumbs: qmsCrumbs('Organization & Scope'), sub: 'Who we are, what the QMS covers, and the context it operates in — ISO 9001 clauses 4.1–4.4.',
+      actions: `<a class="btn" href="#/settings/organization">${icon('pencil')}Edit Organization</a>` });
   }
-
   function policiesPage() {
-    const S = Q.S, pol = S.policies.quality, d = Q.doc(pol.doc), a = pol.communicated;
-    const pct = Math.round(a.acknowledged / a.total * 100);
-    const others = S.documents.filter(x => x.type === 'Policy' && x.id !== pol.doc);
-    return { title: 'Policies', nav: 'qms', html:
-      Q.pageHead({ crumbs: qmsCrumbs('Policies'), title: 'Policies', sub: 'The quality policy and other policies that set direction for the QMS — ISO 9001 clause 5.2.',
-        actions: `<button class="btn" type="button" data-action="create-revision" data-id="${d.id}">${icon('git-branch-plus')}Revise Quality Policy</button>` }) +
-      `<div class="grid-2"><div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-        <section class="policy-card" aria-labelledby="qp"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><h2 id="qp" style="font-size:20px">Quality Policy</h2>${Q.st('Published')}<span class="small muted tnum">${esc(d.id)} · Rev ${esc(d.rev)}</span></div>
-          <blockquote>${esc(pol.statement)}</blockquote><ol>${pol.commitments.map(c => `<li>${esc(c)}</li>`).join('')}</ol>
-          <div class="policy-sign"><span>Approved by <b>${esc(Q.pname(pol.approvedBy))}</b>, ${esc(Q.person(pol.approvedBy).title)}</span><span>Effective <b>${Q.fmt(d.effective)}</b></span><span>Next review <b>${Q.fmt(d.nextReview)}</b></span><button class="link-btn" type="button" data-action="open-doc" data-id="${d.id}">Open controlled copy</button></div></section>
-        <section class="panel"><div class="panel-head"><h2>Other policies</h2><span class="muted small">${others.length}</span></div>
-          ${others.length ? `<ul class="worklist">${others.map(x => `<li><span class="w-kind">${icon('scroll-text')}</span><div class="w-main"><div class="w-title">${esc(x.title)}</div><div class="w-meta">${esc(x.id)} · Rev ${esc(x.rev)} · ${esc(Q.plabel(x.process))} · owner ${esc(Q.pname(x.owner))}</div></div>${Q.reviewDate(x.nextReview, Q.docOverdue(x), Q.docDueSoon(x))}<button class="btn sm" type="button" data-action="open-doc" data-id="${x.id}">Open</button></li>`).join('')}</ul>` : '<div class="empty">No other policies.</div>'}</section>
-      </div><div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-        <section class="panel"><div class="panel-head"><h2>Communicated & understood</h2><span class="clause small muted">5.2.2 · 7.3</span></div><div class="panel-pad">
-          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:32px;font-weight:600" class="tnum">${pct}%</span><span class="muted">acknowledged</span></div>
-          <div class="stack-bar" style="margin:8px 0"><span class="b-complete" style="width:${pct}%"></span></div>
-          <p class="small muted">${a.acknowledged} of ${a.total} employees acknowledged Rev ${esc(d.rev)} · last campaign ${Q.fmt(a.lastCampaign)}</p>
-          <button class="btn sm" type="button" style="margin-top:12px" data-action="toast" data-title="Reminder sent" data-msg="${a.total - a.acknowledged} employees will be asked to read and acknowledge the Quality Policy.">${icon('send')}Remind ${a.total - a.acknowledged} people</button></div></section>
-        <section class="panel"><div class="panel-head"><h2>Measured through</h2><div class="actions"><a class="btn sm ghost" href="#/qms/objectives">Objectives & KPIs</a></div></div>
-          <ul class="health-list">${[...new Set(S.kpis.map(k => k.objective))].slice(0, 7).map(o => { const ks = S.kpis.filter(k => k.objective === o); const below = ks.filter(k => !Q.kpiOk(k)).length; return `<li>${icon('target')}<span>${esc(o)}</span><span class="v ${below ? 'attn' : 'zero'}" style="font-size:12px;white-space:nowrap">${below ? `${below} below target` : 'on target'}</span></li>`; }).join('')}</ul></section>
-      </div></div>` };
+    const d = Q.doc(Q.S.policies.quality.doc);
+    return Q.pageView('policies', { title: 'Policies', nav: 'qms', crumbs: qmsCrumbs('Policies'), sub: 'The quality policy and other policies that set direction for the QMS — ISO 9001 clause 5.2.',
+      actions: `<button class="btn" type="button" data-action="create-revision" data-id="${d.id}">${icon('git-branch-plus')}Revise Quality Policy</button>` });
+  }
+  function processesPage(q) {
+    // Old links (?view=table) set the display once; the Cards/Register switch remembers it after that.
+    if (q.view) { Q.UI.procView = q.view === 'table' ? 'table' : 'map'; Q.saveUI(); location.replace('#/qms/processes'); return { title: 'Processes', nav: 'qms', html: '' }; }
+    return Q.pageView('processes', { title: 'Processes', nav: 'qms', crumbs: qmsCrumbs('Processes'), sub: 'The processes of the QMS and how they interact — ISO 9001 clause 4.4. Open a process for its documents, risks, KPIs, evidence and audits.',
+      actions: `<a class="btn" href="#/settings/processes">${icon('network')}Edit Process Structure</a>` });
   }
 
-  function processesPage(q) {
-    const view = q.view === 'table' ? 'table' : 'map';
+  /* ---------------- Organization & context components ---------------- */
+  const G1 = 'Organization & context';
+  // Rows edited on the page need stable ids.
+  const ctxRows = kind => { const list = Q.S.context[kind]; let ch = false; list.forEach(x => { if (!x.id) { x.id = `${kind.slice(0, 3)}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; ch = true; } }); if (ch) Q.save(); return list; };
+  const CTX = {
+    sites: { one: 'site', title: 'Site', label: x => x.name, fields: [['name', 'Site', 'input', true], ['address', 'Location', 'input', true], ['activities', 'Activities in scope', 'textarea', true]] },
+    parties: { one: 'interested party', title: 'Interested party', label: x => x.party, fields: [['party', 'Interested party', 'input', true], ['needs', 'Relevant needs & expectations', 'textarea', true], ['monitoring', 'How we monitor', 'textarea', false]] }
+  };
+  const ctxMenu = (kind, x) => `<span class="row-menu">${Q.menu(`Actions for ${CTX[kind].label(x)}`, [
+    { label: 'Edit', icon: 'pencil', data: { action: 'ctx-edit', kind, id: x.id } }, '-',
+    { label: 'Delete', icon: 'trash-2', cls: 'danger', data: { action: 'ctx-delete', kind, id: x.id } }], { align: 'min-width:160px' })}</span>`;
+  const ctxTable = (kind, id, columns, noun, narrow) => Q.table({ id, rows: () => ctxRows(kind), noun, caption: noun, bare: true, rowLabel: CTX[kind].label,
+    search: x => CTX[kind].fields.map(f => x[f[0]] || '').join(' '),
+    tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search ${esc(noun)}" aria-label="Search ${esc(noun)}"></div>`,
+    columns: [...(narrow ? columns.slice(0, 2) : columns), { key: 'actions', label: '', cls: 'c-actions c-menu', render: x => ctxMenu(kind, x) }],
+    empty: `<h3>No ${esc(noun)} yet</h3><p>Add the first one with the button above.</p>` });
+  const ctxForm = (kind, row) => {
+    const K = CTX[kind];
+    const m = Q.openModal({ size: 'm', title: `${row ? 'Edit' : 'Add'} ${K.one}`, sub: row ? esc(K.label(row)) : 'Shown on Organization & Scope and wherever this list is placed.',
+      body: `<form class="modal-body"><div style="display:flex;flex-direction:column;gap:16px">${K.fields.map(([k, l, t, req], i) => `<label class="field"><span>${esc(l)}${req ? ' <span class="req">*</span>' : ''}</span>${t === 'textarea' ? `<textarea class="textarea" name="${k}" rows="3" ${req ? 'required' : ''}>${esc(row?.[k] || '')}</textarea>` : `<input class="input" name="${k}" ${req ? 'required' : ''} ${i === 0 ? 'autofocus' : ''} value="${esc(row?.[k] || '')}">`}</label>`).join('')}</div></form>`,
+      foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>${row ? 'Save Changes' : `Add ${K.title}`}</button>` });
+    const ok = () => {
+      const f = m.querySelector('form'); if (!Q.validate(f)) return;
+      const v = Q.formValues(f); Object.keys(v).forEach(k => { v[k] = v[k].trim(); });
+      if (row) Object.assign(row, v); else Q.S.context[kind].push({ id: `${kind.slice(0, 3)}-${Date.now().toString(36)}`, ...v });
+      Q.save(); Q.closeModal(); Q.render({ noFocus: true }); Q.toast(row ? `${K.title} updated` : `${K.title} added`, K.label(row || v));
+    };
+    m.querySelector('[data-ok]').addEventListener('click', ok); m.querySelector('form').addEventListener('submit', e => { e.preventDefault(); ok(); });
+  };
+  Q.actions['ctx-add'] = d => ctxForm(d.kind, null);
+  Q.actions['ctx-edit'] = d => ctxForm(d.kind, ctxRows(d.kind).find(x => x.id === d.id));
+  Q.actions['ctx-delete'] = d => { const K = CTX[d.kind], list = ctxRows(d.kind), row = list.find(x => x.id === d.id); if (!row) return;
+    Q.confirm({ title: `Delete this ${K.one}?`, body: `<p><b>${esc(K.label(row))}</b> is removed from the list. Update the controlled document if it lists it too.</p>`, confirm: 'Delete', danger: true,
+      onConfirm: () => { list.splice(list.indexOf(row), 1); Q.save(); Q.render({ noFocus: true }); Q.toast(`${K.title} deleted`, K.label(row)); } }); };
+  Q.actions['ctx-issues'] = () => {
+    const c = Q.S.context;
+    const m = Q.openModal({ size: 'l', title: 'Edit context issues', sub: 'ISO 9001 clause 4.1 — one issue per line.',
+      body: `<form class="modal-body"><div class="form-grid"><label class="field"><span>Internal issues</span><textarea class="textarea" name="internal" rows="8">${esc(c.issues.internal.join('\n'))}</textarea></label><label class="field"><span>External issues</span><textarea class="textarea" name="external" rows="8">${esc(c.issues.external.join('\n'))}</textarea></label></div></form>`,
+      foot: `<span class="left">Keep ${esc(c.contextDoc)} in step with this list.</span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Save Changes</button>` });
+    m.querySelector('[data-ok]').addEventListener('click', () => { const v = Q.formValues(m.querySelector('form')), lines = s => s.split('\n').map(x => x.trim()).filter(Boolean);
+      c.issues.internal = lines(v.internal); c.issues.external = lines(v.external); Q.save(); Q.closeModal(); Q.render({ noFocus: true }); Q.toast('Context issues updated', `${c.issues.internal.length} internal · ${c.issues.external.length} external`); });
+  };
+
+  Q.component('context-review-alert', { group: G1, name: 'Register review alert', icon: 'calendar-clock', desc: 'A warning shown only while the Context & Interested Parties Register is overdue for review.',
+    hiddenNote: 'Shown only while the Context & Interested Parties Register is overdue for review.',
+    render: () => { const d = Q.doc(Q.S.context.contextDoc); return d && Q.docOverdue(d) ? `<div class="callout warning">${icon('calendar-clock')}<span><b>${esc(d.title)} review is overdue</b>Was due ${Q.fmt(d.nextReview)}. Issues and interested parties may be out of date — this is also an input to the next management review.</span><button class="btn sm" type="button" data-action="create-revision" data-id="${d.id}" style="margin-left:auto">Create Revision</button></div>` : ''; } });
+  Q.component('scope-statement', { group: G1, name: 'QMS scope', icon: 'file-text', desc: 'The scope statement of the QMS with its controlled source document (clause 4.3).',
+    render: (b, ctx) => { const c = Q.S.context, d = Q.doc(c.scopeDoc); return Q.panel({ title: ctx.title('QMS scope'), tag: '4.3', pad: true, actions: `<button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">${icon('file-text')}Open ${esc(d.id)}</button>`,
+      body: `<p class="scope-statement">${esc(c.scope)}</p><p class="small muted" style="margin-top:10px">Source: ${docChip(d.id)}</p>` }); } });
+  Q.component('sites', { group: G1, name: 'Sites covered', icon: 'building-2', desc: 'Sites in the scope of the QMS. Sort, search, export, add, edit and delete.',
+    render: (b, ctx) => Q.panel({ title: ctx.title('Sites covered'), count: Q.S.context.sites.length, actions: `<button class="btn sm" type="button" data-action="ctx-add" data-kind="sites">${icon('plus')}Add Site</button>`,
+      body: ctxTable('sites', `ctx-sites-${b.id}`, [
+        { key: 'name', label: 'Site', sort: x => x.name, render: x => `<span class="title">${esc(x.name)}</span>` },
+        { key: 'address', label: 'Location', sort: x => x.address, render: x => esc(x.address) },
+        { key: 'activities', label: 'Activities in scope', sort: x => x.activities, render: x => `<span class="small">${esc(x.activities)}</span>` }], 'sites', ctx.zone === 'side') }) });
+  Q.component('context-issues', { group: G1, name: 'Context of the organization', icon: 'globe', desc: 'Internal and external issues that affect the QMS (clause 4.1). Editable.',
+    render: (b, ctx) => { const c = Q.S.context, col = (h, list) => `<div><h3 style="font-size:14px;margin-bottom:8px">${h}</h3>${list.length ? `<ul class="bullets">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted small">None recorded.</p>'}</div>`;
+      return Q.panel({ title: ctx.title('Context of the organization'), tag: '4.1', actions: `<button class="btn sm ghost" type="button" data-action="open-doc" data-id="${esc(c.contextDoc)}">Open register</button><button class="btn sm" type="button" data-action="ctx-issues">${icon('pencil')}Edit</button>`,
+        body: `<div class="panel-pad ${ctx.zone === 'side' ? 'stack-16' : 'grid-halves'}" style="gap:24px">${col('Internal issues', c.issues.internal)}${col('External issues', c.issues.external)}</div>` }); } });
+  Q.component('parties', { group: G1, name: 'Interested parties', icon: 'users', desc: 'Interested parties, what they expect and how it is monitored (clause 4.2). Sort, search, export, add, edit and delete.',
+    render: (b, ctx) => Q.panel({ title: ctx.title('Interested parties'), tag: '4.2', count: Q.S.context.parties.length, actions: `<button class="btn sm" type="button" data-action="ctx-add" data-kind="parties">${icon('plus')}Add Party</button>`,
+      body: ctxTable('parties', `ctx-parties-${b.id}`, [
+        { key: 'party', label: 'Interested party', sort: x => x.party, render: x => `<span class="title">${esc(x.party)}</span>` },
+        { key: 'needs', label: 'Relevant needs & expectations', sort: x => x.needs, render: x => `<span class="small">${esc(x.needs)}</span>` },
+        { key: 'monitoring', label: 'How we monitor', sort: x => x.monitoring, render: x => `<span class="small">${esc(x.monitoring)}</span>` }], 'interested parties', ctx.zone === 'side') }) });
+  Q.component('org-facts', { group: G1, name: 'Organization', icon: 'building-2', desc: 'Name, industry, standard, number of processes and people, top management.',
+    render: (b, ctx) => { const S = Q.S, o = S.organization; return Q.panel({ title: ctx.title('Organization'), pad: true, body: `<dl class="dl-list">
+      <dt>Name</dt><dd><b>${esc(o.name)}</b></dd><dt>Industry</dt><dd>${esc(o.industry)}</dd><dt>Standard</dt><dd>${esc(Q.standard())}</dd>
+      <dt>Processes</dt><dd><a href="#/qms/processes">${Q.topProcesses().length} processes</a> · ${S.processes.filter(p => p.parent_process_id && p.status === 'active').length} subprocesses</dd>
+      <dt>People</dt><dd>${S.users.filter(u => u.status === 'Active').length} active users</dd>
+      <dt>Top management</dt><dd>${esc(Q.pname('eric'))}, ${esc(Q.person('eric').title)}</dd>
+      <dt>QMS representative</dt><dd>${esc(Q.pname('maria'))}, ${esc(Q.person('maria').title)}</dd></dl>` }); } });
+  Q.component('exclusions', { group: G1, name: 'Exclusions', icon: 'ban', desc: 'Requirements that do not apply, with the justification from the scope.',
+    render: (b, ctx) => { const list = Q.S.context.exclusions; return Q.panel({ title: ctx.title('Exclusions'), count: 'justified in scope',
+      body: list.length ? `<ul class="worklist">${list.map(x => `<li><div class="w-main"><div class="w-title"><span class="clause">${esc(x.clause)}</span> ${esc(x.title)}</div><div class="w-meta">${esc(x.reason)}</div></div></li>`).join('')}</ul>` : '<div class="empty">No exclusions.</div>' }); } });
+  Q.component('structure-docs', { group: G1, name: 'Structure & responsibilities', icon: 'network', desc: 'The organization chart, responsibilities matrix and process map (clause 5.3).',
+    render: (b, ctx) => Q.panel({ title: ctx.title('Structure & responsibilities'), tag: '5.3',
+      body: `<ul class="link-list" style="padding:4px 20px">${[Q.S.context.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(Q.doc).filter(Boolean).map(d => `<li>${icon('file-text')}<div class="ll-main"><b>${esc(d.title)}</b><span>${esc(d.id)} · Rev ${esc(d.rev)}${d.workingRev && d.status !== 'Published' ? ` → ${esc(d.workingRev)} ${esc(d.status.toLowerCase())}` : ''}</span></div><button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open</button></li>`).join('')}</ul>` }) });
+
+  /* ---------------- Policy components ---------------- */
+  const G2 = 'Policy';
+  Q.component('quality-policy', { group: G2, name: 'Quality Policy', icon: 'scroll-text', desc: 'The policy statement, its commitments, approval and review dates (clause 5.2).',
+    render: () => { const pol = Q.S.policies.quality, d = Q.doc(pol.doc);
+      return `<section class="policy-card" aria-labelledby="qp"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap"><h2 id="qp" style="font-size:20px">Quality Policy</h2>${Q.st('Published')}<span class="small muted tnum">${esc(d.id)} · Rev ${esc(d.rev)}</span></div>
+        <blockquote>${esc(pol.statement)}</blockquote><ol>${pol.commitments.map(c => `<li>${esc(c)}</li>`).join('')}</ol>
+        <div class="policy-sign"><span>Approved by <b>${esc(Q.pname(pol.approvedBy))}</b>, ${esc(Q.person(pol.approvedBy).title)}</span><span>Effective <b>${Q.fmt(d.effective)}</b></span><span>Next review <b>${Q.fmt(d.nextReview)}</b></span><button class="link-btn" type="button" data-action="open-doc" data-id="${d.id}">Open controlled copy</button></div></section>`; } });
+  Q.component('other-policies', { group: G2, name: 'Other policies', icon: 'library', desc: 'Every other controlled policy, as a live table from Documented Information.',
+    render: (b, ctx) => { const main = Q.S.policies.quality.doc, where = d => d.type === 'Policy' && d.id !== main;
+      return Q.panel({ title: ctx.title('Other policies'), count: Q.S.documents.filter(where).length, actions: '<a class="btn sm ghost" href="#/documents?v=v-all">All documents</a>',
+        body: Q.docTable(`pol-others-${b.id}`, { columns: ctx.zone === 'side' ? ['title', 'nextReview'] : ['id', 'title', 'process', 'owner', 'classification', 'nextReview'], where, bare: true }) }); } });
+  Q.component('policy-ack', { group: G2, name: 'Communicated & understood', icon: 'circle-check', desc: 'How many employees acknowledged the current Quality Policy (clauses 5.2.2 and 7.3).',
+    render: (b, ctx) => { const pol = Q.S.policies.quality, d = Q.doc(pol.doc), a = pol.communicated, pct = Math.round(a.acknowledged / a.total * 100);
+      return Q.panel({ title: ctx.title('Communicated & understood'), tag: '5.2.2 · 7.3', pad: true, body: `<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:32px;font-weight:600" class="tnum">${pct}%</span><span class="muted">acknowledged</span></div>
+        <div class="stack-bar" style="margin:8px 0"><span class="b-complete" style="width:${pct}%"></span></div>
+        <p class="small muted">${a.acknowledged} of ${a.total} employees acknowledged Rev ${esc(d.rev)} · last campaign ${Q.fmt(a.lastCampaign)}</p>
+        <button class="btn sm" type="button" style="margin-top:12px" data-action="toast" data-title="Reminder sent" data-msg="${a.total - a.acknowledged} employees will be asked to read and acknowledge the Quality Policy.">${icon('send')}Remind ${a.total - a.acknowledged} people</button>` }); } });
+  Q.component('objectives-health', { group: 'Objectives & processes', name: 'Objectives on target', icon: 'target', desc: 'Each quality objective with how many of its KPIs are below target.',
+    render: (b, ctx) => Q.panel({ title: ctx.title('Measured through'), actions: '<a class="btn sm ghost" href="#/qms/objectives">Objectives & KPIs</a>',
+      body: `<ul class="health-list">${[...new Set(Q.S.kpis.map(k => k.objective))].slice(0, 7).map(o => { const below = Q.S.kpis.filter(k => k.objective === o && !Q.kpiOk(k)).length; return `<li>${icon('target')}<span>${esc(o)}</span><span class="v ${below ? 'attn' : 'zero'}" style="font-size:12px;white-space:nowrap">${below ? `${below} below target` : 'on target'}</span></li>`; }).join('')}</ul>` }) });
+
+  /* ---------------- Processes component ---------------- */
+  Q.actions['proc-view'] = d => { Q.UI.procView = d.view; Q.saveUI(); Q.render({ noFocus: true }); };
+  Q.component('process-map', { group: 'Objectives & processes', name: 'Processes', icon: 'workflow', desc: 'Every process as a card or as a register table, with status and ISO readiness.',
+    render: () => processMap() });
+  function processMap() {
+    const view = Q.UI.procView === 'table' ? 'table' : 'map';
     const tops = Q.topProcesses().map(p => ({ ...p, id: p.process_id, s: Q.stats(p.process_id) }));
     // Process card: type + status · name, purpose, Open · team avatars + ISO readiness.
     const STATUS = { ok: ['On track', 'ok'], attn: ['Needs attention', 'attn'], risk: ['At risk', 'risk'] };
@@ -125,12 +198,9 @@
         { key: 'risk', label: 'High risks', cls: 'c-num', sort: r => r.s.highRisks, render: r => Q.num(r.s.highRisks) },
         { key: 'isor', label: 'ISO readiness', sort: r => r.s.iso.pct ?? -1, render: r => Q.miniProgress(r.s.iso.pct) }
       ] });
-    return { title: 'Processes', nav: 'qms', html:
-      Q.pageHead({ crumbs: qmsCrumbs('Processes'), title: 'Processes', sub: 'The processes of the QMS and how they interact — ISO 9001 clause 4.4. Open a process for its documents, risks, KPIs, evidence and audits.',
-        actions: `<a class="btn" href="#/settings/processes">${icon('network')}Edit Process Structure</a>` }) +
-      `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">${Q.seg('View', [['map', 'Cards'], ['table', 'Register']], view).replace(/data-seg="(\w+)"/g, 'data-go="#/qms/processes?view=$1"')}
+    return `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">${Q.seg('View', [['map', 'Cards'], ['table', 'Register']], view).replace(/data-seg=/g, 'data-action="proc-view" data-view=')}
         <span class="small muted">${tops.length} processes · ${tops.filter(p => p.s.health !== 'ok').length} need attention</span></div>` +
-      (view === 'table' ? table : map) };
+      (view === 'table' ? table : map);
   }
 
   /* ---------- Objectives & KPIs — same saved-views design as Documented Information ---------- */
@@ -171,13 +241,13 @@
     ? `<button class="btn sm primary" type="button" data-action="kpi-record" data-id="${keys[0]}">${icon('plus')}Record new value</button><button class="btn sm" type="button" data-action="go" data-href="#/process/${Q.S.kpis.find(k => k.id === keys[0]).process}/kpis">${icon('workflow')}Open process workspace</button>`
     : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} KPIs were asked to record this period's values.">${icon('bell')}Ask owners for values</button>`;
   // One KPI table for the register page and the process workspace tab.
-  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '' } = {}) => {
+  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0 } = {}) => {
     const cols = (columns || Q.FIELDS.kpis.map(f => f.key)).map(k => Q.field(KT, k)).filter(Boolean)
       .filter(f => !(f.key === 'process' && process && !Q.children(process).length))
       .map(f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render }));
     cols.push({ key: 'actions', label: '', cls: 'c-actions c-menu', render: k => `<span class="row-menu">${kpiMenu(k)}</span>` });
     return Q.table({ id, rows: () => Q.S.kpis.filter(k => (!process || Q.inProc(k.process, process)) && (!where || where(k))), columns: cols,
-      selectable: true, tight: true, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, expand: kpiExpand, selectionBar: kpiSel,
+      selectable: true, tight: true, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, pageSize, expand: kpiExpand, selectionBar: kpiSel,
       search: k => `${k.name} ${k.objective} ${Q.pname(k.owner)}`, ...(Q.tables[id] ? {} : { initialSort }),
       tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}`,
       empty: '<h3>No KPIs match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
@@ -196,14 +266,16 @@
     m.querySelector('[data-ok]').addEventListener('click', ok); m.querySelector('form').addEventListener('submit', e => { e.preventDefault(); ok(); });
   };
 
-  Q.viewPage(KT, { route: '#/qms/objectives', noun: 'KPIs', groups: [['none', 'None'], ['process', 'Process']],
+  Q.viewPage(KT, { route: '#/qms/objectives', noun: 'KPIs',
     legacy: q => q.focus ? { id: 'k-all', extra: { focus: q.focus } } : q.status === 'below' ? { id: 'k-below', fallback: 'k-all' } : q.status === 'on' ? { id: 'k-on', fallback: 'k-all' } : q.process ? { group: 'process', fallback: 'k-all', extra: { p: q.process } } : null });
-  function objectivesPage(q) {
+  Q.kpiGroupFlag = { test: k => !Q.kpiOk(k), title: 'below target' };
+  Q.riskGroupFlag = { test: r => r.kind === 'Risk' && Q.riskOpen(r) && Q.riskLevel(r) === 'High', title: 'high' };
+  // The saved-views card for KPIs: built once per render, used by the page header (breadcrumb) and by the component.
+  function kpiCard(q) {
     const r = Q.vwResolve(KT, q);
-    if (r.redirect) { location.replace(r.redirect); return { title: 'Objectives & KPIs', nav: 'qms', html: '' }; }
-    const v = r.v, where = Q.matcher(KT, v.filters), plan = Q.doc('QOB-PLN-001');
+    if (r.redirect) return { redirect: r.redirect };
+    const v = r.v, where = Q.matcher(KT, v.filters);
     Q.vwRemember(KT);
-    const objs = [...new Set(Q.S.kpis.map(k => k.objective))];
     let body, leaf = null;
     if (v.group === 'process') {
       const inV = Q.S.kpis.filter(where), n = id => inV.filter(k => Q.inProc(k.process, id)).length;
@@ -215,11 +287,20 @@
         <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ${n(pid)} KPIs${v.filters.length ? ' in this view' : ''}${below(pid) ? ` · <span class="date-overdue">${below(pid)} below target</span>` : ''}</p></div>
         <div class="actions"><a class="btn sm" href="#/process/${pid}/kpis">${icon('workflow')}Open process workspace</a></div></div>
         ${Q.kpiTable(Q.vwTableId(KT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort })}</section></div></div>`;
-    } else body = Q.kpiTable(Q.vwTableId(KT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(KT, v) });
-    return { title: 'Objectives & KPIs', nav: 'qms', html:
-      Q.pageHead({ crumbs: [['QMS', '#/qms/scope'], ['Objectives & KPIs', '#/qms/objectives?v=' + (Q.viewList(KT)[0]?.id || '')], ...(leaf ? [[v.name, Q.vwHash(KT, v)], [leaf]] : [[v.name]])], title: 'Objectives & KPIs', sub: `Quality objectives and how each process is measured against them — ISO 9001 clauses 6.2 and 9.1. ${objs.length} objectives · ${Q.S.kpis.length} KPIs.`,
-        actions: `<button class="btn" type="button" data-action="open-doc" data-id="${plan.id}">${icon('file-text')}${esc(plan.title)}</button><button class="btn primary" type="button" data-action="toast" data-title="Add KPI" data-msg="KPI entry form is not part of this mock.">${icon('plus')}Add KPI</button>` }) +
-      Q.vwCard(KT, v, body), after: main => Q.vwAfter(KT, main) };
+    } else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(KT, v, where, q, Q.kpiTable, { flag: Q.kpiGroupFlag }); leaf = g.leaf; body = g.html; }
+    else body = Q.kpiTable(Q.vwTableId(KT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(KT, v) });
+    return { v, leaf, html: Q.vwCard(KT, v, body) };
+  }
+  Q.component('kpi-views', { group: 'Objectives & processes', name: 'Objectives & KPIs register', icon: 'target', pages: ['objectives'], desc: 'The KPI register with its saved views, filters, grouping and export.',
+    render: (b, ctx) => kpiCard(ctx.q).html || '', after: main => Q.vwAfter(KT, main) });
+  function objectivesPage(q) {
+    const k = kpiCard(q);
+    if (k.redirect) { location.replace(k.redirect); return { title: 'Objectives & KPIs', nav: 'qms', html: '' }; }
+    const { v, leaf } = k, plan = Q.doc('QOB-PLN-001'), objs = [...new Set(Q.S.kpis.map(x => x.objective))];
+    return Q.pageView('objectives', { title: 'Objectives & KPIs', nav: 'qms',
+      crumbs: [['QMS', '#/qms/scope'], ['Objectives & KPIs', '#/qms/objectives?v=' + (Q.viewList(KT)[0]?.id || '')], ...(leaf ? [[v.name, Q.vwHash(KT, v)], [leaf]] : [[v.name]])],
+      sub: `Quality objectives and how each process is measured against them — ISO 9001 clauses 6.2 and 9.1. ${objs.length} objectives · ${Q.S.kpis.length} KPIs.`,
+      actions: `<button class="btn" type="button" data-action="open-doc" data-id="${plan.id}">${icon('file-text')}${esc(plan.title)}</button><button class="btn primary" type="button" data-action="toast" data-title="Add KPI" data-msg="KPI entry form is not part of this mock.">${icon('plus')}Add KPI</button>` });
   }
 
   /* ============================== 3. Risks & Opportunities ============================== */
@@ -227,6 +308,68 @@
   const IMP = ['Negligible', 'Minor', 'Moderate', 'Major', 'Severe'];
   const RESPONSE = { High: 'Treatment plan required. Process owner reviews monthly; reported to management review.', Medium: 'Treat or monitor. Reviewed quarterly by the process owner.', Low: 'Accept and monitor. Reviewed at the annual risk review.' };
   const levelOf = s => s >= 15 ? 'High' : s >= 8 ? 'Medium' : 'Low';
+
+  /* ---------- Risks & opportunities — same saved-views design ---------- */
+  const RT = 'risks';
+  const LVL_KIND = { High: 'danger', Medium: 'warning', Low: 'neutral' };
+  const ratingCell = r => { const l = Q.riskLevel(r); return `<span class="tnum" style="display:inline-block;width:22px;font-weight:600">${Q.riskScore(r)}</span>${Q.st(r.kind === 'Opportunity' ? l + ' benefit' : l, r.kind === 'Opportunity' ? 'info' : LVL_KIND[l])}`; };
+  const RSTATUS = { 'Open': 'warning', 'In treatment': 'info', 'Monitoring': 'success', 'Evaluating': 'neutral', 'Closed': 'muted' };
+  Q.RECORDS.risks = () => Q.S.risks;
+  Q.FIELDS.risks = [
+    { key: 'id', label: 'ID', type: 'text', cls: 'c-id', get: r => r.id, sort: r => r.id, render: r => esc(r.id) },
+    { key: 'title', label: 'Risk / opportunity', type: 'text', locked: true, min: '240px', get: r => r.title, sort: r => r.title,
+      render: r => `<button type="button" class="doc-link" data-expand title="Show details">${esc(r.title)}</button><span class="sub">${esc(r.treatment)}</span>` },
+    { key: 'process', label: 'Process', type: 'process', get: r => r.process, sort: r => Q.proc(r.process)?.process_code, render: r => Q.pcell(r.process) },
+    { key: 'kind', label: 'Type', type: 'enum', options: () => ['Risk', 'Opportunity'], get: r => r.kind, sort: r => r.kind, render: r => esc(r.kind) },
+    { key: 'likelihood', label: 'Likelihood', type: 'number', cls: 'c-num', get: r => r.likelihood, sort: r => r.likelihood, render: r => r.likelihood },
+    { key: 'impact', label: 'Impact', type: 'number', cls: 'c-num', get: r => r.impact, sort: r => r.impact, render: r => r.impact },
+    { key: 'rating', label: 'Rating', type: 'number', get: Q.riskScore, sort: Q.riskScore, render: ratingCell },
+    { key: 'level', label: 'Level', type: 'enum', options: () => ['High', 'Medium', 'Low'], get: Q.riskLevel, sort: Q.riskScore, render: r => Q.st(Q.riskLevel(r), r.kind === 'Opportunity' ? 'info' : LVL_KIND[Q.riskLevel(r)]) },
+    { key: 'owner', label: 'Owner', type: 'person', get: r => r.owner, sort: r => Q.pname(r.owner), render: r => `<span class="nowrap">${esc(Q.pname(r.owner))}</span>` },
+    { key: 'due', label: 'Treatment due', type: 'date', cls: 'c-date', get: r => r.due, sort: r => r.due, render: r => Q.dueDate(r.due, r.status === 'Monitoring' || r.status === 'Closed') },
+    { key: 'status', label: 'Status', type: 'enum', options: () => ['Open', 'In treatment', 'Monitoring', 'Evaluating', 'Closed'], get: r => r.status, sort: r => r.status, render: r => Q.st(r.status, RSTATUS[r.status]) },
+    { key: 'linked', label: 'Linked documents', type: 'number', cls: 'c-num', get: r => r.links.length, sort: r => r.links.length, render: r => r.links.length ? r.links.map(id => `<button class="link-btn tnum" type="button" data-action="open-doc" data-id="${esc(id)}">${esc(id)}</button>`).join(', ') : '<span class="zero">—</span>' }
+  ];
+  const riskMenu = r => Q.menu(`Actions for ${r.id}`, [
+    { label: 'Reassess…', icon: 'gauge', data: { action: 'assess-risk', id: r.id } },
+    ...r.links.map(id => ({ label: `Open ${id}`, icon: 'file-text', data: { action: 'open-doc', id } })),
+    '-',
+    { label: 'Open process workspace', icon: 'workflow', data: { action: 'go', href: `#/process/${r.process}/risks` } },
+    { label: 'Show on risk matrix', icon: 'target', data: { action: 'go', href: `#/risks/matrix?cell=${r.likelihood}x${r.impact}` } }
+  ], { align: 'min-width:230px' });
+  const riskExpand = r => `<div class="doc-exp">
+      <div><h4>Treatment</h4><p>${esc(r.treatment)}</p><p style="margin-top:6px">Due ${Q.dueDate(r.due, r.status === 'Monitoring' || r.status === 'Closed')} · ${Q.st(r.status, RSTATUS[r.status])}</p></div>
+      <div><h4>Rating</h4><p><b style="color:var(--text)">${Q.riskScore(r)}</b> = likelihood ${r.likelihood} × impact ${r.impact}</p><p style="margin-top:4px">${ratingCell(r)}</p></div>
+      <div><h4>Linked</h4><ul><li>${Q.pcell(r.process)}</li><li>Owner ${esc(Q.pname(r.owner))}</li><li>${r.links.length ? r.links.map(id => `<button class="link-btn tnum" type="button" data-action="open-doc" data-id="${esc(id)}">${esc(id)}</button>`).join(', ') : '<span class="muted">No linked document</span>'}</li></ul></div>
+      <div class="acts"><button class="btn sm primary" type="button" data-action="assess-risk" data-id="${r.id}">${icon('gauge')}Reassess</button><a class="btn sm" href="#/risks/matrix?cell=${r.likelihood}x${r.impact}">${icon('target')}Show on matrix</a></div></div>`;
+  const riskSel = keys => keys.length === 1
+    ? `<button class="btn sm primary" type="button" data-action="assess-risk" data-id="${keys[0]}">${icon('gauge')}Reassess</button>`
+    : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} risks were asked to update their treatment status.">${icon('bell')}Remind owners</button>`;
+  Q.riskTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0 } = {}) => {
+    const cols = (columns || ['id', 'title', 'process', 'kind', 'rating', 'owner', 'due', 'status']).map(k => Q.field(RT, k)).filter(Boolean)
+      .filter(f => !(f.key === 'process' && process && !Q.children(process).length))
+      .map(f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render }));
+    cols.push({ key: 'actions', label: '', cls: 'c-actions c-menu', render: r => `<span class="row-menu">${riskMenu(r)}</span>` });
+    return Q.table({ id, rows: () => Q.S.risks.filter(r => (!process || Q.inProc(r.process, process)) && (!where || where(r))), columns: cols,
+      selectable: true, tight: true, noun: 'risks & opportunities', caption: 'Risks and opportunities', rowLabel: r => r.title, bare, pageSize, expand: riskExpand, selectionBar: riskSel,
+      search: r => `${r.id} ${r.title} ${r.treatment} ${Q.pname(r.owner)}`, ...(Q.tables[id] ? {} : { initialSort }),
+      footExtra: () => '<span style="margin-left:auto">Rating = likelihood × impact (1–5 each) · High ≥ 15 · Medium 8–12 · Low ≤ 6</span>',
+      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search risks & opportunities" aria-label="Search risks"></div>${extraTools}`,
+      empty: '<h3>No risks or opportunities match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
+  };
+  Q.viewPage(RT, { route: '#/risks', noun: 'risks & opportunities',
+    legacy: q => q.focus ? { id: 'r-all', extra: { focus: q.focus } } : q.level === 'High' ? { id: 'r-high', fallback: 'r-all' } : q.process ? { group: 'process', fallback: 'r-all', extra: { p: q.process } } : null });
+  // Process-grouped browse, shared by the Risks page (KPIs has its own equivalent).
+  const riskByProcess = (v, where, q) => {
+    const inV = Q.S.risks.filter(where), n = id => inV.filter(r => Q.inProc(r.process, id)).length, top = Q.topProcesses();
+    const p = Q.proc(q.p) || top.find(x => n(x.process_id)) || top[0], pid = p.process_id;
+    const high = id => inV.filter(r => Q.inProc(r.process, id) && r.kind === 'Risk' && Q.riskLevel(r) === 'High').length;
+    const row = x => `<a href="${Q.vwHash(RT, v, { p: x.process_id })}" ${x.process_id === pid ? 'aria-current="true"' : ''}><span class="code">${esc(x.process_code)}</span><span class="nm">${esc(x.name)}</span>${high(x.process_id) ? `<i class="flag bad" title="${high(x.process_id)} high"></i>` : ''}<span class="n">${n(x.process_id)}</span></a>`;
+    return { leaf: `${p.process_code} ${p.name}`, html: `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(RT, v)}</div><div class="browse"><nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(row).join('')}</nav><section>
+      <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ${n(pid)} risks &amp; opportunities${v.filters.length ? ' in this view' : ''}${high(pid) ? ` · <span class="date-overdue">${high(pid)} high</span>` : ''}</p></div>
+      <div class="actions"><a class="btn sm" href="#/process/${pid}/risks">${icon('workflow')}Open process workspace</a><button class="btn sm" type="button" data-action="assess-risk" data-process="${pid}">${icon('gauge')}Assess New Risk</button></div></div>
+      ${Q.riskTable(Q.vwTableId(RT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort })}</section></div></div>` };
+  };
 
   Q.views.risks = (parts, q) => {
     const tab = parts[0] === 'matrix' ? 'matrix' : 'register';
@@ -236,8 +379,15 @@
       actions: `<button class="btn" type="button" data-action="open-doc" data-id="RSK-PRO-001">${icon('file-text')}Method</button><button class="btn primary" type="button" data-action="assess-risk">${icon('gauge')}Assess New Risk</button>` });
     const t = tabs([['register', 'Register', '#/risks'], ['matrix', 'Risk matrix', '#/risks/matrix', high ? `${high} high` : '']], tab, 'Risks');
     if (tab === 'register') {
-      const init = q.level ? { level: q.level } : q.process ? { process: q.process } : q.cell ? { cell: q.cell } : undefined;
-      return { title: 'Risks & Opportunities', nav: 'risks', html: head + t + (q.cell ? `<p class="small" style="margin:-8px 0 12px">Showing matrix cell <b>Likelihood ${q.cell[0]} × Impact ${q.cell[2]}</b> · <a href="#/risks">Clear</a></p>` : '') + Q.riskTable('risks', { initialFilters: init }) };
+      if (q.cell) { location.replace(`#/risks/matrix?cell=${q.cell}`); return { title: 'Risks & Opportunities', nav: 'risks', html: '' }; }
+      const r = Q.vwResolve(RT, q);
+      if (r.redirect) { location.replace(r.redirect); return { title: 'Risks & Opportunities', nav: 'risks', html: '' }; }
+      const v = r.v, where = Q.matcher(RT, v.filters); Q.vwRemember(RT);
+      let body;
+      if (v.group === 'process') body = riskByProcess(v, where, q).html;
+      else if (Q.vwFieldGroup(v.group)) body = Q.vwGrouped(RT, v, where, q, Q.riskTable, { flag: Q.riskGroupFlag }).html;
+      else body = Q.riskTable(Q.vwTableId(RT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(RT, v) });
+      return { title: 'Risks & Opportunities', nav: 'risks', html: head + t + Q.vwCard(RT, v, body), after: main => Q.vwAfter(RT, main) };
     }
     const sel = q.cell;
     const risks = open.filter(r => r.kind === 'Risk');
