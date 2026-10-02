@@ -177,7 +177,7 @@
       const s = p.s, [label, cls] = STATUS[s.health];
       const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
       const pal = PALETTES[index % PALETTES.length];
-      return `<article class="proc-card" style="--pc-bg:${pal.bg};--pc-border:${pal.border};--pc-pill:${pal.pill};--pc-ink:${pal.ink}" aria-labelledby="pc-${p.id}">
+      return `<a class="proc-card" href="#/process/${p.id}" style="--pc-bg:${pal.bg};--pc-border:${pal.border};--pc-pill:${pal.pill};--pc-ink:${pal.ink}" aria-labelledby="pc-${p.id}">
         <div class="pc-card-body">
           <div class="pc-card-head">
             <span class="pc-code">${esc(p.process_code)}</span>
@@ -185,7 +185,7 @@
           </div>
 
           <div class="pc-title-block">
-            <h3 id="pc-${p.id}"><a href="#/process/${p.id}">${esc(p.name)}</a></h3>
+            <h3 id="pc-${p.id}">${esc(p.name)}</h3>
             <p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
           </div>
 
@@ -202,10 +202,10 @@
         </div>
 
         <div class="pc-card-foot">
-          <a class="pc-open" href="#/process/${p.id}" aria-label="Explore ${esc(p.name)}">Explore</a>
-          <a class="pc-open-icon" href="#/process/${p.id}" aria-label="Open ${esc(p.name)}">${icon('arrow-right')}</a>
+          <span class="pc-open">Explore</span>
+          <span class="pc-open-icon" aria-hidden="true">${icon('arrow-right')}</span>
         </div>
-      </article>`;
+      </a>`;
     };
     // One section per configured category, with its colour, icon and description.
     const band = c => {
