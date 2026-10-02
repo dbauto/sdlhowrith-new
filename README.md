@@ -228,6 +228,22 @@ The four QMS pages (Organization & Scope, Policies, Processes, Objectives & KPIs
 
 Mock limits: no real authentication, email, payments or backups; the Data Privacy page organizes compliance but is not legal advice.
 
+## Update 12: the organization chart is a chart
+
+Before this, the organization chart was only a document record (QMS-ORG-001), and opening it showed the generic procedure template.
+
+- **QMS → Organization & Scope** now ends with a live **Organization chart** component (clause 5.3). It is drawn from the people in Settings → Users & Access and who each person reports to:
+  - Top management at the top, department heads in a row, their teams stacked underneath (so a wide team doesn't run off the page)
+  - Each card: name, job title, department colour, number of people under them, and the codes of the **processes they own**; badges for *Top management* and *QMS representative*
+  - **Chart / List** toggle (List is the default on phones), and **highlight a department**
+  - **Select a person** to see their email, role, processes and direct reports, and to **change who they report to** (you can't pick yourself or someone under you)
+- **Document control stays in charge.** Under the chart it says whether it matches the controlled copy. When a reporting line changes, it warns that QMS-ORG-001 is out of date, with **Create Revision**.
+- **Opening QMS-ORG-001** shows the chart in a printable layout (top management, then a block per department) instead of the procedure template.
+- **Add User** asks who the new person reports to. Anyone without a manager appears under *Not placed yet*. Deactivated users are left out.
+- Structure & responsibilities has a **View Chart** button next to the organization chart document.
+- Sample data: reporting lines added for every person; data saved in a browser by an earlier build gets them once on load.
+- Mock limit: the document preview shows the current chart. In the real build each published revision would keep a frozen copy of the chart as it was approved.
+
 ## Files
 
 | File | Change |
@@ -241,6 +257,7 @@ Mock limits: no real authentication, email, payments or backups; the Data Privac
 | `assets/core.js` | ISO clause helpers, v2 → v3 route redirects, new storage key |
 | `assets/data.js` | Added process categories, organization context & scope, quality policy, management reviews |
 | `assets/settings-extra.js` | **New.** Regional, Branding, Security, Notifications, API & Webhooks, Data Privacy, Audit Log, Data Export & Backup, Billing & Plan, About System |
+| `assets/orgchart.js` | **New.** Organization chart component, person details and reporting lines, chart in the QMS-ORG-001 preview |
 | `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
 | `assets/app.css` | Styles for the above |
 | `screenshots/` | v3 captures at 1440 px |

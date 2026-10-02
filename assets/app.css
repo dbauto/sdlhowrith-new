@@ -1512,3 +1512,72 @@ body.auth .main, body.auth.sb-pinned .main { margin-left: 0; }
   .toast-host { left: 12px; right: 12px; bottom: 12px; }
   .toast { min-width: 0; max-width: none; }
 }
+
+/* =====================================================================
+   Organization chart (QMS → Organization & Scope, clause 5.3)
+   ===================================================================== */
+.oc-scroll { overflow-x: auto; padding: 4px 2px 8px; }
+.oc { display: flex; flex-direction: column; align-items: center; min-width: max-content; margin: 0 auto; --oc-line: var(--border-strong); }
+.oc ul { list-style: none; margin: 0; padding: 0; }
+.oc-node { position: relative; display: flex; flex-direction: column; gap: 6px; width: 148px; padding: 9px 8px 9px 12px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); text-align: left; color: var(--text); transition: opacity .15s, box-shadow .15s, border-color .15s; }
+button.oc-node:hover { border-color: var(--border-strong); box-shadow: 0 2px 8px rgba(16,40,30,.08); }
+.oc-strip { position: absolute; left: -1px; top: -1px; bottom: -1px; width: 5px; border-radius: var(--r-lg) 0 0 var(--r-lg); }
+.oc-top { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.oc-id { min-width: 0; line-height: 17px; }
+.oc-id b { display: block; font-size: 13px; line-height: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.oc-id span { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.oc-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.oc-n { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.oc-n svg.lucide { width: 13px; height: 13px; }
+.oc-procs { display: flex; flex-wrap: wrap; gap: 4px; }
+.oc-proc { display: inline-block; padding: 0 6px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; line-height: 18px; font-variant-numeric: tabular-nums; }
+.oc-badge { align-self: flex-start; font-size: 12px; line-height: 18px; padding: 0 6px; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--text-2); }
+.oc-badge.top { border-color: var(--accent); color: var(--accent); }
+.oc-badge + .oc-badge { margin-top: -2px; }
+.oc-dim { opacity: .28; }
+/* Connectors: root → level row → each head; heads → stacked reports */
+.oc-root { position: relative; padding-bottom: 20px; }
+.oc-root::after { content: ""; position: absolute; left: 50%; bottom: 0; height: 20px; border-left: 1.5px solid var(--oc-line); }
+.oc-level { display: flex; gap: 0; }
+.oc-level > li { position: relative; display: flex; flex-direction: column; align-items: center; padding: 20px 5px 0; background: linear-gradient(var(--oc-line), var(--oc-line)) center top / 1.5px 20px no-repeat; }
+.oc-level > li::before, .oc-level > li::after { content: ""; position: absolute; top: 0; width: 50%; border-top: 1.5px solid var(--oc-line); }
+.oc-level > li::before { left: 0; } .oc-level > li::after { right: 0; }
+.oc-level > li:first-child::before, .oc-level > li:last-child::after { border-top: 0; }
+.oc-level > li:only-child::before, .oc-level > li:only-child::after { display: none; }
+.oc-stack { position: relative; margin-top: 8px; padding-left: 12px; align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+.oc-stack::before { content: ""; position: absolute; left: 5px; top: -8px; bottom: 22px; border-left: 1.5px solid var(--oc-line); }
+.oc-stack > li { position: relative; }
+.oc-stack > li::before { content: ""; position: absolute; left: -7px; top: 22px; width: 7px; border-top: 1.5px solid var(--oc-line); }
+.oc-stack .oc-node { width: 136px; }
+.oc-stack .oc-stack { margin-left: 14px; }
+.oc-stack .oc-stack .oc-node { width: 122px; }
+.oc-unplaced { margin-top: 16px; padding: 12px 14px; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
+.oc-unplaced > b { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; }
+.oc-unplaced-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.oc-note { margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+.oc-note > span { flex: 1 1 320px; }
+.oc-ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.oc-ctl svg.lucide { color: var(--success); }
+.oc-foot { margin-top: 12px; }
+.oc-filter .select { height: var(--control-h-sm); width: auto; min-width: 170px; }
+/* List view (also the readable fallback on phones) */
+.oc-list, .oc-list ul { list-style: none; margin: 0; padding: 0; }
+.oc-list ul { margin-left: 14px; padding-left: 14px; border-left: 1.5px solid var(--border); }
+.oc-li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; width: 100%; padding: 6px 8px; border: 0; background: none; border-radius: var(--r-md); text-align: left; color: var(--text); }
+.oc-li:hover { background: var(--hover); }
+.oc-li span:not(.oc-proc) { font-size: var(--fs-small); color: var(--text-3); }
+/* In the document viewer */
+.paper-chart { margin: 18px -8px; padding: 12px 0; border-top: 1px solid #D5DAD8; border-bottom: 1px solid #D5DAD8; }
+.ocp-root { display: flex; justify-content: center; position: relative; padding-bottom: 16px; }
+.ocp-root::after { content: ""; position: absolute; left: 50%; bottom: 0; height: 16px; border-left: 1.5px solid var(--border-strong); }
+.ocp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; padding-top: 14px; border-top: 1.5px solid var(--border-strong); }
+.ocp-block { border: 1px solid var(--border); border-top: 3px solid var(--c); border-radius: var(--r-md); padding: 8px 10px; font-size: 12px; line-height: 16px; break-inside: avoid; }
+.ocp-block header b { display: block; font-size: 13px; }
+.ocp-block header span:not(.oc-proc):not(.oc-badge) { display: block; color: var(--text-3); margin-bottom: 4px; }
+.ocp-block header .oc-proc, .ocp-block li .oc-proc { margin-right: 3px; }
+.ocp-block .oc-badge { display: inline-block; margin-top: 4px; }
+.ocp-block ul { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--border); }
+.ocp-block li { padding: 3px 0 3px calc(var(--d) * 12px); }
+.ocp-block li b { display: block; font-weight: 600; }
+.ocp-block li span:not(.oc-proc) { display: block; color: var(--text-3); }
+@media print { .oc-scroll { overflow: visible; } }

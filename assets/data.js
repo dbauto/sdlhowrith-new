@@ -26,24 +26,25 @@
     today: '2026-09-27'
   };
 
+  // reportsTo draws the organization chart (QMS → Organization & Scope, clause 5.3).
   const people = {
-    maria: { name: 'Maria Santos', title: 'Quality Manager', dept: 'Quality', email: 'maria.santos@heliossolar.example' },
-    eric: { name: 'Eric Navarro', title: 'General Manager', dept: 'Management', email: 'eric.navarro@heliossolar.example' },
-    daniel: { name: 'Daniel Reyes', title: 'Engineering Manager', dept: 'Engineering', email: 'daniel.reyes@heliossolar.example' },
-    kim: { name: 'Kim Dela Cruz', title: 'Design Engineer', dept: 'Engineering', email: 'kim.delacruz@heliossolar.example' },
-    grace: { name: 'Grace Lim', title: 'Sales Manager', dept: 'Sales', email: 'grace.lim@heliossolar.example' },
-    marco: { name: 'Marco Villanueva', title: 'Site Assessment Lead', dept: 'Operations', email: 'marco.villanueva@heliossolar.example' },
-    joy: { name: 'Joy Aquino', title: 'Procurement Manager', dept: 'Procurement', email: 'joy.aquino@heliossolar.example' },
-    ben: { name: 'Ben Castillo', title: 'Warehouse Supervisor', dept: 'Operations', email: 'ben.castillo@heliossolar.example' },
-    carlos: { name: 'Carlos Mendoza', title: 'Projects Manager', dept: 'Operations', email: 'carlos.mendoza@heliossolar.example' },
-    ana: { name: 'Ana Cruz', title: 'Commissioning Lead', dept: 'Operations', email: 'ana.cruz@heliossolar.example' },
-    lea: { name: 'Lea Garcia', title: 'After-Sales Manager', dept: 'Customer Service', email: 'lea.garcia@heliossolar.example' },
-    rosa: { name: 'Rosa Tan', title: 'HR & Training Lead', dept: 'People', email: 'rosa.tan@heliossolar.example' },
-    paolo: { name: 'Paolo Ramos', title: 'Equipment Coordinator', dept: 'Operations', email: 'paolo.ramos@heliossolar.example' },
-    nina: { name: 'Nina Flores', title: 'Document Controller', dept: 'Quality', email: 'nina.flores@heliossolar.example' },
-    aaron: { name: 'Aaron Lim', title: 'IT Administrator', dept: 'IT', email: 'aaron.lim@heliossolar.example' },
-    jun: { name: 'Jun Bautista', title: 'Installation Technician', dept: 'Operations', email: 'jun.bautista@heliossolar.example' },
-    rick: { name: 'Rick Soriano', title: 'Former Site Engineer', dept: 'Operations', email: 'rick.soriano@heliossolar.example' }
+    maria: { name: 'Maria Santos', title: 'Quality Manager', dept: 'Quality', email: 'maria.santos@heliossolar.example', reportsTo: 'eric' },
+    eric: { name: 'Eric Navarro', title: 'General Manager', dept: 'Management', email: 'eric.navarro@heliossolar.example', reportsTo: null },
+    daniel: { name: 'Daniel Reyes', title: 'Engineering Manager', dept: 'Engineering', email: 'daniel.reyes@heliossolar.example', reportsTo: 'eric' },
+    kim: { name: 'Kim Dela Cruz', title: 'Design Engineer', dept: 'Engineering', email: 'kim.delacruz@heliossolar.example', reportsTo: 'daniel' },
+    grace: { name: 'Grace Lim', title: 'Sales Manager', dept: 'Sales', email: 'grace.lim@heliossolar.example', reportsTo: 'eric' },
+    marco: { name: 'Marco Villanueva', title: 'Site Assessment Lead', dept: 'Operations', email: 'marco.villanueva@heliossolar.example', reportsTo: 'carlos' },
+    joy: { name: 'Joy Aquino', title: 'Procurement Manager', dept: 'Procurement', email: 'joy.aquino@heliossolar.example', reportsTo: 'eric' },
+    ben: { name: 'Ben Castillo', title: 'Warehouse Supervisor', dept: 'Operations', email: 'ben.castillo@heliossolar.example', reportsTo: 'carlos' },
+    carlos: { name: 'Carlos Mendoza', title: 'Projects Manager', dept: 'Operations', email: 'carlos.mendoza@heliossolar.example', reportsTo: 'eric' },
+    ana: { name: 'Ana Cruz', title: 'Commissioning Lead', dept: 'Operations', email: 'ana.cruz@heliossolar.example', reportsTo: 'carlos' },
+    lea: { name: 'Lea Garcia', title: 'After-Sales Manager', dept: 'Customer Service', email: 'lea.garcia@heliossolar.example', reportsTo: 'eric' },
+    rosa: { name: 'Rosa Tan', title: 'HR & Training Lead', dept: 'People', email: 'rosa.tan@heliossolar.example', reportsTo: 'eric' },
+    paolo: { name: 'Paolo Ramos', title: 'Equipment Coordinator', dept: 'Operations', email: 'paolo.ramos@heliossolar.example', reportsTo: 'carlos' },
+    nina: { name: 'Nina Flores', title: 'Document Controller', dept: 'Quality', email: 'nina.flores@heliossolar.example', reportsTo: 'maria' },
+    aaron: { name: 'Aaron Lim', title: 'IT Administrator', dept: 'IT', email: 'aaron.lim@heliossolar.example', reportsTo: 'eric' },
+    jun: { name: 'Jun Bautista', title: 'Installation Technician', dept: 'Operations', email: 'jun.bautista@heliossolar.example', reportsTo: 'carlos' },
+    rick: { name: 'Rick Soriano', title: 'Former Site Engineer', dept: 'Operations', email: 'rick.soriano@heliossolar.example', reportsTo: 'carlos' }
   };
   const currentUser = 'maria';
 
