@@ -36,6 +36,8 @@
     if (n > 0) { shiftDates(Q.S, n); Q.S.organization.today = to; Q.save(); }
   };
   anchorToToday();
+  // Sample records added by a later build to data saved by an earlier one: move their dates to "today" the same way.
+  Q.shifted = obj => { const n = Math.round((new Date(Q.today()) - new Date(SEED.organization.today)) / 864e5); return n > 0 ? shiftDates(clone(obj), n) : clone(obj); };
   Q.resetData = () => { Q.S = clone(SEED); try { localStorage.removeItem(STORE_KEY); } catch (_) { /* ignore */ } anchorToToday(); };
   Q.UI = (() => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (_) { return {}; } })();
   Q.saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(Q.UI)); } catch (_) { /* ignore */ } };
@@ -606,6 +608,8 @@
     // v3 aliases: old v2 links keep working.
     if (name === 'iso') { location.replace('#/evidence?view=clause'); return; }
     if (name === 'kpis') { location.replace('#/qms/objectives' + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); return; }
+    // Update 14: Internal Audit became the Audits module.
+    if (name === 'audit' && !['actions', 'improvements'].includes(parts[1])) { location.replace(parts[1] === 'findings' ? '#/audits/nc?s=all' : parts[1] === 'coverage' ? '#/audits/programme?view=coverage' : '#/audits'); return; }
     if (name === 'audit' && parts[1] === 'actions') { location.replace('#/capa' + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); return; }
     if (name === 'audit' && parts[1] === 'improvements') { location.replace('#/capa/improvements'); return; }
     if (name === 'reports') { location.replace('#/mgmt-review/reports'); return; }

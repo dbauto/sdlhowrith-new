@@ -208,7 +208,7 @@
         <div class="actions"><a class="btn sm" href="#/evidence?view=clause&c=${esc(focus || top)}">${icon('paperclip')}Evidence for this clause</a></div></div>` +
         (reqs.length ? reqs.map(r => {
           const all = Q.docsForClause(r.clause), docs = inView(all);
-          return `<section class="clause-block" id="cl-${r.clause.replace(/\./g, '-')}"><header><span class="clause">${esc(r.clause)}</span><h3>${esc(r.title)}</h3><span class="proc-chips">${r.processes.map(p => Q.pcell(p)).join('')}</span>${Q.st(r.status, Q.ISO_KIND[r.status])}</header>
+          return `<section class="clause-block" id="cl-${r.clause.replace(/\./g, '-')}"><header><span class="clause">${esc(r.clause)}</span><h3>${esc(r.title)}</h3><span class="proc-chips">${r.processes.map(p => Q.pcell(p)).join('')}</span>${Q.st(r.status, Q.ISO_KIND[r.status])}</header>${Q.AM?.clauseAudit(r) || ''}
             ${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}
             ${docs.length ? `<div class="table-scroll">${miniDocs(docs)}</div>` : all.length ? `<div class="gap" style="color:var(--text-3)">${all.length} document${all.length > 1 ? 's' : ''} mapped, none match this view's filters.</div>` : r.status === 'Not Applicable' ? '<div class="gap" style="color:var(--text-3)">Not applicable — excluded in the QMS scope.</div>' : `<div class="gap">${icon('triangle-alert')}No controlled document mapped to this requirement.</div>`}</section>`;
         }).join('') : '<div class="empty panel"><h3>No requirements mapped under this clause</h3></div>');

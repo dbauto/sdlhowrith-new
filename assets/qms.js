@@ -502,6 +502,7 @@
   const reqBlock = r => {
     const ev = reqEvidence(r), docs = r.controls.map(Q.doc).filter(Boolean);
     return `<section class="clause-block"><header><span class="clause">${esc(r.clause)}</span><h3>${esc(r.title)}</h3><span class="proc-chips">${r.processes.map(Q.pcell).join('')}</span>${Q.st(r.status, Q.ISO_KIND[r.status])}</header>
+      ${Q.AM?.clauseAudit(r) || ''}
       ${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}
       ${docs.length ? `<div class="note" style="background:none">${icon('file-text')} Controls: ${docs.map(d => `<button class="link-btn tnum" type="button" data-action="open-doc" data-id="${d.id}" title="${esc(d.title)}">${esc(d.id)}</button>`).join(', ')}</div>` : ''}
       ${ev.length ? `<div class="table-scroll">${evRows(ev)}</div>` : r.status === 'Not Applicable' ? '<div class="gap" style="color:var(--text-3)">Not applicable — excluded in the QMS scope.</div>' : r.status === 'Complete' ? `<div class="gap" style="color:var(--text-3)">${icon('circle-check')}Satisfied by the controlling documents above; no separate records linked.<button class="btn sm ghost" type="button" data-action="link-evidence" data-process="${r.processes[0]}" style="margin-left:auto">${icon('link')}Link Evidence</button></div>` : `<div class="gap">${icon('paperclip')}No evidence record linked.<button class="btn sm" type="button" data-action="link-evidence" data-process="${r.processes[0]}" style="margin-left:auto">${icon('link')}Link Evidence</button></div>`}</section>`;
@@ -541,44 +542,7 @@
       ${Q.evTable('ev-proc-' + pid, { process: pid })}</section></div>`;
   }
 
-  /* ============================== 5. Internal Audit ============================== */
-  Q.views.audit = (parts, q) => {
-    const S = Q.S, tab = ['findings', 'coverage'].includes(parts[0]) ? parts[0] : 'programme';
-    const done = S.audits.filter(a => a.status === 'Completed').length, next = S.audits.filter(a => a.status === 'Planned').sort((a, b) => a.date < b.date ? -1 : 1)[0];
-    const openF = S.findings.filter(f => f.status === 'Open');
-    const audited = new Set(S.audits.flatMap(a => a.processes));
-    const notCovered = Q.topProcesses().filter(p => !audited.has(p.process_id));
-    const head = Q.pageHead({ title: 'Internal Audit', sub: 'The audit programme, audit findings and process coverage — ISO 9001 clause 9.2.',
-      actions: `<button class="btn" type="button" data-action="open-doc" data-id="AUD-PRO-001">${icon('file-text')}Audit Procedure</button><button class="btn primary" type="button" data-action="toast" data-title="Plan audit" data-msg="Audit planning form is not part of this mock.">${icon('plus')}Plan Audit</button>` });
-    const strip = `<div class="pipeline">
-      <div><div class="k">Programme ${esc(Q.today().slice(0, 4))}</div><div class="v">${done} / ${S.audits.length}</div><div class="d">audits completed</div></div>
-      <div><div class="k">Next audit</div><div class="v" style="font-size:18px;line-height:32px">${next ? Q.fmt(next.date) : '—'}</div><div class="d">${next ? esc(next.title) + ' · ' + esc(Q.pname(next.auditor)) : 'None planned'}</div></div>
-      <div><div class="k">Open findings</div><div class="v" style="color:${openF.length ? 'var(--danger)' : 'inherit'}">${openF.length}</div><div class="d">${openF.filter(f => f.type.startsWith('Major')).length} major · ${openF.filter(f => f.type.startsWith('Minor')).length} minor</div></div>
-      <div><div class="k">Processes not in programme</div><div class="v" style="color:${notCovered.length ? 'var(--warning)' : 'inherit'}">${notCovered.length}</div><div class="d">of ${Q.topProcesses().length} processes</div></div></div>`;
-    const t = tabs([['programme', 'Audit programme', '#/audit'], ['findings', 'Findings', '#/audit/findings', openF.length ? `${openF.length} open` : ''], ['coverage', 'Process coverage', '#/audit/coverage', notCovered.length ? `${notCovered.length} not covered` : '']], tab, 'Internal audit');
-    let body;
-    if (tab === 'findings') body = Q.findingTable('finds');
-    else if (tab === 'coverage') {
-      const rows = () => Q.topProcesses().map(p => { const au = S.audits.filter(a => a.processes.some(x => Q.inProc(x, p.process_id) || x === p.process_id)); const last = au.filter(a => a.status === 'Completed').sort((a, b) => a.date < b.date ? 1 : -1)[0]; const plan = au.find(a => a.status === 'Planned'); return { ...p, id: p.process_id, last, plan, f: S.findings.filter(f => Q.inProc(f.process, p.process_id) && f.status === 'Open').length }; });
-      body = `<p class="small muted" style="margin:-8px 0 12px">ISO 9001 9.2.2 — every process should be audited within the audit cycle, with frequency based on importance, changes and previous results.</p>` + Q.table({ id: 'cov', rows, noun: 'processes', caption: 'Audit coverage by process', columns: [
-        { key: 'p', label: 'Process', sort: r => r.display_order, render: r => Q.pcell(r.id) },
-        { key: 'o', label: 'Owner', render: r => esc(Q.pname(r.owner)) },
-        { key: 'last', label: 'Last audited', cls: 'c-date', sort: r => r.last?.date || '', render: r => r.last ? `${Q.fmt(r.last.date)}<span class="sub">${esc(r.last.id)}</span>` : '<span class="muted">—</span>' },
-        { key: 'plan', label: 'Planned', cls: 'c-date', sort: r => r.plan?.date || '9', render: r => r.plan ? `${Q.fmt(r.plan.date)}<span class="sub">${esc(r.plan.id)}</span>` : '<span class="muted">—</span>' },
-        { key: 'f', label: 'Open findings', cls: 'c-num', sort: r => r.f, render: r => Q.num(r.f) },
-        { key: 's', label: 'Coverage', sort: r => r.last ? 2 : r.plan ? 1 : 0, render: r => r.last ? Q.st('Audited', 'success') : r.plan ? Q.st('Planned', 'info') : Q.st('Not in programme', 'danger') },
-        { key: 'a', label: '', cls: 'c-actions', render: r => r.last || r.plan ? `<a class="btn sm ghost" href="#/process/${r.id}/audit">Open</a>` : `<button class="btn sm" type="button" data-action="toast" data-title="Add to programme" data-msg="${esc(r.process_code + ' ' + r.name)} would be added to the audit programme.">${icon('plus')}Add to programme</button>` }] });
-    } else body = Q.table({ id: 'prog', rows: () => S.audits, noun: 'audits', caption: 'Audit programme', columns: [
-      { key: 'id', label: 'ID', cls: 'c-id', render: a => esc(a.id) },
-      { key: 't', label: 'Audit', render: a => `<span class="title">${esc(a.title)}</span>` },
-      { key: 'p', label: 'Processes audited', render: a => a.processes.map(p => `<div>${Q.pcell(p)}</div>`).join('') },
-      { key: 'd', label: 'Date', cls: 'c-date', sort: a => a.date, render: a => Q.fmt(a.date) },
-      { key: 'au', label: 'Lead auditor', render: a => esc(Q.pname(a.auditor)) },
-      { key: 'f', label: 'Findings', cls: 'c-num', render: a => { const n = S.findings.filter(f => f.audit === a.id).length; return n ? `<a href="#/audit/findings">${n}</a>` : '<span class="zero">—</span>'; } },
-      { key: 's', label: 'Status', render: a => Q.st(a.status, a.status === 'Completed' ? 'success' : 'neutral') },
-      { key: 'x', label: '', cls: 'c-actions', render: a => a.status === 'Completed' ? `<button class="btn sm" type="button" data-action="toast" data-title="Audit report" data-msg="${esc(a.id)} report would open from SharePoint.">${icon('file-text')}Report</button>` : `<button class="btn sm" type="button" data-action="toast" data-title="Audit checklist" data-msg="A checklist for ${esc(a.title)} would be prepared from the mapped ISO clauses and process documents.">${icon('clipboard-list')}Prepare checklist</button>` }] });
-    return { title: 'Internal Audit', nav: 'audit', html: head + strip + t + body };
-  };
+  /* 5. Internal Audit moved to the Audits module (audits.js, audit-nc.js, audit-report.js). */
 
   /* ============================== 6. Management Review ============================== */
   Q.views['mgmt-review'] = (parts, q) => {
@@ -613,7 +577,7 @@
     const kOn = S.kpis.filter(Q.kpiOk).length;
     const procs = Q.topProcesses().map(p => Q.stats(p.process_id));
     const openCA = S.actions.filter(a => !Q.actionClosed(a)), overCA = openCA.filter(Q.actionOverdue);
-    const openF = S.findings.filter(f => f.status === 'Open');
+    const openF = S.findings.filter(f => f.status !== 'Closed');
     const iso = Q.isoScore(S.iso), evOk = S.evidence.filter(e => e.status === 'Verified').length;
     const highR = S.risks.filter(r => r.kind === 'Risk' && Q.riskOpen(r) && Q.riskLevel(r) === 'High');
     const ctx = Q.doc(S.context.contextDoc);
@@ -626,7 +590,7 @@
       ['c3', 'Process performance and conformity of products and services', 'Process register', `<b>${procs.filter(s => s.health === 'risk').length}</b> at risk · ${procs.filter(s => s.health === 'attn').length} need attention`, procs.some(s => s.health === 'risk'), '#/qms/processes'],
       ['c4', 'Nonconformities and corrective actions', 'Corrective Action', `<b>${openCA.length}</b> open · ${overCA.length} overdue`, overCA.length > 0, '#/capa'],
       ['c5', 'Monitoring and measurement results', 'Evidence · ISO readiness', `Readiness <b>${iso.pct}%</b> · ${evOk} of ${S.evidence.length} records verified`, S.evidence.some(Q.evGap), '#/evidence'],
-      ['c6', 'Audit results', 'Internal Audit', `<b>${S.audits.filter(a => a.status === 'Completed').length} of ${S.audits.length}</b> audits · ${openF.length} open findings (${openF.filter(f => f.type.startsWith('Major')).length} major)`, openF.some(f => f.type.startsWith('Major')), '#/audit'],
+      ['c6', 'Audit results', 'Audits · nonconformity register', (() => { const yr = Q.today().slice(0, 4), cur = S.audits.filter(a => a.programme === `AP-${yr}`), done = cur.filter(a => ['Published', 'Follow-up', 'Closed'].includes(a.status)).length, nc = S.findings.filter(f => f.nc && f.nc.status !== 'Closed'); return `<b>${done} of ${cur.length}</b> audits reported · ${nc.length} open NCs (${nc.filter(f => f.nc.classification === 'Major').length} major) · ${openF.filter(f => !f.nc).length} other open findings`; })(), S.findings.some(f => f.nc && f.nc.classification === 'Major' && f.nc.status !== 'Closed'), '#/audits'],
       ['c7', 'Performance of external providers', 'KPI K-06 · supplier scorecards', `On-time delivery ${kv(otd)}`, !Q.kpiOk(otd), '#/process/p05'],
       ['d', 'Adequacy of resources', 'KPI K-11 · risk R-007', `Training plan ${kv(train)}`, !Q.kpiOk(train), '#/process/p10'],
       ['e', 'Effectiveness of actions taken to address risks and opportunities', 'Risks & Opportunities', `<b>${highR.length}</b> high risks open · ${S.risks.filter(r => r.status === 'In treatment').length} in treatment`, highR.length > 0, '#/risks/matrix'],
@@ -649,7 +613,7 @@
     return { title: 'Corrective Action', nav: 'capa', html: head + strip + t + body };
   };
   Q.actions['raise-ca'] = () => {
-    const S = Q.S, openF = S.findings.filter(f => f.status === 'Open' && !f.action);
+    const S = Q.S, openF = S.findings.filter(f => f.status !== 'Closed' && !f.action && !f.nc);
     const m = Q.openModal({ size: 'm', title: 'Raise Corrective Action', sub: 'Starts at step 1 — root cause investigation.',
       body: `<form class="modal-body"><div class="form-grid">
         <label class="field full"><span>Nonconformity <span class="req">*</span></span><input class="input" name="title" required autofocus placeholder="What went wrong?"></label>

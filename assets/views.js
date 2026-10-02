@@ -21,6 +21,7 @@
       <div><div class="stack-bar" role="img" aria-label="Complete ${c['Complete']}, partially complete ${c['Partially Complete']}, at risk ${c['At Risk']}, missing ${c['Missing']}">${seg('Complete', 'b-complete')}${seg('Partially Complete', 'b-partial')}${seg('At Risk', 'b-atrisk')}${seg('Missing', 'b-missing')}</div>
       <div class="legend">${leg('Complete', 'var(--success)', 'complete')}${leg('Partially Complete', '#E0A43A', 'partial')}${leg('At Risk', 'var(--orange)', 'atrisk')}${leg('Missing', 'var(--danger)', 'missing')}<span class="muted">Not applicable ${c['Not Applicable']}</span></div>
       ${locked.length ? `<p class="rd-note">${icon('lock')}<span><b>${locked.length} supporting document${locked.length === 1 ? ' is' : 's are'} Confidential.</b> ${compact ? 'Counted from the owner’s description only.' : 'They are counted from the description their owner provided; iQMS has not read their content.'} <a href="#/documents?v=v-restricted">View them</a></span></p>` : ''}
+      ${(() => { const nc = Q.S.findings.filter(f => f.nc && f.nc.status !== 'Closed' && reqs.some(r => Q.AM?.fam(f.clause, r.clause))); return nc.length ? `<p class="rd-note rd-audit">${icon('search-check')}<span><b>${nc.length} open audit nonconformit${nc.length === 1 ? 'y' : 'ies'}</b> on ${new Set(nc.map(f => f.clause.split('.').slice(0, 2).join('.'))).size} clause${new Set(nc.map(f => f.clause.split('.').slice(0, 2).join('.'))).size === 1 ? '' : 's'} (${[...new Set(nc.map(f => f.clause.split('.').slice(0, 2).join('.')))].sort().join(', ')}). Requirement status should reflect them. <a href="#/audits/nc">View NCs</a></span></p>` : ''; })()}
       ${compact ? '' : `<details class="explain"><summary>${icon('chevron-right')}How is this calculated?</summary><div class="explain-body">
         Each ISO 9001 requirement is mapped to the processes, controls and evidence that satisfy it and given a status by the QMS Manager.<br>
         <span class="formula">Readiness = (Complete × 1 + Partially complete × 0.5 + At risk × 0 + Missing × 0) ÷ applicable requirements</span><br>
@@ -119,7 +120,7 @@
   };
   Q.findingTable = (id, { process = null } = {}) => Q.table({ id, rows: () => Q.S.findings.filter(f => !process || Q.inProc(f.process, process)), noun: 'findings', caption: 'Audit findings',
     search: f => `${f.id} ${f.title} ${f.audit}`,
-    tools: `${searchBox('findings')}${procFilter(process)}<select class="select" data-filter="type" aria-label="Finding type"><option value="all">All types</option><option>Major nonconformity</option><option>Minor nonconformity</option><option>Observation</option><option>Opportunity for improvement</option></select><select class="select" data-filter="status" aria-label="Status"><option value="all">Open & closed</option><option>Open</option><option>Closed</option></select>`,
+    tools: `${searchBox('findings')}${procFilter(process)}<select class="select" data-filter="type" aria-label="Finding type"><option value="all">All types</option><option>Major nonconformity</option><option>Minor nonconformity</option><option>Observation</option><option>Opportunity for improvement</option></select><select class="select" data-filter="status" aria-label="Status"><option value="all">Open & closed</option><option>Open</option><option>Action Assigned</option><option>In Progress</option><option>Verification Required</option><option>Verified</option><option>Closed</option></select>`,
     filters: { process: (f, v) => Q.inProc(f.process, v), type: (f, v) => f.type === v, status: (f, v) => f.status === v },
     columns: [
       { key: 'id', label: 'ID', cls: 'c-id', sort: f => f.id, render: f => esc(f.id) },
@@ -128,8 +129,9 @@
       { key: 'type', label: 'Type', sort: f => f.type, render: f => Q.st(f.type, f.type.startsWith('Major') ? 'danger' : f.type.startsWith('Minor') ? 'warning' : 'neutral') },
       { key: 'clause', label: 'Clause', cls: 'c-num', render: f => `<span class="clause">${esc(f.clause)}</span>` },
       { key: 'raised', label: 'Raised', cls: 'c-date', sort: f => f.raised, render: f => Q.fmt(f.raised) },
-      { key: 'status', label: 'Status', sort: f => f.status, render: f => Q.st(f.status, f.status === 'Open' ? 'warning' : 'muted') },
-      { key: 'ca', label: 'Corrective action', render: f => f.action ? `<a href="#/capa?focus=${f.action}" class="nowrap">${esc(f.action)}</a>` : '<span class="muted">Not required</span>' }
+      { key: 'status', label: 'Status', sort: f => f.status, render: f => Q.st(f.status, f.status === 'Closed' ? 'muted' : f.status === 'Open' ? 'warning' : 'info') },
+      { key: 'ca', label: 'Corrective action', render: f => f.action ? `<a href="#/capa?focus=${f.action}" class="nowrap">${esc(f.action)}</a>` : '<span class="muted">Not required</span>' },
+      { key: 'open', label: 'Actions', cls: 'c-actions', render: f => f.nc ? `<a class="btn sm" href="#/audits/nc/${f.nc.no}">Open NC</a>` : `<a class="btn sm ghost" href="#/audits/a/${f.audit}/findings">Open Audit</a>` }
     ], empty: '<h3>No audit findings for this process</h3>' });
   Q.actionTable = (id, { process = null, initialFilters } = {}) => Q.table({ id, rows: () => Q.S.actions.filter(a => !process || Q.inProc(a.process, process)), noun: 'corrective actions', caption: 'Corrective actions', initialFilters,
     search: a => `${a.id} ${a.title} ${a.source} ${a.rootCause}`,
@@ -137,7 +139,7 @@
     filters: { process: (a, v) => Q.inProc(a.process, v), status: (a, v) => v === 'open' ? !Q.actionClosed(a) : v === 'overdue' ? Q.actionOverdue(a) : Q.actionClosed(a) },
     columns: [
       { key: 'id', label: 'ID', cls: 'c-id', sort: a => a.id, render: a => esc(a.id) },
-      { key: 'title', label: 'Corrective action', sort: a => a.title, render: a => `<span class="title">${esc(a.title)}</span><span class="sub">Source: ${a.source.startsWith('F-') ? `<a href="#/audit/findings?focus=${a.source}">${esc(a.source)}</a>` : esc(a.source)}</span>` },
+      { key: 'title', label: 'Corrective action', sort: a => a.title, render: a => `<span class="title">${esc(a.title)}</span><span class="sub">Source: ${a.source.startsWith('F-') ? (() => { const f = Q.S.findings.find(x => x.id === a.source); return f?.nc ? `<a href="#/audits/nc/${f.nc.no}">${esc(f.nc.no)}</a> (${esc(f.audit)})` : `<a href="#/audits/a/${f?.audit}/findings">${esc(a.source)}</a>`; })() : esc(a.source)}</span>` },
       ...procCol(process),
       { key: 'root', label: 'Root cause', render: a => `<span class="small">${esc(a.rootCause)}</span>` },
       { key: 'stage', label: 'Stage', render: a => { const st = ['Root cause', 'Action', 'Effectiveness', 'Closed']; const i = st.indexOf(a.stage); return `<span class="nowrap">${i < 3 ? `Step ${i + 1} of 3 · ` : ''}${esc(a.stage)}</span>`; } },

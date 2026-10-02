@@ -47,7 +47,7 @@
       `<div class="sb-drawer-only">${sub('#/documents?view=process', 'documents-process', 'By process')}${sub('#/documents?view=clause', 'documents-clause', 'By ISO 9001 clause')}${sub('#/review', 'review', 'Routing', mine ? `<span class="count">${mine}</span>` : '')}</div>` +
       item('#/risks', 'risks', 'shield-alert', 'Risks & Opportunities') +
       item('#/evidence', 'evidence', 'paperclip', 'Evidence') +
-      item('#/audit', 'audit', 'search-check', 'Internal Audit') +
+      item('#/audits', 'audits', 'search-check', 'Audits', (() => { const n = Q.AM ? Q.AM.ncs().filter(f => Q.AM.ncOpen(f) && (Q.AM.needsResponse(f) && (f.nc.ca?.owner || f.nc.owner) === Q.me() || f.nc.status === 'Verification Required' && f.auditor === Q.me())).length : 0; return n ? `<span class="count" title="${n} nonconformit${n === 1 ? 'y needs' : 'ies need'} your action">${n}</span>` : ''; })()) +
       item('#/mgmt-review', 'mgmt-review', 'presentation', 'Management Review') +
       item('#/capa', 'capa', 'list-checks', 'Corrective Action') +
       flyoutHtml();
@@ -202,7 +202,8 @@
     S.risks.forEach(r => out.push({ g: 'Risks & Opportunities', icon: 'shield-alert', t: r.title, m: `${r.id} · ${r.kind} · ${Q.plabel(r.process)}`, go: () => Q.go(`#/risks?focus=${r.id}`), s: `${r.id} ${r.title} ${r.treatment}` }));
     S.kpis.forEach(k => out.push({ g: 'KPIs', icon: 'target', t: k.name, m: `${Q.plabel(k.process)} · actual ${Q.kpiFmt(k.actual, k)} vs target ${k.dir} ${Q.kpiFmt(k.target, k)}`, go: () => Q.go(`#/qms/objectives?focus=${k.id}`), s: `${k.name} ${k.objective}` }));
     S.evidence.forEach(e => out.push({ g: 'Evidence', icon: 'paperclip', t: e.name, m: `${e.source.system} · ${e.status} · ${Q.plabel(e.process)}`, go: () => Q.go(`#/evidence?focus=${e.id}`), s: `${e.id} ${e.name} ${e.control} ${e.source.record}` }));
-    S.findings.forEach(f => out.push({ g: 'Audit findings & actions', icon: 'search-check', t: f.title, m: `${f.id} · ${f.type} · ${Q.plabel(f.process)}`, go: () => Q.go(`#/audit/findings?focus=${f.id}`), s: `${f.id} ${f.title}` }));
+    S.findings.forEach(f => out.push({ g: 'Audit findings & actions', icon: 'search-check', t: f.title, m: `${f.id} · ${f.type} · ${Q.plabel(f.process)}`, go: () => Q.go(f.nc ? `#/audits/nc/${f.nc.no}` : `#/audits/a/${f.audit}/findings`), s: `${f.id} ${f.nc?.no || ''} ${f.title}` }));
+    S.audits.forEach(a => out.push({ g: 'Audits', icon: 'search-check', t: `${a.id} ${a.title}`, m: `${a.type} · ${a.status} · lead ${Q.pname(a.auditor)}`, go: () => Q.go(`#/audits/a/${a.id}`), s: `${a.id} ${a.title} ${a.type}` }));
     S.actions.forEach(a => out.push({ g: 'Audit findings & actions', icon: 'list-checks', t: a.title, m: `${a.id} · Corrective action · ${a.status}`, go: () => Q.go(`#/capa?focus=${a.id}`), s: `${a.id} ${a.title} ${a.rootCause}` }));
     return out;
   };

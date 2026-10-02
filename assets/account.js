@@ -57,6 +57,19 @@
     Q.myWorkflows().forEach(w => { const d = Q.doc(w.doc); out.push({ id: 'wf-' + w.id, ic: 'file-search', t: `${w.stage === 'review' ? 'Review' : w.stage === 'approval' ? 'Approval' : 'Publication'} assigned: ${d.title} Rev ${w.rev}`, m: `Due ${Q.fmt(w.due)}`, href: `#/review/${w.id}`, urgent: w.due < today }); });
     S.documents.filter(d => d.owner === my && Q.docOverdue(d)).forEach(d => out.push({ id: 'od-' + d.id, ic: 'calendar-clock', t: `Review overdue: ${d.title}`, m: `Was due ${Q.fmt(d.nextReview)}`, href: `#/documents?status=overdue`, urgent: true }));
     S.actions.filter(a => a.owner === my && Q.actionOverdue(a)).forEach(a => out.push({ id: 'ca-' + a.id, ic: 'list-checks', t: `Corrective action overdue: ${a.title}`, m: `Was due ${Q.fmt(a.due)}`, href: `#/capa?focus=${a.id}`, urgent: true }));
+    // Audit Management: NCs needing my response or verification, and reports waiting for me.
+    if (Q.AM) {
+      Q.AM.ncs().filter(f => Q.AM.ncOpen(f)).forEach(f => {
+        const owner = f.nc.ca?.owner || f.nc.owner;
+        if (owner === my && Q.AM.needsResponse(f)) out.push({ id: `nc-r-${f.nc.no}-${f.nc.last}`, ic: 'message-square', t: `${f.nc.no} needs your response: ${f.title}`, m: `Due ${Q.fmt(f.nc.due)} · ${f.audit}`, href: `#/audits/nc/${f.nc.no}/discussion`, urgent: Q.AM.ncOverdue(f) });
+        if (f.auditor === my && f.nc.status === 'Verification Required') out.push({ id: `nc-v-${f.nc.no}`, ic: 'search-check', t: `Verify corrective action ${f.nc.no}`, m: `${Q.pname(owner)} submitted it`, href: `#/audits/nc/${f.nc.no}/action` });
+        if (f.nc.comments.some(c => c.who !== my && new RegExp(`@(${Q.person(my).name}|${Q.person(my).name.split(' ')[0]})\\b`).test(c.text) && c.at > (f.nc.seen?.[my] || ''))) out.push({ id: `nc-m-${f.nc.no}-${f.nc.last}`, ic: 'message-square', t: `You were mentioned in ${f.nc.no}`, m: f.title, href: `#/audits/nc/${f.nc.no}/discussion` });
+      });
+      S.audits.forEach(a => {
+        if (a.report.status === 'For Review' && !a.report.reviewed && a.report.reviewer === my) out.push({ id: `rp-r-${a.id}-${a.report.rev}`, ic: 'file-search', t: `Review audit report ${a.id}`, m: a.title, href: `#/audits/a/${a.id}/report` });
+        if (a.report.status === 'For Review' && a.report.reviewed && a.report.approver === my) out.push({ id: `rp-a-${a.id}-${a.report.rev}`, ic: 'stamp', t: `Approve audit report ${a.id}`, m: a.title, href: `#/audits/a/${a.id}/report` });
+      });
+    }
     S.risks.filter(r => Q.riskOpen(r) && r.kind === 'Risk' && Q.riskLevel(r) === 'High' && Q.proc(Q.rootId(r.process))?.owner === my).forEach(r => out.push({ id: 'rk-' + r.id, ic: 'shield-alert', t: `High risk in your process: ${r.title}`, m: Q.plabel(r.process), href: `#/risks?focus=${r.id}` }));
     (S.settings?.privacy?.breaches || []).filter(b => b.status === 'Open').forEach(b => out.push({ id: 'pb-' + b.id, ic: 'shield-alert', t: `Personal data breach ${b.id}: ${b.summary}`, m: 'Notify within 72 hours if required', href: '#/settings/privacy', urgent: true }));
     return out;

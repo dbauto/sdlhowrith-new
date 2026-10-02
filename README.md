@@ -25,7 +25,7 @@ Open <http://127.0.0.1:4173>. You can also open `index.html` directly. Changes a
 | 2 | **Documented Information** + hover list | `#/documents`, `#/review` | **Library** (List / By process / By ISO 9001 clause) and **Routing** (review → approval → publication) |
 | 3 | Risks & Opportunities | `#/risks`, `#/risks/matrix` | Register + 5×5 **risk matrix** + an **Assess / Reassess** tool with live scoring and the required response (6.1) |
 | 4 | Evidence | `#/evidence` | **By ISO subclause** (with readiness), **By process** (expected records per process), All records |
-| 5 | Internal Audit | `#/audit` | Programme, Findings, **Process coverage** (which processes aren't in the programme, 9.2.2) |
+| 5 | **Audits** (was Internal Audit) | `#/audits` | Audit Management module: programme, audits, nonconformities and reports. Old `#/audit` links redirect. |
 | 6 | Management Review | `#/mgmt-review` | **9.3.2 inputs assembled live** (a–f), decisions and actions (9.3.3), meetings, reports |
 | 7 | Corrective Action | `#/capa` | Stage pipeline (root cause → action → effectiveness → closed), corrective actions, improvement opportunities; **Raise Corrective Action** form |
 | 8 | Settings | `#/settings` | Grouped: Workspace, People & access, Connections, Trust & compliance, Account (see Update 11) |
@@ -261,10 +261,22 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
   - The six attention numbers become stat cards with a coloured icon tile (red = critical, amber = needs attention, green = all clear)
 - All Material styles are scoped to `html[data-ui="material"]` in `app.css`, so Classic can't change by accident.
 
-## Update 14: customizable Overview and component sizing
+## Update 14: Audit Management
+
+The sidebar item **Internal Audit** is now **Audits**, covering the complete audit lifecycle without creating a parallel record store. Existing processes, corrective actions, evidence, management-review inputs and ISO readiness all use the same audit and finding records.
+
+- **Overview:** audit and NC counts, upcoming and overdue work, programme progress, trends, findings by area and ISO clause.
+- **Programme:** 2026/2027 table and calendar views, area-clause matrix, process coverage, planning, scheduling and auditor assignment.
+- **Audit workspace:** plan, team and independence, checklist, evidence snapshots, findings, corrective actions, report and activity history.
+- **Nonconformities:** status views, area monitoring, discussion threads and mentions, correction/root cause/action workflow, verification and effectiveness.
+- **Reports:** area reports, consolidated editor, review/approval/publishing, frozen revisions and A4 print/PDF layouts based on structured audit results.
+- **Lifecycle controls:** an audit cannot close until its report is published and every NC is closed; publishing a report does not close its NCs.
+- **Role demonstration:** QMS Manager, Lead Auditor, Auditor, Area Owner, Reviewer, Approver and Viewer can be demonstrated with the module's “Viewing as” control.
+
+## Update 15: customizable Overview and drag-resizable components
 
 - **Overview → Customize page** uses the same saved-layout editor as the QMS pages. Welcome, attention summary, ISO readiness, assigned work, process status, upcoming reviews and management actions are separate pre-made components.
-- Every page-layout component has safe **Width** and **Height** settings. Width choices respect a component-specific minimum; fixed heights respect a minimum that keeps controls usable.
+- Every page-layout component has safe width and height minimums. In customize mode, drag the right edge, bottom edge or bottom-right corner to resize; changes persist after **Save layout**.
 - Fixed-height content scrolls inside its component. Register and process-status tables therefore scroll vertically and horizontally without making the whole page excessively long.
 - At phone widths every component becomes full width, regardless of its saved desktop width.
 
@@ -282,6 +294,10 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
 | `assets/data.js` | Added process categories, organization context & scope, quality policy, management reviews |
 | `assets/settings-extra.js` | **New.** Regional, Branding, Security, Notifications, API & Webhooks, Data Privacy, Audit Log, Data Export & Backup, Billing & Plan, About System |
 | `assets/orgchart.js` | **New.** Organization chart component, person details and reporting lines, chart in the QMS-ORG-001 preview |
+| `assets/audit-data.js` | **New.** Audit programmes, audits, findings, NCs, discussions, qualified auditors and area-clause mappings |
+| `assets/audits.js` | **New.** Audit model, migration, permissions, programme, workspace, checklist and evidence snapshots |
+| `assets/audit-nc.js` | **New.** NC register, monitoring, discussions, corrective action, verification and effectiveness |
+| `assets/audit-report.js` | **New.** Area/consolidated reports, editor, workflow, revisions and A4 print/PDF layout |
 | `assets/theme.js` | **New.** Theme switch and Material welcome banner |
 | `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
 | `assets/app.css` | Styles for the above |
