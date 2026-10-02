@@ -58,7 +58,10 @@
     return `<div class="pb-block editing${sizeClass}" style="${sizeStyle}" data-b="${esc(b.id)}" draggable="true">
       <div class="pb-frame-head"><span class="pb-grip" title="Drag to move">${GRIP}</span><b>${esc(titleOf(b))}</b>${c && b.title ? `<span class="pb-type">${esc(c.name)}</span>` : ''}<span class="pb-size">${Math.round(size.w / 12 * 100)}% · ${size.h ? `${size.h}px` : 'Auto height'}</span>
         <span class="pb-tools"><button type="button" class="icon-btn" data-action="pb-up" data-b="${esc(b.id)}" ${at.i === 0 ? 'disabled' : ''} aria-label="Move ${esc(titleOf(b))} up">${icon('arrow-up')}</button><button type="button" class="icon-btn" data-action="pb-down" data-b="${esc(b.id)}" ${at.i === list.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(titleOf(b))} down">${icon('arrow-down')}</button>${Q.menu(`Move ${titleOf(b)} to another area`, [{ note: 'Move to' }, ...moveTo], { icon: 'move', cls: 'icon-btn', align: 'min-width:210px;right:0;left:auto' })}<button type="button" class="icon-btn" data-action="pb-settings" data-b="${esc(b.id)}" aria-label="Settings for ${esc(titleOf(b))}">${icon('settings')}</button><button type="button" class="icon-btn danger" data-action="pb-remove" data-b="${esc(b.id)}" aria-label="Remove ${esc(titleOf(b))}">${icon('x')}</button></span></div>
-      <div class="pb-content" inert>${html || `<div class="pb-ghost">${icon(c ? 'eye-off' : 'triangle-alert')}<span>${c ? esc(c.hiddenNote || 'Nothing to show right now. This component appears when it has content.') : 'This component is no longer available.'}</span></div>`}</div></div>`;
+      <div class="pb-content" inert>${html || `<div class="pb-ghost">${icon(c ? 'eye-off' : 'triangle-alert')}<span>${c ? esc(c.hiddenNote || 'Nothing to show right now. This component appears when it has content.') : 'This component is no longer available.'}</span></div>`}</div>
+      <button class="pb-resize pb-resize-x" type="button" data-resize="x" draggable="false" aria-label="Resize ${esc(titleOf(b))} width" title="Drag to resize width. Arrow keys also work."></button>
+      <button class="pb-resize pb-resize-y" type="button" data-resize="y" draggable="false" aria-label="Resize ${esc(titleOf(b))} height" title="Drag to resize height. Arrow keys also work."></button>
+      <button class="pb-resize pb-resize-xy" type="button" data-resize="xy" draggable="false" aria-label="Resize ${esc(titleOf(b))} width and height" title="Drag to resize width and height. Arrow keys also work."></button></div>`;
   };
   Q.pageBody = pageId => {
     const editing = EDIT?.page === pageId, L = editing ? EDIT.draft : Q.pageLayout(pageId);
@@ -71,7 +74,7 @@
   };
   const editBar = pageId => {
     const L = EDIT.draft;
-    return `<div class="pb-bar" role="region" aria-label="Customize page"><div class="pb-bar-l">${icon('layout-template')}<div><b>Customizing “${esc(Q.PAGES[pageId].title)}”</b><span>Drag components to reorder them or move them to another area. The layout applies to everyone in the organization.</span></div></div>
+    return `<div class="pb-bar" role="region" aria-label="Customize page"><div class="pb-bar-l">${icon('layout-template')}<div><b>Customizing “${esc(Q.PAGES[pageId].title)}”</b><span>Drag components to reorder. Drag an edge or corner handle to resize. Changes apply after Save layout.</span></div></div>
       <div class="pb-bar-r"><div class="pb-bar-field"><span class="small muted">Columns</span>${Q.seg('Columns', LAYOUTS, L.layout).replace(/data-seg=/g, 'data-action="pb-layout" data-layout=')}</div>
         <button class="btn" type="button" data-action="pb-add">${icon('plus')}Add component</button>
         ${Q.menu('More layout options', [{ label: 'Restore default layout', icon: 'history', data: { action: 'pb-reset', page: pageId } }], { icon: 'ellipsis', cls: 'btn', align: 'min-width:220px;right:0;left:auto' })}
@@ -87,7 +90,7 @@
       html: Q.pageHead({ crumbs, title, sub, actions: editing ? '' : actions + custom }) + (editing ? editBar(pageId) : intro) + Q.pageBody(pageId),
       after: main => {
         all(L).forEach(b => Q.COMPONENTS[b.type]?.after?.(main, b));
-        if (editing) wireDrag(main);
+        if (editing) { wireDrag(main); wireResize(main); }
         if (EDIT?.flash) { const el = main.querySelector(`[data-b="${EDIT.flash}"]`); EDIT.flash = null; if (el) { el.classList.add('pb-new'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }
       } };
   };
@@ -97,7 +100,7 @@
     const root = main.querySelector('.pb-editing'); if (!root) return;
     let dragId = null;
     const clear = () => root.querySelectorAll('.drop-before, .drop-after, .drop-into, .dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into', 'dragging'));
-    root.addEventListener('dragstart', e => { const blk = e.target.closest('.pb-block'); if (!blk) return; dragId = blk.dataset.b; blk.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); Q.closeMenus(); });
+    root.addEventListener('dragstart', e => { if (e.target.closest('.pb-resize')) { e.preventDefault(); return; } const blk = e.target.closest('.pb-block'); if (!blk) return; dragId = blk.dataset.b; blk.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); Q.closeMenus(); });
     root.addEventListener('dragover', e => {
       if (!dragId) return;
       const blk = e.target.closest('.pb-block'), zone = e.target.closest('.pb-zone'); if (!zone) return;
@@ -119,6 +122,50 @@
       list.splice(Math.max(0, to), 0, from.b); dragId = null; EDIT.flash = from.b.id; touch();
     });
     root.addEventListener('dragend', () => { dragId = null; clear(); });
+  }
+
+  /* Direct resize handles: preview immediately, save only with the page-level Save layout button. */
+  function wireResize(main) {
+    const root = main.querySelector('.pb-editing'); if (!root) return;
+    const sync = (blk, b, mode, w, h) => {
+      const c = Q.COMPONENTS[b.type], safe = sizeOf({ ...b, size: { w, h } }, c);
+      b.size = { w: safe.w, h: safe.h };
+      blk.style.setProperty('--pb-span', safe.w);
+      if (safe.h) { blk.style.setProperty('--pb-height', `${safe.h}px`); blk.classList.add('pb-fixed'); }
+      else { blk.style.removeProperty('--pb-height'); blk.classList.remove('pb-fixed'); }
+      const label = blk.querySelector('.pb-size'); if (label) label.textContent = `${Math.round(safe.w / 12 * 100)}% · ${safe.h ? `${safe.h}px` : 'Auto height'}`;
+      const handle = blk.querySelector(`[data-resize="${mode}"]`); if (handle) handle.setAttribute('aria-valuetext', label?.textContent || '');
+      EDIT.dirty = true;
+      return safe;
+    };
+    root.addEventListener('contextmenu', e => { if (e.target.closest('.pb-resize')) e.preventDefault(); });
+    root.addEventListener('pointerdown', e => {
+      const handle = e.target.closest('.pb-resize'); if (!handle || (e.button !== 0 && e.button !== 2)) return;
+      const blk = handle.closest('.pb-block'), at = find(EDIT.draft, blk.dataset.b); if (!at) return;
+      e.preventDefault(); e.stopPropagation(); Q.closeMenus();
+      const mode = handle.dataset.resize, zone = blk.closest('.pb-zone'), start = sizeOf(at.b), rect = blk.getBoundingClientRect();
+      const startX = e.clientX, startY = e.clientY, startW = start.w, startH = start.h || Math.round(rect.height);
+      const minW = start.minW, minH = start.minH, zoneWidth = zone.getBoundingClientRect().width;
+      blk.classList.add('resizing'); blk.draggable = false; handle.setPointerCapture?.(e.pointerId);
+      const move = ev => {
+        const w = mode.includes('x') ? Math.max(minW, Math.min(12, Math.round(startW + (ev.clientX - startX) / zoneWidth * 12))) : startW;
+        const h = mode.includes('y') ? Math.max(minH, Math.min(1200, Math.round((startH + ev.clientY - startY) / 10) * 10)) : start.h;
+        sync(blk, at.b, mode, w, h); ev.preventDefault();
+      };
+      const done = ev => { if (Number.isFinite(ev.clientX) && Number.isFinite(ev.clientY)) move(ev); blk.classList.remove('resizing'); blk.draggable = true; handle.releasePointerCapture?.(e.pointerId); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', done); window.removeEventListener('pointercancel', done); };
+      window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', done); window.addEventListener('pointercancel', done);
+    });
+    root.addEventListener('keydown', e => {
+      const handle = e.target.closest('.pb-resize'); if (!handle || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      const blk = handle.closest('.pb-block'), at = find(EDIT.draft, blk.dataset.b); if (!at) return;
+      const mode = handle.dataset.resize, cur = sizeOf(at.b), rect = blk.getBoundingClientRect();
+      let w = cur.w, h = cur.h || Math.round(rect.height);
+      if (mode.includes('x') && e.key === 'ArrowLeft') w--;
+      if (mode.includes('x') && e.key === 'ArrowRight') w++;
+      if (mode.includes('y') && e.key === 'ArrowUp') h -= 20;
+      if (mode.includes('y') && e.key === 'ArrowDown') h += 20;
+      sync(blk, at.b, mode, w, mode.includes('y') ? h : cur.h); e.preventDefault();
+    });
   }
 
   /* ---------------- Actions ---------------- */
@@ -166,7 +213,7 @@
     });
   };
 
-  /* Component settings: title, safe size controls, plus component-specific options. */
+  /* Component settings: naming and component-specific options. Size is adjusted directly on the page. */
   A['pb-settings'] = d => {
     const at = find(EDIT.draft, d.b), b = at.b, c = Q.COMPONENTS[b.type], opts = b.opts || {};
     const field = s => {
@@ -175,16 +222,11 @@
       if (s.type === 'textarea') return `<label class="field"><span>${esc(s.label)}</span><textarea class="textarea" name="o_${s.key}" rows="5" placeholder="${esc(s.placeholder || '')}">${esc(v)}</textarea>${s.help ? `<span class="help">${esc(s.help)}</span>` : ''}</label>`;
       return `<label class="field"><span>${esc(s.label)}</span><input class="input" name="o_${s.key}" value="${esc(v)}"></label>`;
     };
-    const sz = sizeOf(b, c);
-    const widths = [[3, '25%'], [4, '33%'], [6, '50%'], [8, '67%'], [9, '75%'], [12, '100%']].filter(([w]) => w >= sz.minW);
-    const heights = [[0, 'Auto — fit content'], [240, 'Compact · 240 px'], [360, 'Medium · 360 px'], [520, 'Tall · 520 px'], [680, 'Extra tall · 680 px']].filter(([h]) => !h || h >= sz.minH);
     const m = Q.openModal({ size: 'm', title: 'Component settings', sub: esc(c.name),
       body: `<form class="modal-body"><div style="display:flex;flex-direction:column;gap:16px">
         <label class="field"><span>Title</span><input class="input" name="title" maxlength="60" value="${esc(b.title || '')}" placeholder="${esc(c.name)}"><span class="help">Leave empty to use the standard title.</span></label>
-        <div class="form-grid"><label class="field"><span>Width</span><select class="select" name="size_w">${widths.map(([v, l]) => `<option value="${v}" ${v === sz.w ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="help">Minimum ${Math.round(sz.minW / 12 * 100)}% to protect the component layout.</span></label>
-        <label class="field"><span>Height</span><select class="select" name="size_h">${heights.map(([v, l]) => `<option value="${v}" ${v === sz.h ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="help">Fixed-height content scrolls inside the component. Minimum ${sz.minH}px.</span></label></div>
         ${(c.settings || []).map(field).join('')}
-        <div class="callout small">${icon('info')}<span>${esc(c.desc || '')}</span></div></div></form>`,
+        <div class="callout small">${icon('info')}<span>Resize directly on the page using the right, bottom, or corner handle. ${esc(c.desc || '')}</span></div></div></form>`,
       foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Apply</button>` });
     const form = m.querySelector('form');
     // Dependent options (e.g. the saved views of the chosen register) refresh when their parent changes.
@@ -195,7 +237,6 @@
     const ok = () => {
       const v = Q.formValues(form);
       b.title = v.title.trim() || undefined; if (!b.title) delete b.title;
-      b.size = { w: Number(v.size_w) || 12, h: Number(v.size_h) || 0 };
       (c.settings || []).forEach(s => { b.opts = b.opts || {}; b.opts[s.key] = v['o_' + s.key]; });
       Q.closeModal(); touch();
     };
