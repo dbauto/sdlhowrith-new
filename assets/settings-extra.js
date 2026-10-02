@@ -11,7 +11,7 @@
   /* ---------- Settings state (stored with the organization; defaults merged in once) ---------- */
   const DEFAULTS = () => ({
     regional: { timeZone: 'Asia/Manila', dateFormat: 'd MMM yyyy', weekStart: 'Monday', language: 'English', currency: 'PHP' },
-    branding: { palette: 'forest', initials: Q.S.organization.initials, loginMessage: '' },
+    branding: { theme: 'classic', palette: 'forest', initials: Q.S.organization.initials, loginMessage: '' },
     security: { mfa: 'admins', sso: { status: 'Not configured', domain: '', enforce: false }, minLength: '12', complexity: true, expiry: 'Never', lockout: '5', idle: '30', maxSession: '12 hours', ipEnabled: false, ipList: '' },
     notifications: {
       events: { assigned: ['app', 'email'], dueSoon: ['app', 'email'], overdue: ['app', 'email'], caAssigned: ['app', 'email'], caOverdue: ['app', 'email'], riskHigh: ['app'], kpiBelow: ['app'], mention: ['app', 'email'], weekly: ['email'] },
@@ -95,8 +95,8 @@
   };
   V.branding = () => {
     const b = S().branding;
-    return { html: section('Branding', 'How iQMS looks for your organization. Colours are pre-checked for readable contrast.') +
-      `<section class="panel"><form class="panel-pad" id="brandForm">
+    return { html: section('Branding', 'How iQMS looks for your organization: the theme, the colours and the logo. Colours are pre-checked for readable contrast.') +
+      `<section class="panel"><form class="panel-pad" id="brandForm">${Q.themePicker ? Q.themePicker(Q.theme()) : ''}
         <fieldset class="fieldset"><legend>Colour theme</legend><p class="help">Changes the sidebar, buttons and links for everyone.</p>
           <div class="palette-grid" role="radiogroup" aria-label="Colour theme">${Object.entries(Q.PALETTES).map(([k, p]) => `<label class="palette-opt"><input type="radio" name="palette" value="${k}" ${k === b.palette ? 'checked' : ''}><span class="pal-prev" aria-hidden="true"><i style="background:${p.sb}"></i><i style="background:${p.accent}"></i><i style="background:${p.soft}"></i></span><b>${esc(p.name)}</b></label>`).join('')}</div></fieldset>
         <div class="form-grid">
@@ -105,10 +105,14 @@
           <label class="field full"><span>Sign-in page message</span><input class="input" name="loginMessage" maxlength="140" value="${esc(b.loginMessage)}" placeholder="e.g. Authorized Helios Solar personnel only."><span class="help">Shown under the sign-in form. Up to 140 characters.</span></label>
         </div>${saveBar()}</form></section>`,
       after: main => {
-        main.querySelectorAll('[name="palette"]').forEach(r => r.addEventListener('change', () => { const keep = b.palette; b.palette = r.value; Q.applyBranding(); b.palette = keep; }));
+        // Preview a theme or colour straight away; Save keeps it, leaving the page without saving restores the saved look.
+        const preview = () => { const f = main.querySelector('#brandForm'), keep = { theme: b.theme, palette: b.palette }; b.theme = f.theme?.value || b.theme; b.palette = f.palette.value; Q.applyBranding(); Object.assign(b, keep); };
+        main.querySelectorAll('[name="palette"], [name="theme"]').forEach(r => r.addEventListener('change', preview));
+        const restore = () => { if (!location.hash.startsWith('#/settings/branding')) { Q.applyBranding(); removeEventListener('hashchange', restore); } };
+        addEventListener('hashchange', restore);
         onSubmit(main, '#brandForm', v => {
-          Object.assign(b, { palette: v.palette, initials: v.initials.trim().toUpperCase(), loginMessage: v.loginMessage.trim() });
-          Q.S.organization.initials = b.initials; Q.save(); Q.applyBranding(); Q.renderSidebar(); Q.audit('Settings', `changed branding (${Q.PALETTES[v.palette].name})`); Q.toast('Branding saved');
+          Object.assign(b, { theme: v.theme || b.theme, palette: v.palette, initials: v.initials.trim().toUpperCase(), loginMessage: v.loginMessage.trim() });
+          Q.S.organization.initials = b.initials; Q.save(); Q.applyBranding(); Q.renderSidebar(); Q.audit('Settings', `changed branding (${Q.THEMES?.[b.theme]?.name || 'Classic'} theme, ${Q.PALETTES[v.palette].name})`); Q.toast('Branding saved', `${Q.THEMES?.[b.theme]?.name || 'Classic'} theme · ${Q.PALETTES[v.palette].name}`);
         });
       } };
   };

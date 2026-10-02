@@ -298,7 +298,7 @@
     const k = kpiCard(q);
     if (k.redirect) { location.replace(k.redirect); return { title: 'Objectives & KPIs', nav: 'qms', html: '' }; }
     const { v, leaf } = k, plan = Q.doc('QOB-PLN-001'), objs = [...new Set(Q.S.kpis.map(x => x.objective))];
-    return Q.pageView('objectives', { title: 'Objectives & KPIs', nav: 'qms',
+    return Q.pageView('objectives', { title: 'Objectives & KPIs', nav: 'qms', intro: Q.themeObjectives?.() || '',
       crumbs: [['QMS', '#/qms/scope'], ['Objectives & KPIs', '#/qms/objectives?v=' + (Q.viewList(KT)[0]?.id || '')], ...(leaf ? [[v.name, Q.vwHash(KT, v)], [leaf]] : [[v.name]])],
       sub: `Quality objectives and how each process is measured against them — ISO 9001 clauses 6.2 and 9.1. ${objs.length} objectives · ${Q.S.kpis.length} KPIs.`,
       actions: `<button class="btn" type="button" data-action="open-doc" data-id="${plan.id}">${icon('file-text')}${esc(plan.title)}</button><button class="btn primary" type="button" data-action="toast" data-title="Add KPI" data-msg="KPI entry form is not part of this mock.">${icon('plus')}Add KPI</button>` });
