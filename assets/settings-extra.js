@@ -97,19 +97,20 @@
     const b = S().branding;
     return { html: section('Branding', 'How iQMS looks for your organization: the theme, the colours and the logo. Colours are pre-checked for readable contrast.') +
       `<section class="panel"><form class="panel-pad" id="brandForm">${Q.themePicker ? Q.themePicker(Q.theme()) : ''}
-        <fieldset class="fieldset"><legend>Colour theme</legend><p class="help">Changes the sidebar, buttons and links for everyone.</p>
+        <fieldset class="fieldset"><legend>Colour theme</legend><p class="help">Changes the sidebar, buttons and links for everyone. Applies straight away.</p>
           <div class="palette-grid" role="radiogroup" aria-label="Colour theme">${Object.entries(Q.PALETTES).map(([k, p]) => `<label class="palette-opt"><input type="radio" name="palette" value="${k}" ${k === b.palette ? 'checked' : ''}><span class="pal-prev" aria-hidden="true"><i style="background:${p.sb}"></i><i style="background:${p.accent}"></i><i style="background:${p.soft}"></i></span><b>${esc(p.name)}</b></label>`).join('')}</div></fieldset>
         <div class="form-grid">
           <label class="field"><span>Logo initials <span class="req">*</span></span><input class="input" name="initials" maxlength="3" required value="${esc(b.initials)}"><span class="help">Shown in the sidebar when no logo is uploaded. Up to 3 letters.</span></label>
           <div class="field"><span>Logo</span><button class="btn" type="button" data-action="toast" data-title="Upload logo" data-msg="PNG or SVG, at least 128 × 128 px. Not stored in this mock.">${icon('upload')}Upload Logo</button><span class="help">Square PNG or SVG, at least 128 × 128 px.</span></div>
           <label class="field full"><span>Sign-in page message</span><input class="input" name="loginMessage" maxlength="140" value="${esc(b.loginMessage)}" placeholder="e.g. Authorized Helios Solar personnel only."><span class="help">Shown under the sign-in form. Up to 140 characters.</span></label>
-        </div>${saveBar()}</form></section>`,
+        </div>${saveBar('Save Logo & Sign-in Message')}</form></section>`,
       after: main => {
-        // Preview a theme or colour straight away; Save keeps it, leaving the page without saving restores the saved look.
-        const preview = () => { const f = main.querySelector('#brandForm'), keep = { theme: b.theme, palette: b.palette }; b.theme = f.theme?.value || b.theme; b.palette = f.palette.value; Q.applyBranding(); Object.assign(b, keep); };
-        main.querySelectorAll('[name="palette"], [name="theme"]').forEach(r => r.addEventListener('change', preview));
-        const restore = () => { if (!location.hash.startsWith('#/settings/branding')) { Q.applyBranding(); removeEventListener('hashchange', restore); } };
-        addEventListener('hashchange', restore);
+        // Theme and colour apply and save as soon as they're picked: no hidden preview that reverts when you leave.
+        main.querySelectorAll('[name="palette"], [name="theme"]').forEach(r => r.addEventListener('change', () => {
+          b[r.name] = r.value; Q.save(); Q.applyBranding();
+          const label = r.name === 'theme' ? `${Q.THEMES?.[r.value]?.name || r.value} theme` : `${Q.PALETTES[r.value].name} colours`;
+          Q.audit('Settings', `changed branding to the ${label}`); Q.toast(`${label} applied`, 'Saved for everyone in the organization. Pick another option to switch back.');
+        }));
         onSubmit(main, '#brandForm', v => {
           Object.assign(b, { theme: v.theme || b.theme, palette: v.palette, initials: v.initials.trim().toUpperCase(), loginMessage: v.loginMessage.trim() });
           Q.S.organization.initials = b.initials; Q.save(); Q.applyBranding(); Q.renderSidebar(); Q.audit('Settings', `changed branding (${Q.THEMES?.[b.theme]?.name || 'Classic'} theme, ${Q.PALETTES[v.palette].name})`); Q.toast('Branding saved', `${Q.THEMES?.[b.theme]?.name || 'Classic'} theme · ${Q.PALETTES[v.palette].name}`);
