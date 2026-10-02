@@ -74,7 +74,7 @@
   const compactHtml = () => {
     const m = Q.orgModel(); if (!m.root) return '';
     const rows = (id, depth) => reportsOf(id).map(x => `<li style="--d:${depth}"><b>${esc(Q.pname(x))}</b><span>${esc(Q.person(x).title)}</span>${owned(x).map(pr => `<span class="oc-proc">${esc(pr.process_code)}</span>`).join('')}</li>${rows(x, depth + 1)}`).join('');
-    return `<div class="ocp"><div class="ocp-root">${node(m.root, { interactive: false })}</div><div class="ocp-grid">${reportsOf(m.root).map(h => { const p = Q.person(h); return `<section class="ocp-block" style="--c:${deptColor(p.dept)}"><header><b>${esc(p.name)}</b><span>${esc(p.title)}</span>${owned(h).map(pr => `<span class="oc-proc">${esc(pr.process_code)}</span>`).join('')}${h === qmsRep() ? '<span class="oc-badge">QMS representative</span>' : ''}</header>${reportsOf(h).length ? `<ul>${rows(h, 0)}</ul>` : ''}</section>`; }).join('')}</div></div>`;
+    return `<div class="ocp"><div class="ocp-root">${node(m.root, { interactive: false })}</div><div class="ocp-grid">${reportsOf(m.root).map(h => { const p = Q.person(h); return `<section class="ocp-block" style="--c:${deptColor(p.dept)}"><header><span class="avatar sm">${esc(Q.initials(h))}</span><span class="ocp-person"><b>${esc(p.name)}</b><span>${esc(p.title)}</span></span><span class="ocp-codes">${owned(h).map(pr => `<span class="oc-proc">${esc(pr.process_code)}</span>`).join('')}</span>${h === qmsRep() ? '<span class="oc-badge">QMS representative</span>' : ''}</header>${reportsOf(h).length ? `<ul>${rows(h, 0)}</ul>` : '<p class="ocp-empty">No direct reports</p>'}<footer>${esc(p.dept)}</footer></section>`; }).join('')}</div></div>`;
   };
   const listHtml = () => {
     const m = Q.orgModel(); if (!m.root) return '';
