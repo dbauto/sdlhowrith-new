@@ -1,4 +1,4 @@
-/* iQMS — UI themes. "Classic" is the original look and stays the default.
+/* iQMS — UI themes. "Material" is the default; Classic remains available.
  * "Material" (inspired by Material Dashboard) adds a floating sidebar, soft card shadows,
  * icon stat cards and a welcome banner. The colour palette (Settings → Branding)
  * applies to both. Theme CSS is scoped under html[data-ui="material"], so Classic is untouched. */
@@ -9,7 +9,7 @@
     classic: { name: 'Classic', desc: 'Compact and flat. Collapsible sidebar, bordered panels. The current look.' },
     material: { name: 'Material', desc: 'Floating sidebar, soft shadows, icon stat cards and a welcome banner on Overview.' }
   };
-  Q.theme = () => (Q.S.settings?.branding?.theme in Q.THEMES ? Q.S.settings.branding.theme : 'classic');
+  Q.theme = () => (Q.S.settings?.branding?.theme in Q.THEMES ? Q.S.settings.branding.theme : 'material');
   Q.isMaterial = () => Q.theme() === 'material';
   const apply = Q.applyBranding;
   Q.applyBranding = () => { apply?.(); document.documentElement.dataset.ui = Q.theme(); };
@@ -38,5 +38,5 @@
   Q.themePicker = sel => `<fieldset class="fieldset"><legend>Theme</legend><p class="help">The overall look of iQMS. Applies straight away for everyone in the organization; switch back at any time. No data changes.</p>
     <div class="theme-grid" role="radiogroup" aria-label="Theme">${Object.entries(Q.THEMES).map(([k, t]) => `<label class="theme-opt"><input type="radio" name="theme" value="${k}" ${k === sel ? 'checked' : ''}>
       <span class="theme-prev tp-${k}" aria-hidden="true"><i class="tp-sb"></i><span class="tp-main"><i class="tp-top"></i><span class="tp-cards"><i></i><i></i><i></i></span><i class="tp-panel"></i></span></span>
-      <b>${esc(t.name)}${k === 'classic' ? ' <span class="muted small">(default)</span>' : ''}</b><span>${esc(t.desc)}</span></label>`).join('')}</div></fieldset>`;
+      <b>${esc(t.name)}${k === 'material' ? ' <span class="muted small">(default)</span>' : ''}</b><span>${esc(t.desc)}</span></label>`).join('')}</div></fieldset>`;
 })();

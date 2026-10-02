@@ -5,13 +5,13 @@
   'use strict';
   const { esc, icon } = Q;
   const V = Q.settingsViews = Q.settingsViews || {};
-  const APP = { name: 'iQMS', version: '3.11.0', build: '2026.10.02-1', channel: 'Stable', released: '2026-10-02' };
+  const APP = { name: 'iQMS', version: '3.11.1', build: '2026.10.02-2', channel: 'Stable', released: '2026-10-02' };
   Q.APP = APP;
 
   /* ---------- Settings state (stored with the organization; defaults merged in once) ---------- */
   const DEFAULTS = () => ({
     regional: { timeZone: 'Asia/Manila', dateFormat: 'd MMM yyyy', weekStart: 'Monday', language: 'English', currency: 'PHP' },
-    branding: { theme: 'classic', palette: 'forest', initials: Q.S.organization.initials, loginMessage: '' },
+    branding: { theme: 'material', palette: 'forest', initials: Q.S.organization.initials, loginMessage: '' },
     security: { mfa: 'admins', sso: { status: 'Not configured', domain: '', enforce: false }, minLength: '12', complexity: true, expiry: 'Never', lockout: '5', idle: '30', maxSession: '12 hours', ipEnabled: false, ipList: '' },
     notifications: {
       events: { assigned: ['app', 'email'], dueSoon: ['app', 'email'], overdue: ['app', 'email'], caAssigned: ['app', 'email'], caOverdue: ['app', 'email'], riskHigh: ['app'], kpiBelow: ['app'], mention: ['app', 'email'], weekly: ['email'] },
@@ -30,6 +30,11 @@
   const merge = (base, over) => { Object.entries(over || {}).forEach(([k, v]) => { base[k] = v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) ? merge(base[k], v) : v; }); return base; };
   const ensure = () => { Q.S.settings = merge(DEFAULTS(), Q.S.settings); return Q.S.settings; };
   ensure();
+  if (!Q.S.organization.materialDefaultApplied) {
+    Q.S.settings.branding.theme = 'material';
+    Q.S.organization.materialDefaultApplied = true;
+    Q.save();
+  }
   const S = () => Q.S.settings || ensure();
   const today = () => Q.today();
   const daysAgo = n => Q.addDays(today(), -n);

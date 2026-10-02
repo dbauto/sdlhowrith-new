@@ -250,10 +250,11 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
 
 | Theme | Look |
 |---|---|
-| **Classic** (default) | The current design, unchanged: compact, flat, collapsible sidebar, bordered panels |
-| **Material** | Inspired by Material Dashboard: floating rounded sidebar with a gradient, soft card shadows, rounded controls, filled active menu item, uppercase table headers |
+| **Classic** | The original compact design: flat, collapsible sidebar, bordered panels |
+| **Material** (default) | Inspired by Material Dashboard: floating rounded sidebar with a gradient, soft card shadows, rounded controls, filled active menu item, uppercase table headers |
 
 - Picking a theme or colour **applies and saves it straight away** for everyone in the organization, with a confirmation message. Pick another option to switch back. (Before 13.1 it was only a preview until *Save Changes*, and leaving the page undid it.) **Save Logo & Sign-in Message** saves the remaining fields. Switching theme never changes data.
+- Existing sample-data sessions move to Material once; a later manual switch back to Classic is preserved.
 - The colour palettes (Forest, Ocean, Plum, Slate, Terracotta) work with both themes.
 - **Material only, Overview:**
   - Welcome banner: greeting by time of day, what's waiting for you, readiness %, **Open Routing**
