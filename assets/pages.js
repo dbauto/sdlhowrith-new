@@ -69,13 +69,13 @@
         <button class="btn" type="button" data-action="pb-cancel">Cancel</button><button class="btn primary" type="button" data-action="pb-save">${icon('check')}Save layout</button></div></div>`;
   };
   /* A page built from its layout. `actions` are the page's own header buttons. */
-  Q.pageView = (pageId, { title, sub = '', crumbs = null, actions = '', nav }) => {
+  Q.pageView = (pageId, { title, sub = '', crumbs = null, actions = '', nav, intro = '' }) => {
     if (EDIT && EDIT.page !== pageId) EDIT = null; // leaving a page discards an unsaved draft
     const editing = EDIT?.page === pageId;
     const L = editing ? EDIT.draft : Q.pageLayout(pageId);
     const custom = `<button class="btn" type="button" data-action="pb-customize" data-page="${esc(pageId)}" title="Choose which components this page shows and where">${icon('layout-template')}Customize page</button>`;
     return { title, nav,
-      html: Q.pageHead({ crumbs, title, sub, actions: editing ? '' : actions + custom }) + (editing ? editBar(pageId) : '') + Q.pageBody(pageId),
+      html: Q.pageHead({ crumbs, title, sub, actions: editing ? '' : actions + custom }) + (editing ? editBar(pageId) : intro) + Q.pageBody(pageId),
       after: main => {
         all(L).forEach(b => Q.COMPONENTS[b.type]?.after?.(main, b));
         if (editing) wireDrag(main);

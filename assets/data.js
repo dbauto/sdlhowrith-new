@@ -637,5 +637,15 @@
       .map(([key, label]) => ({ key, label, visible: true }))
   };
 
-  window.QMS_DATA = { organization, people, currentUser, processes, documents, revisions, workflows, risks, kpis, evidence, iso, audits, findings, actions, improvements, managementActions, activity, users, roles, integrations, templates, context, policies, managementReviews, savedViews, processCategories, workspace };
+  /* ---------- Monthly history for the Material theme's chart cards (last 6 months, oldest first) ----------
+   * readiness: ISO 9001 readiness % (the last month is replaced by the live score)
+   * reviewsOnTime: % of periodic document reviews completed by their due date
+   * actionsClosed: corrective actions closed in the month, and how many of them on time */
+  const trends = {
+    readiness: [44, 47, 51, 54, 58, 61],
+    reviewsOnTime: [71, 76, 74, 80, 83, 79],
+    actionsClosed: [[3, 2], [4, 3], [2, 2], [5, 3], [4, 4], [3, 2]]
+  };
+
+  window.QMS_DATA = { trends, organization, people, currentUser, processes, documents, revisions, workflows, risks, kpis, evidence, iso, audits, findings, actions, improvements, managementActions, activity, users, roles, integrations, templates, context, policies, managementReviews, savedViews, processCategories, workspace };
 })();

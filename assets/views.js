@@ -84,7 +84,7 @@
     return {
       title: 'Overview',
       html: Q.pageHead({ title: 'Overview', sub: `What needs attention across ${esc(orgPossessive)} processes today, ${Q.fmt(today)}.` }) +
-        strip +
+        (Q.themeOverview?.() || '') + strip + (Q.themeOverviewCharts?.() || '') +
         `<div class="grid-halves section" style="margin-top:24px">
           <section class="panel"><div class="panel-head"><h2>ISO 9001 readiness</h2><span class="muted small">${esc(S.organization.standard)}</span><div class="actions"><a class="btn sm" href="#/evidence?view=clause">Open by clause</a></div></div><div class="panel-pad">${Q.readinessBlock(S.iso)}
             <p class="small" style="margin-top:14px"><b>Largest gaps:</b> ${S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status)).map(r => `<a href="#/evidence?view=clause&c=${r.clause}">${r.clause} ${esc(r.title)}</a>`).join(' · ')}</p></div></section>
