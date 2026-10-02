@@ -979,6 +979,9 @@ svg.lucide.flip-y { transform: scaleY(-1); }
   --pc-ink: #50697C;
   display: flex;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
   min-height: 190px;
   flex-direction: column;
   overflow: hidden;
@@ -993,7 +996,7 @@ svg.lucide.flip-y { transform: scaleY(-1); }
   box-shadow: 0 5px 14px rgba(20, 30, 45, .10);
   border-color: color-mix(in srgb, var(--pc-border) 76%, #7E8B98);
 }
-.proc-card:focus-within {
+.proc-card:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--pc-border) 65%, #687887);
   outline-offset: 2px;
 }
@@ -1056,11 +1059,10 @@ svg.lucide.flip-y { transform: scaleY(-1); }
   line-height: 19px;
   letter-spacing: -.012em;
 }
-.pc-title-block h3 a {
-  color: inherit;
-  text-decoration: none;
+.pc-title-block h3 {
+  color: #17212B;
 }
-.pc-title-block h3 a:hover {
+.proc-card:hover .pc-title-block h3 {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -1119,7 +1121,7 @@ svg.lucide.flip-y { transform: scaleY(-1); }
   font-weight: 650;
   text-decoration: none;
 }
-.pc-open:hover {
+.proc-card:hover .pc-open {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -1133,7 +1135,7 @@ svg.lucide.flip-y { transform: scaleY(-1); }
   color: #4E5966;
   text-decoration: none;
 }
-.pc-open-icon:hover {
+.proc-card:hover .pc-open-icon {
   background: #F1F4F7;
   color: #202A35;
 }
