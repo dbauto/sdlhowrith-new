@@ -253,15 +253,11 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
 | **Classic** (default) | The current design, unchanged: compact, flat, collapsible sidebar, bordered panels |
 | **Material** | Inspired by Material Dashboard: floating rounded sidebar with a gradient, soft card shadows, rounded controls, filled active menu item, uppercase table headers |
 
-- Picking a theme or colour previews it straight away; **Save Changes** keeps it for everyone in the organization. Leaving the page without saving goes back to the saved look. Switching theme never changes data.
+- Picking a theme or colour **applies and saves it straight away** for everyone in the organization, with a confirmation message. Pick another option to switch back. (Before 13.1 it was only a preview until *Save Changes*, and leaving the page undid it.) **Save Logo & Sign-in Message** saves the remaining fields. Switching theme never changes data.
 - The colour palettes (Forest, Ocean, Plum, Slate, Terracotta) work with both themes.
 - **Material only, Overview:**
   - Welcome banner: greeting by time of day, what's waiting for you, readiness %, **Open Routing**
   - The six attention numbers become stat cards with a coloured icon tile (red = critical, amber = needs attention, green = all clear)
-  - Three chart cards: **ISO 9001 readiness** (6 months), **Document reviews on time** (target 90%), **Corrective actions closed on time** (target 85%)
-- **Material only, Objectives & KPIs:** "Furthest from target" shows trend charts for the 3 KPIs with the largest gap, with their target line. The title opens the KPI in the register.
-- Charts: one series each, hover a month for its value, screen readers get every value; the target is a dashed line with a key under the chart.
-- Sample data: monthly history for the three Overview charts (`trends` in `data.js`). The readiness chart's current month is the live score.
 - All Material styles are scoped to `html[data-ui="material"]` in `app.css`, so Classic can't change by accident.
 
 ## Files
@@ -278,7 +274,7 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
 | `assets/data.js` | Added process categories, organization context & scope, quality policy, management reviews |
 | `assets/settings-extra.js` | **New.** Regional, Branding, Security, Notifications, API & Webhooks, Data Privacy, Audit Log, Data Export & Backup, Billing & Plan, About System |
 | `assets/orgchart.js` | **New.** Organization chart component, person details and reporting lines, chart in the QMS-ORG-001 preview |
-| `assets/theme.js` | **New.** Theme switch, chart cards and tooltip, Material welcome banner, Overview and KPI chart rows |
+| `assets/theme.js` | **New.** Theme switch and Material welcome banner |
 | `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
 | `assets/app.css` | Styles for the above |
 | `screenshots/` | v3 captures at 1440 px |
