@@ -163,44 +163,47 @@
       return [p.owner, ...others];
     };
     const issues = s => [s.docsOverdue && `${s.docsOverdue} doc${s.docsOverdue > 1 ? 's' : ''} overdue`, s.kpisBelow && `${s.kpisBelow} KPI${s.kpisBelow > 1 ? 's' : ''} below target`, s.highRisks && `${s.highRisks} high risk${s.highRisks > 1 ? 's' : ''}`, s.evGaps && `${s.evGaps} evidence gap${s.evGaps > 1 ? 's' : ''}`, s.actionsOverdue && `${s.actionsOverdue} action${s.actionsOverdue > 1 ? 's' : ''} overdue`].filter(Boolean);
-    const card = p => {
-      const s = p.s, [label, cls] = STATUS[s.health], kids = Q.children(p.id).length, iss = issues(s);
+    const PALETTES = [
+      { bg: '#EEF3F8', border: '#BFD0DF', pill: '#DDE8F1', ink: '#50697C' },
+      { bg: '#F6EEE7', border: '#D8BEA8', pill: '#EEDFD2', ink: '#7A5B45' },
+      { bg: '#F0ECF8', border: '#C7B9DD', pill: '#E3DCF1', ink: '#655681' },
+      { bg: '#EAF5EF', border: '#B8D7C7', pill: '#D8EBDD', ink: '#4E715E' },
+      { bg: '#F5F1E7', border: '#D8CFB2', pill: '#EAE2C9', ink: '#756B48' },
+      { bg: '#EAF1F8', border: '#B9CCE0', pill: '#D9E6F2', ink: '#506985' },
+      { bg: '#EDF4EA', border: '#BDD1B4', pill: '#DDEADB', ink: '#587050' },
+      { bg: '#E8F4F3', border: '#B9D5D1', pill: '#D6EAE7', ink: '#4F716D' }
+    ];
+    const card = (p, index) => {
+      const s = p.s, [label, cls] = STATUS[s.health];
       const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
-      const cat = Q.catOf(p);
-      return `<article class="proc-card" style="--pc-accent:${esc(cat?.color || '#2F6F52')}" aria-labelledby="pc-${p.id}">
-        <div class="pc-card-head">
-          <span class="pc-code">${esc(p.process_code)}</span>
-          <span class="pc-badge ${cls}"><span class="pc-status-dot" aria-hidden="true"></span>${label}</span>
-        </div>
-
+      const pal = PALETTES[index % PALETTES.length];
+      return `<article class="proc-card" style="--pc-bg:${pal.bg};--pc-border:${pal.border};--pc-pill:${pal.pill};--pc-ink:${pal.ink}" aria-labelledby="pc-${p.id}">
         <div class="pc-card-body">
-          <div class="pc-title-row">
-            <span class="pc-icon" aria-hidden="true">${icon(cat?.icon || 'workflow')}</span>
-            <div class="pc-text">
-              <h3 id="pc-${p.id}"><a href="#/process/${p.id}">${esc(p.name)}</a></h3>
-              <p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
-            </div>
+          <div class="pc-card-head">
+            <span class="pc-code">${esc(p.process_code)}</span>
+            <span class="pc-badge ${cls}"><span class="pc-status-dot" aria-hidden="true"></span>${label}</span>
           </div>
 
-          <dl class="pc-meta">
-            <div><dt>Owner</dt><dd>${esc(Q.pname(p.owner))}</dd></div>
-            <div><dt>Area</dt><dd>${esc(p.department || 'Not assigned')}${kids ? ` <span class="pc-subcount">· ${kids} subprocess${kids === 1 ? '' : 'es'}</span>` : ''}</dd></div>
-          </dl>
-
-          <div class="pc-metrics" aria-label="Process record counts">
-            <div><span class="pc-metric-value tnum">${s.docs}</span><span class="pc-metric-label">Documents</span></div>
-            <div><span class="pc-metric-value tnum">${s.evidence}</span><span class="pc-metric-label">Evidence</span></div>
+          <div class="pc-title-block">
+            <h3 id="pc-${p.id}"><a href="#/process/${p.id}">${esc(p.name)}</a></h3>
+            <p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
           </div>
 
-          <div class="pc-iso">
-            <span class="pc-section-label">ISO 9001 clauses</span>
-            <div class="pc-clauses">${clauses.length ? clauses.map(c => `<span>${esc(c)}</span>`).join('') : '<span class="empty">Not mapped</span>'}${moreClauses ? `<span class="more">+${moreClauses} more</span>` : ''}</div>
+          <div class="pc-tag-row" aria-label="Process details">
+            <span title="Process owner">Owner · ${esc(Q.pname(p.owner))}</span>
+            <span>${s.docs} docs</span>
+            <span>${s.evidence} evidence</span>
+          </div>
+
+          <div class="pc-tag-row pc-clause-row" aria-label="Applicable ISO 9001 clauses">
+            ${clauses.length ? clauses.map(c => `<span>${esc(c)}</span>`).join('') : '<span>Not mapped</span>'}
+            ${moreClauses ? `<span>+${moreClauses} more</span>` : ''}
           </div>
         </div>
 
         <div class="pc-card-foot">
-          <div class="pc-alertline">${iss.length ? `<span class="pc-alert-dot ${cls}" aria-hidden="true"></span><span title="${esc(iss.join(' · '))}">${esc(iss[0])}${iss.length > 1 ? ` · +${iss.length - 1} more` : ''}</span>` : `<span class="pc-alert-dot ok" aria-hidden="true"></span><span>No overdue items</span>`}</div>
-          <a class="pc-open" href="#/process/${p.id}" aria-label="View ${esc(p.name)}">View Process ${icon('arrow-right')}</a>
+          <a class="pc-open" href="#/process/${p.id}" aria-label="Explore ${esc(p.name)}">Explore</a>
+          <a class="pc-open-icon" href="#/process/${p.id}" aria-label="Open ${esc(p.name)}">${icon('arrow-right')}</a>
         </div>
       </article>`;
     };
@@ -216,7 +219,7 @@
         ${list.length ? `<div class="pc-grid">${list.map(card).join('')}</div>` : `<div class="cat-empty">No processes in this category yet. <a href="#/settings/processes">Add or move a process</a></div>`}</section>`;
     };
     // One grid of process cards in display order (no category grouping on this page).
-    const map = `<div class="pc-grid">${tops.map(card).join('')}</div>`;
+    const map = `<div class="proc-showcase"><div class="pc-grid">${tops.map((p, i) => card(p, i)).join('')}</div></div>`;
     const table = Q.table({ id: 'qmsproc', rows: () => tops, key: r => r.id, noun: 'processes', caption: 'Process register',
       columns: [
         { key: 'name', label: 'Process', sort: r => r.display_order, render: r => `<a class="proc" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },
