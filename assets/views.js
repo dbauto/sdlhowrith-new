@@ -58,10 +58,10 @@
     const procRows = () => Q.topProcesses().map(p => ({ ...p, id: p.process_id, s: Q.stats(p.process_id) }));
     const procTable = Q.table({
       id: 'ovproc', rows: procRows, key: r => r.id, noun: 'processes', caption: 'Process status', foot: false,
-      tools: `${Q.seg('Show', [['all', 'All processes', procRows().length], ['attn', 'Needs attention', procRows().filter(r => r.s.health !== 'ok').length]], 'all')}<span class="right">Counts include subprocesses. Select a process name to open its workspace.</span>`,
+      tools: `${Q.seg('Show', [['all', 'All processes', procRows().length], ['attn', 'Needs attention', procRows().filter(r => r.s.health !== 'ok').length]], 'all')}<span class="right">Counts include subprocesses. Status reflects open items; ISO readiness is scored separately.</span>`,
       segs: { attn: r => r.s.health !== 'ok' },
       columns: [
-        { key: 'name', label: 'Process', sort: r => r.display_order, render: r => `<a class="proc" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },
+        { key: 'name', label: 'Process', cls: 'c-sticky', sort: r => r.display_order, render: r => `<a class="proc proc-link" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },
         { key: 'owner', label: 'Owner', sort: r => Q.pname(r.owner), render: r => `<span class="nowrap">${esc(Q.pname(r.owner))}</span>` },
         { key: 'health', label: 'Status', sort: r => ({ risk: 0, attn: 1, ok: 2 })[r.s.health], render: r => Q.health(r.s.health) },
         { key: 'docs', label: 'Docs overdue', cls: 'c-num', sort: r => r.s.docsOverdue, render: r => Q.num(r.s.docsOverdue) },
@@ -74,10 +74,11 @@
     });
 
     const upcoming = S.documents.filter(d => d.nextReview && d.nextReview >= today && Q.days(today, d.nextReview) <= 60).sort((a, b) => a.nextReview < b.nextReview ? -1 : 1);
-    const mgmt = S.managementActions;
+    const mgmt = S.managementActions.filter(a => a.status !== 'Closed').sort((a, b) => a.due < b.due ? -1 : 1);
+    const orgName = S.organization.name, orgPossessive = orgName.endsWith('s') ? `${orgName}'` : `${orgName}'s`;
     return {
       title: 'Overview',
-      html: Q.pageHead({ title: 'Overview', sub: `What needs attention across ${esc(S.organization.name)}'s processes today, ${Q.fmt(today)}.` }) +
+      html: Q.pageHead({ title: 'Overview', sub: `What needs attention across ${esc(orgPossessive)} processes today, ${Q.fmt(today)}.` }) +
         strip +
         `<div class="grid-halves section" style="margin-top:24px">
           <section class="panel"><div class="panel-head"><h2>ISO 9001 readiness</h2><span class="muted small">${esc(S.organization.standard)}</span><div class="actions"><a class="btn sm" href="#/evidence?view=clause">Open by clause</a></div></div><div class="panel-pad">${Q.readinessBlock(S.iso)}
@@ -88,8 +89,8 @@
         <div class="grid-halves section">
           <section class="panel"><div class="panel-head"><h2>Upcoming document reviews</h2><span class="muted small">next 60 days</span><div class="actions"><a class="btn sm ghost" href="#/documents?status=overdue">View overdue</a></div></div>
             ${upcoming.length ? `<ul class="worklist">${upcoming.map(d => `<li><div class="w-main"><div class="w-title">${esc(d.title)}</div><div class="w-meta tnum">${esc(d.id)} · Rev ${esc(d.rev)} · ${esc(Q.pname(d.owner))}</div></div><span class="date-soon nowrap">${Q.fmt(d.nextReview)}</span><button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open Document</button></li>`).join('')}</ul>` : '<div class="empty">No reviews due in the next 60 days.</div>'}</section>
-          <section class="panel"><div class="panel-head"><h2>Management actions</h2><span class="muted small">from management review</span><div class="actions"><a class="btn sm ghost" href="#/mgmt-review/actions">Management Review</a></div></div>
-            <ul class="worklist">${mgmt.map(a => `<li><div class="w-main"><div class="w-title">${esc(a.title)}</div><div class="w-meta">${esc(a.id)} · ${esc(Q.pname(a.owner))} · ${esc(Q.plabel(a.process))}</div></div><span class="nowrap">${Q.dueDate(a.due)}</span></li>`).join('')}</ul></section>
+          <section class="panel"><div class="panel-head"><h2>Management actions</h2><span class="muted small">${mgmt.length} open</span><div class="actions"><a class="btn sm ghost" href="#/mgmt-review/actions">Management Review</a></div></div>
+            ${mgmt.length ? `<ul class="worklist">${mgmt.map(a => `<li><div class="w-main"><div class="w-title">${esc(a.title)}</div><div class="w-meta">${esc(a.id)} · ${esc(Q.pname(a.owner))} · ${esc(Q.plabel(a.process))}</div></div><span class="nowrap">${Q.dueDate(a.due)}</span></li>`).join('')}</ul>` : '<div class="empty">No open management actions.</div>'}</section>
         </div>`
     };
   };

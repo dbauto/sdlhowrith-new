@@ -154,9 +154,10 @@ h1[tabindex="-1"]:focus { outline: none; box-shadow: none; }
 
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
 .panel-pad { padding: var(--s4) var(--s5); }
-.panel-head { display: flex; align-items: center; gap: var(--s3); padding: 14px var(--s5); border-bottom: 1px solid var(--border); }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); row-gap: 4px; padding: 14px var(--s5); border-bottom: 1px solid var(--border); }
 .panel-head h2, .panel-head h3 { font-size: 16px; line-height: 24px; }
 .panel-head .actions { margin-left: auto; display: flex; gap: var(--s2); }
+.panel-head > .muted.small { white-space: nowrap; }
 .grid-2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap: var(--s5); align-items: start; }
 .grid-halves { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5); align-items: start; }
 
@@ -253,6 +254,13 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 .dt tbody tr.selected td.c-actions { background: var(--selected); }
 .proc b { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 6px; color: var(--text-3); }
 .dt a.proc { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.dt a.proc-link .title { color: var(--accent); font-weight: 500; }
+.dt a.proc-link:hover .title { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 3px; }
+/* Keeps the identifying column in view while wide tables scroll sideways */
+.dt .c-sticky { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: inset -1px 0 0 var(--border); }
+.dt th.c-sticky { z-index: 2; background: var(--surface-2); }
+.dt tbody tr:hover td.c-sticky { background: var(--hover); }
+@media (max-width: 720px) { .dt .c-sticky a.proc { max-width: 150px; } }
 .dt.tight a.proc { max-width: 150px; }
 .dt .rev-next { color: var(--text-3); font-weight: 400; font-size: var(--fs-small); }
 @media (max-width: 1599px) { .dt .hide-lg { display: none; } }
