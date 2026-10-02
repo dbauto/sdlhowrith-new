@@ -261,7 +261,7 @@
     const role = u.role;
     const m = Q.openModal({ size: 'l', title: isNew ? 'Add User' : `Edit Access — ${esc(p.name)}`, sub: isNew ? 'The user receives an invitation email.' : `${esc(p.email)} · ${esc(p.dept)}`,
       body: `<form class="modal-body" id="accForm">
-        ${isNew ? `<fieldset class="fieldset"><legend>Person</legend><div class="form-grid"><label class="field"><span>Full name <span class="req">*</span></span><input class="input" name="name" required autofocus></label><label class="field"><span>Work email <span class="req">*</span></span><input class="input" type="email" name="email" required></label><label class="field"><span>Job title</span><input class="input" name="title"></label><label class="field"><span>Department</span><input class="input" name="dept"></label></div></fieldset>` : ''}
+        ${isNew ? `<fieldset class="fieldset"><legend>Person</legend><div class="form-grid"><label class="field"><span>Full name <span class="req">*</span></span><input class="input" name="name" required autofocus></label><label class="field"><span>Work email <span class="req">*</span></span><input class="input" type="email" name="email" required></label><label class="field"><span>Job title</span><input class="input" name="title"></label><label class="field"><span>Department</span><input class="input" name="dept"></label><label class="field"><span>Reports to</span><select class="select" name="reportsTo"><option value="">Choose later</option>${Q.S.users.filter(x => x.status !== 'Deactivated').map(x => `<option value="${x.id}">${esc(Q.pname(x.id))} — ${esc(Q.person(x.id).title)}</option>`).join('')}</select><span class="help">Places them on the organization chart.</span></label></div></fieldset>` : ''}
         <fieldset class="fieldset"><legend>Role</legend><p class="help">Sets default permissions. Adjusting permissions below switches the role to Custom.</p>
           <div class="role-options">${Object.entries(Q.S.roles).map(([r, def]) => `<label class="role-opt"><input type="radio" name="role" value="${esc(r)}" ${r === role ? 'checked' : ''}><span><b>${esc(r)}</b><span>${esc(def.desc)}</span></span></label>`).join('')}</div></fieldset>
         <fieldset class="fieldset"><legend>Process access</legend><p class="help">Documents, risks, KPIs and evidence inherit access from their process. Individual documents can override this later.</p>
@@ -286,7 +286,8 @@
       const f = m.querySelector('form'); if (!Q.validate(f)) return; const v = Q.formValues(f);
       if (isNew) {
         const id = Q.uid('u').toLowerCase();
-        Q.S.people[id] = { name: v.name, title: v.title || '—', dept: v.dept || '—', email: v.email };
+        Q.S.people[id] = { name: v.name, title: v.title || '—', dept: v.dept || '—', email: v.email, reportsTo: v.reportsTo || null };
+        if (v.reportsTo) Q.S.context.orgChartChanged = Q.today();
         Q.S.users.push({ id, role: v.role, status: 'Invited', lastActive: null, access });
         Q.toast('Invitation sent', `${v.name} · ${v.email}`);
       } else { u.role = v.role; u.access = access; Q.toast('Access saved', `${p.name} · ${v.role}`); }

@@ -22,7 +22,7 @@
    * below only set the page header; what the page shows comes from its layout.         */
   const P = (type, extra = {}) => ({ id: `d-${type}`, type, ...extra });
   Q.page('scope', { title: 'Organization & Scope', route: '#/qms/scope', layout: { layout: '2-1', zones: {
-    top: [P('context-review-alert')], main: [P('scope-statement'), P('sites'), P('context-issues'), P('parties')], side: [P('org-facts'), P('exclusions'), P('structure-docs')] } } });
+    top: [P('context-review-alert')], main: [P('scope-statement'), P('sites'), P('context-issues'), P('parties')], side: [P('org-facts'), P('exclusions'), P('structure-docs')], bottom: [P('org-chart')] } } });
   Q.page('policies', { title: 'Policies', route: '#/qms/policies', layout: { layout: '2-1', zones: {
     main: [P('quality-policy'), P('other-policies')], side: [P('policy-ack'), P('objectives-health')] } } });
   Q.page('processes', { title: 'Processes', route: '#/qms/processes', layout: { layout: '1', zones: { top: [P('process-map')] } } });
@@ -121,7 +121,8 @@
       body: list.length ? `<ul class="worklist">${list.map(x => `<li><div class="w-main"><div class="w-title"><span class="clause">${esc(x.clause)}</span> ${esc(x.title)}</div><div class="w-meta">${esc(x.reason)}</div></div></li>`).join('')}</ul>` : '<div class="empty">No exclusions.</div>' }); } });
   Q.component('structure-docs', { group: G1, name: 'Structure & responsibilities', icon: 'network', desc: 'The organization chart, responsibilities matrix and process map (clause 5.3).',
     render: (b, ctx) => Q.panel({ title: ctx.title('Structure & responsibilities'), tag: '5.3',
-      body: `<ul class="link-list" style="padding:4px 20px">${[Q.S.context.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(Q.doc).filter(Boolean).map(d => `<li>${icon('file-text')}<div class="ll-main"><b>${esc(d.title)}</b><span>${esc(d.id)} · Rev ${esc(d.rev)}${d.workingRev && d.status !== 'Published' ? ` → ${esc(d.workingRev)} ${esc(d.status.toLowerCase())}` : ''}</span></div><button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open</button></li>`).join('')}</ul>` }) });
+      body: `<ul class="link-list" style="padding:4px 20px">${[Q.S.context.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(Q.doc).filter(Boolean).map(d => `<li>${icon('file-text')}<div class="ll-main"><b>${esc(d.title)}</b><span>${esc(d.id)} · Rev ${esc(d.rev)}${d.workingRev && d.status !== 'Published' ? ` → ${esc(d.workingRev)} ${esc(d.status.toLowerCase())}` : ''}</span></div>${d.id === Q.S.context.orgChartDoc ? `<button class="btn sm ghost" type="button" data-action="oc-scroll">View Chart</button>` : ''}<button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open</button></li>`).join('')}</ul>` }) });
+  Q.actions['oc-scroll'] = () => { const el = document.getElementById('org-chart'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.querySelector('.oc-node, .oc-li')?.focus({ preventScroll: true }); } else Q.toast('Organization chart', 'Add the “Organization chart” component to this page with Customize page.'); };
 
   /* ---------------- Policy components ---------------- */
   const G2 = 'Policy';

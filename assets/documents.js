@@ -229,6 +229,7 @@
     </article>`;
   Q.paper = (d, rev, draft = false) => {
     if (Q.docRestricted(d)) return Q.restrictedPanel(d, rev, draft);
+    if (Q.orgChartPaper && d.id === Q.S.context?.orgChartDoc) return Q.orgChartPaper(d, rev, draft);
     const p = Q.proc(d.process), root = Q.proc(Q.rootId(d.process));
     const els = (root?.elements || []).filter(e => e.kind !== 'Activity');
     const recs = (root?.elements || []).filter(e => ['Record', 'Form', 'Register'].includes(e.kind));
