@@ -164,14 +164,44 @@
     };
     const issues = s => [s.docsOverdue && `${s.docsOverdue} doc${s.docsOverdue > 1 ? 's' : ''} overdue`, s.kpisBelow && `${s.kpisBelow} KPI${s.kpisBelow > 1 ? 's' : ''} below target`, s.highRisks && `${s.highRisks} high risk${s.highRisks > 1 ? 's' : ''}`, s.evGaps && `${s.evGaps} evidence gap${s.evGaps > 1 ? 's' : ''}`, s.actionsOverdue && `${s.actionsOverdue} action${s.actionsOverdue > 1 ? 's' : ''} overdue`].filter(Boolean);
     const card = p => {
-      const s = p.s, [label, cls] = STATUS[s.health], kids = Q.children(p.id).length, t = team(p), pct = s.iso.pct ?? 0, iss = issues(s);
-      return `<article class="proc-card" aria-labelledby="pc-${p.id}">
-        <div class="pc-top"><span class="pc-type">${icon('building-2')}${esc(p.department || 'No department')}${kids ? ` · ${kids} subprocesses` : ''}</span><span class="pc-badge ${cls}">${label}</span></div>
-        <div class="pc-main"><div class="pc-text"><h3 id="pc-${p.id}"><a href="#/process/${p.id}"><span class="pc-code">${esc(p.process_code)}</span>${esc(p.name)}</a></h3><p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p></div>
-          <a class="btn sm pc-open" href="#/process/${p.id}" aria-label="Open ${esc(p.name)}">Open</a></div>
-        <p class="pc-issues">${iss.length ? iss.slice(0, 2).map(x => `<span>${esc(x)}</span>`).join('') + (iss.length > 2 ? `<span class="more">+${iss.length - 2} more</span>` : '') : `<span class="ok">${s.docs} document${s.docs === 1 ? '' : 's'} · ${s.kpis} KPI${s.kpis === 1 ? '' : 's'} · nothing overdue</span>`}</p>
-        <div class="pc-foot"><div class="pc-team" aria-label="Owner and team">${t.slice(0, 3).map((id, i) => avatar(id, i === 0 ? ' owner' : '')).join('')}${t.length > 3 ? `<span class="av more" title="${esc(t.slice(3).map(Q.pname).join(', '))}">+${t.length - 3}</span>` : ''}</div>
-          <div class="pc-progress" title="ISO 9001 readiness for this process: ${s.iso.points} of ${s.iso.applicable} applicable requirements"><span class="pc-plabel">ISO readiness</span><span class="bar"><span style="width:${pct}%"></span></span><b class="tnum">${s.iso.pct == null ? '—' : pct + '%'}</b></div></div>
+      const s = p.s, [label, cls] = STATUS[s.health], kids = Q.children(p.id).length, iss = issues(s);
+      const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
+      const cat = Q.catOf(p);
+      return `<article class="proc-card" style="--pc-accent:${esc(cat?.color || '#2F6F52')}" aria-labelledby="pc-${p.id}">
+        <div class="pc-card-head">
+          <span class="pc-code">${esc(p.process_code)}</span>
+          <span class="pc-badge ${cls}"><span class="pc-status-dot" aria-hidden="true"></span>${label}</span>
+        </div>
+
+        <div class="pc-card-body">
+          <div class="pc-title-row">
+            <span class="pc-icon" aria-hidden="true">${icon(cat?.icon || 'workflow')}</span>
+            <div class="pc-text">
+              <h3 id="pc-${p.id}"><a href="#/process/${p.id}">${esc(p.name)}</a></h3>
+              <p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
+            </div>
+          </div>
+
+          <dl class="pc-meta">
+            <div><dt>Owner</dt><dd>${esc(Q.pname(p.owner))}</dd></div>
+            <div><dt>Area</dt><dd>${esc(p.department || 'Not assigned')}${kids ? ` <span class="pc-subcount">· ${kids} subprocess${kids === 1 ? '' : 'es'}</span>` : ''}</dd></div>
+          </dl>
+
+          <div class="pc-metrics" aria-label="Process record counts">
+            <div><span class="pc-metric-value tnum">${s.docs}</span><span class="pc-metric-label">Documents</span></div>
+            <div><span class="pc-metric-value tnum">${s.evidence}</span><span class="pc-metric-label">Evidence</span></div>
+          </div>
+
+          <div class="pc-iso">
+            <span class="pc-section-label">ISO 9001 clauses</span>
+            <div class="pc-clauses">${clauses.length ? clauses.map(c => `<span>${esc(c)}</span>`).join('') : '<span class="empty">Not mapped</span>'}${moreClauses ? `<span class="more">+${moreClauses} more</span>` : ''}</div>
+          </div>
+        </div>
+
+        <div class="pc-card-foot">
+          <div class="pc-alertline">${iss.length ? `<span class="pc-alert-dot ${cls}" aria-hidden="true"></span><span title="${esc(iss.join(' · '))}">${esc(iss[0])}${iss.length > 1 ? ` · +${iss.length - 1} more` : ''}</span>` : `<span class="pc-alert-dot ok" aria-hidden="true"></span><span>No overdue items</span>`}</div>
+          <a class="pc-open" href="#/process/${p.id}" aria-label="View ${esc(p.name)}">View Process ${icon('arrow-right')}</a>
+        </div>
       </article>`;
     };
     // One section per configured category, with its colour, icon and description.
