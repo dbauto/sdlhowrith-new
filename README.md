@@ -261,6 +261,13 @@ Before this, the organization chart was only a document record (QMS-ORG-001), an
   - The six attention numbers become stat cards with a coloured icon tile (red = critical, amber = needs attention, green = all clear)
 - All Material styles are scoped to `html[data-ui="material"]` in `app.css`, so Classic can't change by accident.
 
+## Update 14: customizable Overview and component sizing
+
+- **Overview → Customize page** uses the same saved-layout editor as the QMS pages. Welcome, attention summary, ISO readiness, assigned work, process status, upcoming reviews and management actions are separate pre-made components.
+- Every page-layout component has safe **Width** and **Height** settings. Width choices respect a component-specific minimum; fixed heights respect a minimum that keeps controls usable.
+- Fixed-height content scrolls inside its component. Register and process-status tables therefore scroll vertically and horizontally without making the whole page excessively long.
+- At phone widths every component becomes full width, regardless of its saved desktop width.
+
 ## Files
 
 | File | Change |

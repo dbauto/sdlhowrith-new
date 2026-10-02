@@ -149,7 +149,7 @@
     const rows = Object.values(Q.PAGES).map(p => { const L = Q.pageLayout(p.id), n = Object.values(L.zones).reduce((a, z) => a + z.length, 0), custom = Q.pageCustomized(p.id);
       return `<li><span class="ic">${icon('layout-template')}</span><div class="i-main"><b>${esc(p.title)}</b><span>${n} component${n === 1 ? '' : 's'} · ${{ '2-1': 'wide + side columns', '1-1': 'two equal columns', '1': 'one column' }[L.layout]}</span></div>${Q.st(custom ? 'Customized' : 'Default layout', custom ? 'info' : 'neutral')}
         <button class="btn sm" type="button" data-pl-reset="${p.id}" ${custom ? '' : 'disabled'}>Restore default</button><button class="btn sm primary" type="button" data-pl-edit="${p.id}">${icon('pencil')}Customize</button></li>`; }).join('');
-    const html = `<div class="section-head"><h2>Page Layouts</h2><span class="sub">Each QMS page is built from pre-made components. Choose which ones a page shows and where; the layout applies to everyone in the organization.</span></div>
+    const html = `<div class="section-head"><h2>Page Layouts</h2><span class="sub">Overview and each QMS page are built from pre-made components. Choose what a page shows, where it appears, and each component's safe width and height; the layout applies to everyone in the organization.</span></div>
       <section class="panel"><ul class="integration-list page-layout-list">${rows}</ul></section>
       <p class="small muted" style="margin-top:12px">${Object.keys(Q.COMPONENTS).length} components are available. You can also start from any QMS page with <b>Customize page</b>.</p>`;
     const after = main => {

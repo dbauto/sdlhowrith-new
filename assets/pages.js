@@ -1,7 +1,7 @@
 /* iQMS v3 — page layouts: a page is a set of pre-made components placed in areas.
  *
  *   LAYOUT  = { layout: '2-1' | '1-1' | '1', zones: { top: [], main: [], side: [], bottom: [] } }
- *   BLOCK   = { id, type, title?, opts? }          — one placed component
+ *   BLOCK   = { id, type, title?, opts?, size?: { w, h } } — one placed component
  *   COMPONENT (Q.component) = { name, desc, icon, group, pages?, settings?, render(block, ctx), after? }
  *
  * Every page ships with a default layout (Q.page). An organization can change it with
@@ -35,19 +35,28 @@
   const find = (L, id) => { for (const z of ZONES) { const i = L.zones[z].findIndex(b => b.id === id); if (i >= 0) return { z, i, b: L.zones[z][i] }; } return null; };
   const newId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const titleOf = b => b.title || Q.COMPONENTS[b.type]?.name || 'Component';
+  const sizeOf = (b, c = Q.COMPONENTS[b.type]) => {
+    const minW = Math.max(3, Math.min(12, Number(c?.minWidth) || 3));
+    const w = Math.max(minW, Math.min(12, Number(b.size?.w) || 12));
+    const minH = Math.max(180, Number(c?.minHeight) || 220);
+    const rawH = Number(b.size?.h) || 0;
+    return { w, h: rawH ? Math.max(minH, rawH) : 0, minW, minH };
+  };
   const rerender = () => Q.render({ noFocus: true });
   const touch = () => { EDIT.dirty = true; rerender(); };
 
   /* ---------------- Rendering ---------------- */
   const blockHtml = (b, zone, editing, pageId) => {
     const c = Q.COMPONENTS[b.type];
+    const size = sizeOf(b, c), sizeStyle = `--pb-span:${size.w};${size.h ? `--pb-height:${size.h}px;` : ''}`;
+    const sizeClass = size.h ? ' pb-fixed' : '';
     const ctx = { page: pageId, zone, editing, title: def => b.title || def, q: Q.route().q };
     const html = c ? c.render(b, ctx) : '';
-    if (!editing) return html ? `<div class="pb-block" data-b="${esc(b.id)}">${html}</div>` : '';
+    if (!editing) return html ? `<div class="pb-block${sizeClass}" style="${sizeStyle}" data-b="${esc(b.id)}">${html}</div>` : '';
     const L = EDIT.draft, at = find(L, b.id), list = L.zones[zone];
     const moveTo = ZONES.filter(z => z !== zone).map(z => ({ label: ZONE_LABEL[z], icon: z === 'side' ? 'panel-right' : z === 'main' ? 'square' : 'maximize-2', data: { action: 'pb-move', b: b.id, zone: z } }));
-    return `<div class="pb-block editing" data-b="${esc(b.id)}" draggable="true">
-      <div class="pb-frame-head"><span class="pb-grip" title="Drag to move">${GRIP}</span><b>${esc(titleOf(b))}</b>${c && b.title ? `<span class="pb-type">${esc(c.name)}</span>` : ''}
+    return `<div class="pb-block editing${sizeClass}" style="${sizeStyle}" data-b="${esc(b.id)}" draggable="true">
+      <div class="pb-frame-head"><span class="pb-grip" title="Drag to move">${GRIP}</span><b>${esc(titleOf(b))}</b>${c && b.title ? `<span class="pb-type">${esc(c.name)}</span>` : ''}<span class="pb-size">${Math.round(size.w / 12 * 100)}% · ${size.h ? `${size.h}px` : 'Auto height'}</span>
         <span class="pb-tools"><button type="button" class="icon-btn" data-action="pb-up" data-b="${esc(b.id)}" ${at.i === 0 ? 'disabled' : ''} aria-label="Move ${esc(titleOf(b))} up">${icon('arrow-up')}</button><button type="button" class="icon-btn" data-action="pb-down" data-b="${esc(b.id)}" ${at.i === list.length - 1 ? 'disabled' : ''} aria-label="Move ${esc(titleOf(b))} down">${icon('arrow-down')}</button>${Q.menu(`Move ${titleOf(b)} to another area`, [{ note: 'Move to' }, ...moveTo], { icon: 'move', cls: 'icon-btn', align: 'min-width:210px;right:0;left:auto' })}<button type="button" class="icon-btn" data-action="pb-settings" data-b="${esc(b.id)}" aria-label="Settings for ${esc(titleOf(b))}">${icon('settings')}</button><button type="button" class="icon-btn danger" data-action="pb-remove" data-b="${esc(b.id)}" aria-label="Remove ${esc(titleOf(b))}">${icon('x')}</button></span></div>
       <div class="pb-content" inert>${html || `<div class="pb-ghost">${icon(c ? 'eye-off' : 'triangle-alert')}<span>${c ? esc(c.hiddenNote || 'Nothing to show right now. This component appears when it has content.') : 'This component is no longer available.'}</span></div>`}</div></div>`;
   };
@@ -157,7 +166,7 @@
     });
   };
 
-  /* Component settings: a title for every component, plus the options the component declares. */
+  /* Component settings: title, safe size controls, plus component-specific options. */
   A['pb-settings'] = d => {
     const at = find(EDIT.draft, d.b), b = at.b, c = Q.COMPONENTS[b.type], opts = b.opts || {};
     const field = s => {
@@ -166,9 +175,14 @@
       if (s.type === 'textarea') return `<label class="field"><span>${esc(s.label)}</span><textarea class="textarea" name="o_${s.key}" rows="5" placeholder="${esc(s.placeholder || '')}">${esc(v)}</textarea>${s.help ? `<span class="help">${esc(s.help)}</span>` : ''}</label>`;
       return `<label class="field"><span>${esc(s.label)}</span><input class="input" name="o_${s.key}" value="${esc(v)}"></label>`;
     };
+    const sz = sizeOf(b, c);
+    const widths = [[3, '25%'], [4, '33%'], [6, '50%'], [8, '67%'], [9, '75%'], [12, '100%']].filter(([w]) => w >= sz.minW);
+    const heights = [[0, 'Auto — fit content'], [240, 'Compact · 240 px'], [360, 'Medium · 360 px'], [520, 'Tall · 520 px'], [680, 'Extra tall · 680 px']].filter(([h]) => !h || h >= sz.minH);
     const m = Q.openModal({ size: 'm', title: 'Component settings', sub: esc(c.name),
       body: `<form class="modal-body"><div style="display:flex;flex-direction:column;gap:16px">
         <label class="field"><span>Title</span><input class="input" name="title" maxlength="60" value="${esc(b.title || '')}" placeholder="${esc(c.name)}"><span class="help">Leave empty to use the standard title.</span></label>
+        <div class="form-grid"><label class="field"><span>Width</span><select class="select" name="size_w">${widths.map(([v, l]) => `<option value="${v}" ${v === sz.w ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="help">Minimum ${Math.round(sz.minW / 12 * 100)}% to protect the component layout.</span></label>
+        <label class="field"><span>Height</span><select class="select" name="size_h">${heights.map(([v, l]) => `<option value="${v}" ${v === sz.h ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="help">Fixed-height content scrolls inside the component. Minimum ${sz.minH}px.</span></label></div>
         ${(c.settings || []).map(field).join('')}
         <div class="callout small">${icon('info')}<span>${esc(c.desc || '')}</span></div></div></form>`,
       foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Apply</button>` });
@@ -181,6 +195,7 @@
     const ok = () => {
       const v = Q.formValues(form);
       b.title = v.title.trim() || undefined; if (!b.title) delete b.title;
+      b.size = { w: Number(v.size_w) || 12, h: Number(v.size_h) || 0 };
       (c.settings || []).forEach(s => { b.opts = b.opts || {}; b.opts[s.key] = v['o_' + s.key]; });
       Q.closeModal(); touch();
     };
@@ -237,4 +252,23 @@
     settings: [{ key: 'text', label: 'Text', type: 'textarea', required: true, placeholder: 'Write the note. Leave an empty line between paragraphs.' }],
     hiddenNote: 'This note is empty. Open its settings to write the text.',
     render: (b, ctx) => { const text = (b.opts?.text || '').trim(); return text ? Q.panel({ title: ctx.title('Note'), pad: true, body: text.split(/\n\s*\n/).map(p => `<p class="note-p">${esc(p).replace(/\n/g, '<br>')}</p>`).join('') }) : ''; } });
+
+  /* Overview components use the same page builder and sizing rules as the QMS pages. */
+  const overviewPart = (key, fallback) => ({ pages: ['overview'], group: 'Overview', ...fallback,
+    render: () => Q.overviewParts?.[key] || '' });
+  Q.component('overview-welcome', overviewPart('welcome', { name: 'Welcome banner', icon: 'sparkles', minWidth: 6, minHeight: 220, desc: 'Greeting, assigned work, readiness and quick actions.' }));
+  Q.component('overview-attention', overviewPart('attention', { name: 'Attention summary', icon: 'gauge', minWidth: 8, minHeight: 240, desc: 'Critical and needs-attention totals across the QMS.' }));
+  Q.component('overview-readiness', overviewPart('readiness', { name: 'ISO 9001 readiness', icon: 'badge-check', minWidth: 4, minHeight: 300, desc: 'Readiness score, requirement status and largest gaps.' }));
+  Q.component('overview-work', overviewPart('work', { name: 'Needs your action', icon: 'inbox', minWidth: 4, minHeight: 280, desc: 'Reviews, approvals, corrective actions and periodic reviews assigned to you.' }));
+  Q.component('overview-processes', overviewPart('processes', { name: 'Process status', icon: 'table', minWidth: 6, minHeight: 300, desc: 'Scrollable process-health table with readiness and issue counts.' }));
+  Q.component('overview-reviews', overviewPart('reviews', { name: 'Upcoming document reviews', icon: 'calendar-clock', minWidth: 4, minHeight: 240, desc: 'Controlled documents due for periodic review.' }));
+  Q.component('overview-actions', overviewPart('actions', { name: 'Management actions', icon: 'list-checks', minWidth: 4, minHeight: 240, desc: 'Open actions from management review.' }));
+
+  const O = (id, type, w = 12, h = 0) => ({ id, type, size: { w, h } });
+  Q.page('overview', { title: 'Overview', route: '#/overview', layout: { layout: '1', zones: { top: [
+    O('ov-welcome', 'overview-welcome'), O('ov-attention', 'overview-attention'),
+    O('ov-readiness', 'overview-readiness', 6), O('ov-work', 'overview-work', 6),
+    O('ov-processes', 'overview-processes', 12, 520),
+    O('ov-reviews', 'overview-reviews', 6), O('ov-actions', 'overview-actions', 6)
+  ] } } });
 })();
