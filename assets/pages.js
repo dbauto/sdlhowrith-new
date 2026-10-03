@@ -245,7 +245,13 @@
 
   /* ======================= General components (usable on any page) ======================= */
   Q.component('iso-readiness', { name: 'ISO 9001 readiness', icon: 'badge-check', desc: 'Readiness score and requirement status for the whole QMS.',
-    render: (b, ctx) => Q.panel({ title: ctx.title('ISO 9001 readiness'), count: Q.standard(), actions: '<a class="btn sm" href="#/evidence?view=clause">Open by clause</a>', pad: true, body: Q.readinessBlock(Q.S.iso, { compact: ctx.zone === 'side' }) }) });
+    render: (b, ctx) => {
+      // If a user customized the Overview page before this redesign, their saved layout
+      // may still contain the generic iso-readiness component. Render the new Overview
+      // card there too so saved layouts receive the same upgraded design.
+      if (ctx.page === 'overview' && Q.overviewParts?.readiness) return Q.overviewParts.readiness;
+      return Q.panel({ title: ctx.title('ISO 9001 readiness'), count: Q.standard(), actions: '<a class="btn sm" href="#/evidence?view=clause">Open by clause</a>', pad: true, body: Q.readinessBlock(Q.S.iso, { compact: ctx.zone === 'side' }) });
+    } });
 
   Q.component('key-figures', { name: 'Key figures', icon: 'gauge', desc: 'Four numbers that need attention: overdue documents, KPIs below target, high risks and overdue actions.',
     render: (b, ctx) => {
