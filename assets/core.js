@@ -244,7 +244,7 @@
   /* ---------------- Page chrome ---------------- */
   Q.crumbs = items => `<nav class="crumbs" aria-label="Breadcrumb">${items.map((c, i) => i < items.length - 1 ? `<a href="${c[1]}">${esc(c[0])}</a>${Q.icon('chevron-right')}` : `<span aria-current="page">${esc(c[0])}</span>`).join('')}</nav>`;
   Q.pageHead = ({ title, sub = '', actions = '', crumbs = null, pre = '', meta = '' }) =>
-    `${crumbs ? Q.crumbs(crumbs) : ''}<div class="page-head"><div>${pre}<h1 tabindex="-1">${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}${meta}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
+    `${crumbs ? Q.crumbs(crumbs) : ''}<div class="page-head"><div>${pre}<h1 tabindex="-1"${sub ? ` class="page-title-tip" data-sub="${esc(sub)}"` : ''}>${title}</h1>${meta}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
   Q.seg = (name, items, current) => `<div class="seg" role="group" aria-label="${esc(name)}">${items.map(([v, l, n]) => `<button type="button" data-seg="${v}" aria-pressed="${v === current}">${esc(l)}${n != null ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</div>`;
   Q.sparkline = (vals, ok) => {
     const w = 84, h = 24, min = Math.min(...vals), max = Math.max(...vals), rng = max - min || 1;
