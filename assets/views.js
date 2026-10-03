@@ -95,8 +95,7 @@
       ${cell('#/documents?status=overdue', 'Overdue documents', docsOverdue.length, `review date passed · ${S.documents.filter(Q.docDueSoon).length} due in 30 days`, 'attention')}
       ${cell('#/review?show=all', 'Pending approvals', approvals.length, `${mineApprovals} assigned to you`, 'attention')}
       ${cell('#/qms/objectives?status=below', 'KPIs below target', kpiBelow.length, `of ${S.kpis.length} KPIs measured`, 'attention')}
-      ${cell('#/evidence?status=gaps', 'Evidence gaps', gaps.length, `${S.evidence.filter(e => e.status === 'Pending verification').length} awaiting verification`, 'attention')}</div>
-    <p class="sev-key small muted">${icon('triangle-alert')}<span>Critical: act now</span>${icon('clock-alert')}<span>Needs attention: plan it</span>${icon('circle-check')}<span>All clear</span></p>`;
+      ${cell('#/evidence?status=gaps', 'Evidence gaps', gaps.length, `${S.evidence.filter(e => e.status === 'Pending verification').length} awaiting verification`, 'attention')}</div>`;
 
     // Needs your action
     const work = [
@@ -148,17 +147,17 @@
             </span>
           </span>
           <span class="irc-metrics" aria-label="Readiness status breakdown">
-            <span class="irc-metric">
+            <span class="irc-metric" title="Complete requirements">
               <span class="irc-metric-icon complete">${icon('circle-check')}</span>
-              <span class="irc-metric-copy"><span>Complete</span><b class="tnum">${c['Complete']}</b></span>
+              <span class="irc-metric-copy"><span>All clear</span><b class="tnum">${c['Complete']}</b></span>
             </span>
-            <span class="irc-metric">
-              <span class="irc-metric-icon partial">${icon('circle-dashed')}</span>
-              <span class="irc-metric-copy"><span>Partial</span><b class="tnum">${c['Partially Complete']}</b></span>
+            <span class="irc-metric" title="Partially complete requirements">
+              <span class="irc-metric-icon partial">${icon('clock-alert')}</span>
+              <span class="irc-metric-copy"><span>Needs attention</span><b class="tnum">${c['Partially Complete']}</b></span>
             </span>
-            <span class="irc-metric">
+            <span class="irc-metric" title="At risk or missing requirements">
               <span class="irc-metric-icon gap">${icon('triangle-alert')}</span>
-              <span class="irc-metric-copy"><span>Gaps</span><b class="tnum">${gapCount}</b></span>
+              <span class="irc-metric-copy"><span>Critical</span><b class="tnum">${gapCount}</b></span>
             </span>
           </span>
         </button>`;
