@@ -2612,3 +2612,54 @@ html[data-ui="material"] .ui-demo { border: 0; box-shadow: var(--m-shadow); }
 .stack-panels { grid-template-columns: minmax(0, 1fr); } .grid-halves { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } @media (max-width: 1023px) { .grid-halves { grid-template-columns: minmax(0, 1fr); } }
 .worklist .w-meta, .worklist .w-title, .ui-row-meta, .ui-row-title { position: relative; }
 .health.attn, .health.risk, .health.ok { font-weight: 500; }
+
+/* ===================================================================== Update 17 — revision routing timeline */
+.tl { list-style: none; margin: 0; padding: 0; position: relative; }
+.tl-item { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding-bottom: 18px; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before { content: ""; position: absolute; left: 15px; top: 30px; bottom: -2px; width: 2px; background: var(--border); border-radius: 1px; }
+.tl-item:last-child::before { display: none; }
+.tl-item.pending::before { background: repeating-linear-gradient(to bottom, var(--border-strong) 0 4px, transparent 4px 8px); }
+.tl-mark { display: flex; justify-content: center; padding-top: 1px; }
+.tl-mark .avatar { width: 30px; height: 30px; font-size: 11px; box-shadow: 0 0 0 3px var(--surface); }
+.tl-dot { width: 14px; height: 14px; margin-top: 8px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); box-shadow: 0 0 0 4px var(--surface); }
+.tl-item.current .tl-dot { border-color: var(--info); background: var(--info-bg); }
+.tl-body { min-width: 0; }
+.tl-head { font-size: 14px; line-height: 22px; }
+.tl-head b { font-weight: 600; }
+.tl-head .muted { color: var(--text-3); }
+.tl-desc { margin: 2px 0 0; font-size: 13px; line-height: 19px; color: var(--text-2); }
+.tl-quote { display: inline-flex; align-items: flex-start; gap: 8px; max-width: 100%; margin-top: 6px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 13px; line-height: 19px; color: var(--text); }
+.tl-quote svg.lucide { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--text-3); }
+.tl-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.tl-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-2); background: var(--surface); white-space: nowrap; }
+.tl-chip svg.lucide { width: 13px; height: 13px; color: var(--text-3); }
+.tl-chip b { font-weight: 600; color: var(--text); }
+.tl-avatars { display: inline-flex; padding-left: 3px; }
+.tl-avatars .avatar.xs { width: 22px; height: 22px; font-size: 9px; margin-left: -3px; box-shadow: 0 0 0 2px var(--surface); }
+.tl-avatars .avatar.more { background: var(--muted-bg); color: var(--text-2); }
+.tl-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.tl-when { font-size: 12px; color: var(--text-3); }
+.tl-item.pending .tl-head { color: var(--text-2); }
+.tl-item.pending:not(.current) { opacity: .75; }
+.tl.compact .tl-item { padding-bottom: 14px; }
+.tl.compact .tl-head { font-size: 13px; line-height: 20px; }
+.tl.compact .tl-mark .avatar { width: 26px; height: 26px; font-size: 10px; }
+.tl.compact { padding-top: 4px; }
+.tl.compact .tl-item { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+.tl.compact .tl-item::before { left: 13px; top: 28px; }
+.rev-trail > li { padding: 0; }
+.rev-trail details > summary { list-style: none; cursor: pointer; padding: 12px 14px; border-radius: var(--r-md); }
+.rev-trail details > summary::-webkit-details-marker { display: none; }
+.rev-trail details > summary:hover { background: var(--hover); }
+.rev-trail details > summary:focus-visible { outline: none; box-shadow: var(--focus); }
+.rev-trail .rev-toggle { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: var(--text-3); }
+.rev-trail .rev-toggle svg.lucide { width: 14px; height: 14px; transition: transform .15s; }
+.rev-trail details[open] .rev-toggle svg.lucide { transform: rotate(180deg); }
+.rev-trail details > .tl { padding: 4px 14px 14px; }
+.rt-expand { padding: 4px 4px 8px; }
+.rt-expand h4 { margin: 0 0 12px; font-size: 13px; color: var(--text-2); font-weight: 600; }
+.rev-list .tl-item { padding: 0 0 14px; border-bottom: 0; font-size: inherit; }
+.rev-list .tl-item:last-child { padding-bottom: 0; }
+.rev-list .active-rev > details > summary { background: var(--accent-soft); }
+.rev-trail > li.active-rev { background: none; margin: 0; padding: 0; border-bottom-color: var(--border); }

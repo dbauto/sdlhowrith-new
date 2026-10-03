@@ -244,11 +244,67 @@
       ? `<span class="src-lock">${icon('lock')}Link only</span><span>${esc(d.source.system)} · ${esc(d.source.library)} / ${esc(d.source.folder)}</span><span class="file">${esc(d.source.file)}</span><span class="muted">Link checked ${Q.fmt(d.source.verified)} · not read by iQMS</span>`
       : `<span class="src-bad">${icon('triangle-alert')}Access unavailable</span><span class="file">${esc(d.source.file)}</span><span class="muted">Link last checked ${Q.fmt(d.source.verified)}</span>`);
 
-  Q.revList = d => {
+  /* ---------- Revision routing timeline: who started the revision, each review, approval and publication ---------- */
+  const STAGE_KIND = { Draft: 'neutral', Review: 'info', Approval: 'warning', Publication: 'accent', Published: 'success', Changes: 'orange' };
+  const avatars = ids => `<span class="tl-avatars">${ids.slice(0, 4).map(w => `<span class="avatar xs" title="${esc(Q.pname(w))}">${esc(Q.initials(w))}</span>`).join('')}${ids.length > 4 ? `<span class="avatar xs more">+${ids.length - 4}</span>` : ''}</span>`;
+  const chip = (ic, label, value, kind = '') => `<span class="tl-chip ${kind}">${ic ? icon(ic) : ''}${label ? `<span>${esc(label)}</span>` : ''}${value ? `<b>${esc(value)}</b>` : ''}</span>`;
+  // Events for a revision that is being routed now (live from the workflow), oldest first; open steps follow as "waiting".
+  Q.wfTrail = (w, r) => {
+    const ev = [], used = new Set();
+    const note = (who, date) => { const c = w.comments.find((x, i) => !used.has(i) && x.who === who && x.date === date); if (c) used.add(w.comments.indexOf(c)); return c?.text || ''; };
+    ev.push({ at: w.started, who: w.startedBy, verb: 'started routing for', obj: `Rev ${w.rev}`, desc: r?.summary || '', icon: 'route', stage: 'Review',
+      chips: [avatars(w.reviewers.map(x => x.who)), chip('', 'Reviewers', String(w.reviewers.length)), chip('calendar', 'Due', Q.fmt(w.due))] });
+    w.reviewers.filter(x => x.date).forEach(x => { const changes = x.state === 'Changes requested';
+      ev.push({ at: x.date, who: x.who, verb: changes ? 'requested changes to' : 'completed review of', obj: `Rev ${w.rev}`, quote: note(x.who, x.date), stage: changes ? 'Changes' : 'Review', icon: changes ? 'message-square' : 'file-check' }); });
+    w.approvers.filter(x => x.date).forEach(x => { const changes = x.state === 'Changes requested';
+      ev.push({ at: x.date, who: x.who, verb: changes ? 'requested changes to' : 'approved', obj: `Rev ${w.rev}`, quote: note(x.who, x.date), stage: changes ? 'Changes' : 'Approval', icon: changes ? 'message-square' : 'stamp' }); });
+    w.comments.forEach((c, i) => { if (!used.has(i)) ev.push({ at: c.date, who: c.who, verb: 'commented on', obj: `Rev ${w.rev}`, quote: c.text, stage: null, icon: 'message-square' }); });
+    ev.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+    // What is still open, in routing order.
+    const waiting = [];
+    if (w.changesRequested) waiting.push({ who: w.startedBy, verb: 'to submit an updated draft of', obj: `Rev ${w.rev}`, stage: 'Changes' });
+    else {
+      if (w.stage === 'review') w.reviewers.filter(x => x.state === 'Pending').forEach(x => waiting.push({ who: x.who, verb: 'to review', obj: `Rev ${w.rev}`, stage: 'Review', due: w.due }));
+      if (['review', 'approval'].includes(w.stage)) w.approvers.filter(x => !['Approved'].includes(x.state)).forEach(x => waiting.push({ who: x.who, verb: 'to approve', obj: `Rev ${w.rev}`, stage: 'Approval', due: w.stage === 'approval' ? w.due : null }));
+      waiting.push({ who: w.publisher, verb: 'to publish', obj: `Rev ${w.rev}`, stage: 'Publication' });
+    }
+    return ev.concat(waiting.map((x, i) => ({ ...x, pending: true, current: i === 0 && !w.changesRequested ? true : !!w.changesRequested })));
+  };
+  // Events for a revision that is no longer routed: stored at publication, or rebuilt from the revision record for older history.
+  Q.revTrail = (d, r) => {
+    const w = Q.S.workflows.find(x => x.doc === d.id && x.rev === r.rev);
+    if (w) return Q.wfTrail(w, r);
+    if (r.trail) return r.trail;
+    if (!r.published) return [{ at: r.date, who: r.author, verb: 'started draft', obj: `Rev ${r.rev}`, desc: r.summary || '', icon: 'file-text', stage: 'Draft' }, { who: r.author, verb: 'to send', obj: `Rev ${r.rev}`, tail: 'for review', stage: 'Draft', pending: true, current: true }];
+    const pub = r.published, reviewers = (r.reviewers || []).length ? r.reviewers : ['maria'];
+    const approver = d.owner === 'eric' ? 'maria' : 'eric', publisher = 'nina';
+    const day = n => Q.addDays(pub, -n);
+    return [
+      { at: day(21), who: r.author, verb: 'started routing for', obj: `Rev ${r.rev}`, desc: r.summary || '', icon: 'route', stage: 'Review', chips: [avatars(reviewers), chip('', 'Reviewers', String(reviewers.length))] },
+      ...reviewers.map((x, i) => ({ at: day(12 - i), who: x, verb: 'completed review of', obj: `Rev ${r.rev}`, icon: 'file-check', stage: 'Review' })),
+      { at: day(4), who: approver, verb: 'approved', obj: `Rev ${r.rev}`, icon: 'stamp', stage: 'Approval' },
+      { at: pub, who: publisher, verb: 'published', obj: `Rev ${r.rev}`, icon: 'send', stage: 'Published', chips: [chip('calendar', 'Effective', Q.fmt(pub))] }];
+  };
+  Q.revTimeline = (events, { compact = false } = {}) => events.length ? `<ol class="tl${compact ? ' compact' : ''}">${events.map(e => `<li class="tl-item${e.pending ? ' pending' : ''}${e.current ? ' current' : ''}">
+      <span class="tl-mark">${e.pending ? `<span class="tl-dot"></span>` : `<span class="avatar sm" title="${esc(Q.pname(e.who))}">${esc(Q.initials(e.who))}</span>`}</span>
+      <div class="tl-body">
+        <div class="tl-head">${e.pending ? `<span class="muted">Waiting for</span> <b>${esc(Q.pname(e.who))}</b> <span class="muted">${esc(e.verb)}</span> <b>${esc(e.obj)}</b>${e.tail ? ` <span class="muted">${esc(e.tail)}</span>` : ''}` : `<b>${esc(Q.pname(e.who))}</b> <span class="muted">${esc(e.verb)}</span> <b>${esc(e.obj)}</b>`}</div>
+        ${e.desc ? `<p class="tl-desc">${esc(e.desc)}</p>` : ''}
+        ${e.quote ? `<div class="tl-quote">${icon('message-square')}<span>${esc(e.quote)}</span></div>` : ''}
+        ${e.chips?.length ? `<div class="tl-chips">${e.chips.join('')}</div>` : ''}
+        <div class="tl-foot">${e.at ? `<span class="tl-when">${Q.fmt(e.at)}</span>` : e.due ? `<span class="tl-when">Due ${Q.fmt(e.due)}</span>` : ''}${e.stage ? Q.ui.badge(e.stage === 'Changes' ? 'Changes requested' : e.stage, STAGE_KIND[e.stage]) : ''}${e.current ? Q.ui.badge('Current step', 'info', { dot: true }) : ''}</div>
+      </div></li>`).join('')}</ol>` : '<p class="muted small">No routing history.</p>';
+
+  // Revision list. With { trail: true } each revision expands to its routing timeline (newest open by default).
+  Q.revList = (d, { trail = false, openFirst = true } = {}) => {
     const list = [...(Q.S.revisions[d.id] || [])].reverse();
-    return list.length ? `<ul class="rev-list">${list.map(r => `<li class="${r.state === 'Published' ? 'active-rev' : ''}"><div class="rev-top"><span class="rev-no">Rev ${esc(r.rev)}</span>${Q.st(r.state === 'Published' ? 'Published — active' : r.state, r.state === 'Published' ? 'success' : undefined)}</div>
+    if (!list.length) return '<p class="muted">No revisions yet.</p>';
+    const head = r => `<div class="rev-top"><span class="rev-no">Rev ${esc(r.rev)}</span>${Q.st(r.state === 'Published' ? 'Published — active' : r.state, r.state === 'Published' ? 'success' : undefined)}</div>
       <div class="rev-sum">${esc(r.summary || 'No change summary yet.')}</div>
-      <div class="rev-meta">${esc(Q.pname(r.author))} · ${r.published ? 'published ' + Q.fmt(r.published) : 'started ' + Q.fmt(r.date)}${r.approval ? ' · ' + esc(r.approval) : ''}</div></li>`).join('')}</ul>` : '<p class="muted">No revisions yet.</p>';
+      <div class="rev-meta">${esc(Q.pname(r.author))} · ${r.published ? 'published ' + Q.fmt(r.published) : 'started ' + Q.fmt(r.date)}${r.approval ? ' · ' + esc(r.approval) : ''}</div>`;
+    if (!trail) return `<ul class="rev-list">${list.map(r => `<li class="${r.state === 'Published' ? 'active-rev' : ''}">${head(r)}</li>`).join('')}</ul>`;
+    return `<ul class="rev-list rev-trail">${list.map((r, i) => { const ev = Q.revTrail(d, r), done = ev.filter(e => !e.pending).length;
+      return `<li class="${r.state === 'Published' ? 'active-rev' : ''}"><details${i === 0 && openFirst ? ' open' : ''}><summary>${head(r)}<span class="rev-toggle">${icon('chevron-down')}${done} step${done === 1 ? '' : 's'}${ev.some(e => e.pending) ? ' · in routing' : ''}</span></summary>${Q.revTimeline(ev, { compact: true })}</details></li>`; }).join('')}</ul>`;
   };
   Q.linkedItems = d => {
     const docRow = id => { const x = Q.doc(id); return x ? `<li>${icon('file-text')}<div class="ll-main"><b>${esc(x.title)}</b><span>${esc(x.id)} · Rev ${esc(x.rev || '—')}</span></div><button class="btn sm" type="button" data-action="open-doc" data-id="${esc(x.id)}" data-stack="1">Open</button></li>` : ''; };
@@ -328,7 +384,7 @@
         const panel = el.querySelector('#vpanel');
         const setTab = t => {
           el.querySelectorAll('[data-vtab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vtab === t)));
-          panel.innerHTML = t === 'details' ? Q.docDetails(d) : t === 'revisions' ? `<p class="small muted" style="margin-bottom:8px">Every revision is retained. Only the published revision is the active controlled version.</p>${Q.revList(d)}` : Q.linkedItems(d);
+          panel.innerHTML = t === 'details' ? Q.docDetails(d) : t === 'revisions' ? `<p class="small muted" style="margin-bottom:8px">Every revision is retained with its routing history. Only the published revision is the active controlled version.</p>${Q.revList(d, { trail: true })}` : Q.linkedItems(d);
           Q.refreshIcons();
         };
         el.querySelectorAll('[data-vtab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.vtab)));
@@ -525,6 +581,7 @@
       <select class="select" data-filter="process" aria-label="Process">${Q.processOptions()}</select>`;
     return Q.table({
       id, rows, key: r => r.id, selectable: true, tight: true, noun: 'workflows', caption: 'Documents in review', rowLabel: r => r.d.title, tools, segDefault: seg,
+      expand: r => `<div class="rt-expand"><h4>Routing activity · ${esc(r.d.id)} Rev ${esc(r.rev)}</h4>${Q.revTimeline(Q.wfTrail(Q.wf(r.id), (Q.S.revisions[r.d.id] || []).find(x => x.rev === r.rev)), { compact: true })}</div>`,
       segs: { mine: segs.mine, all: segs.all }, initialSeg: seg,
       filters: { stage: (r, v) => r.stage === v && !r.changesRequested, process: (r, v) => Q.inProc(r.d.process, v) },
       columns: [
@@ -572,11 +629,6 @@
     else bar = `<span class="note">Waiting for ${esc(waiting || '—')}. You have no action on this revision.</span><button class="btn" type="button" data-action="toast" data-title="Reminder sent" data-msg="Reminder sent to ${esc(waiting)}.">Send Reminder</button>`;
 
     const person = (x, role) => `<li><span class="avatar sm">${esc(Q.initials(x.who))}</span><div class="p-main">${Q.who(x.who)}<span>${esc(role)} · ${esc(Q.person(x.who).title)}</span></div>${Q.st(x.state + (x.date ? ' · ' + Q.fmt(x.date) : ''), { 'Completed': 'success', 'Approved': 'success', 'Pending': 'info', 'Changes requested': 'orange', 'Not started': 'neutral' }[x.state])}</li>`;
-    const history = [
-      [w.started, `${Q.pname(w.startedBy)} started the workflow for Rev ${w.rev}`],
-      ...w.reviewers.filter(r => r.date).map(r => [r.date, `${Q.pname(r.who)} ${r.state === 'Changes requested' ? 'requested changes' : 'completed review'}`]),
-      ...w.approvers.filter(r => r.date).map(r => [r.date, `${Q.pname(r.who)} approved Rev ${w.rev}`])
-    ].sort((a, b) => a[0] < b[0] ? 1 : -1);
 
     const html = `<div class="review-page">
       <div class="review-head">${Q.crumbs([['Documented Information', '#/documents'], ['Routing', '#/review'], [`${d.id} Rev ${w.rev}`]])}
@@ -593,8 +645,8 @@
               <ul class="comments">${w.comments.map(c => `<li><span class="avatar sm">${esc(Q.initials(c.who))}</span><div class="c-body"><div class="c-meta">${Q.who(c.who)} · ${Q.fmt(c.date)}</div>${esc(c.text)}</div></li>`).join('') || '<li class="muted small">No comments yet.</li>'}</ul>
               <form class="comment-form" id="commentForm"><label class="sr-only" for="cText">Add a comment</label><textarea class="textarea" id="cText" placeholder="Add a comment for the audit trail"></textarea><button class="btn" type="submit">Comment</button></form></section>
             <section class="panel"><div class="panel-head"><h2>Linked items</h2></div><div class="panel-pad">${Q.linkedItems(d)}</div></section>
-            <section class="panel"><div class="panel-head"><h2>Approval history</h2></div><ul class="activity">${history.map(([dt, t]) => `<li><span>${esc(t)}</span><span class="when">${Q.fmt(dt)}</span></li>`).join('')}</ul></section>
-            <section class="panel"><div class="panel-head"><h2>Revision history</h2></div><div class="panel-pad">${Q.revList(d)}</div></section>
+            <section class="panel"><div class="panel-head"><h2>Routing activity</h2><span class="muted small">Rev ${esc(w.rev)}</span></div><div class="panel-pad">${Q.revTimeline(Q.wfTrail(w, rev))}</div></section>
+            <section class="panel"><div class="panel-head"><h2>Revision history</h2></div><div class="panel-pad">${Q.revList(d, { trail: true, openFirst: false })}</div></section>
           </div>
           <div class="action-bar">${bar}</div>
         </section>
@@ -673,7 +725,8 @@
         onConfirm: () => {
           const list = Q.S.revisions[d.id];
           list.forEach(r => { if (r.state === 'Published') r.state = 'Superseded'; });
-          const r = list.find(x => x.rev === w.rev); Object.assign(r, { state: 'Published', published: today, approval: 'Approved', reviewers: w.reviewers.map(x => x.who) });
+          const r = list.find(x => x.rev === w.rev); const trail = Q.wfTrail(w, r).filter(e => !e.pending).concat({ at: today, who: me, verb: 'published', obj: `Rev ${w.rev}`, icon: 'send', stage: 'Published', chips: [`<span class="tl-chip">${icon('calendar')}<span>Effective</span><b>${Q.fmt(today)}</b></span>`] });
+          Object.assign(r, { state: 'Published', published: today, approval: 'Approved', reviewers: w.reviewers.map(x => x.who), trail });
           Object.assign(d, { rev: w.rev, workingRev: null, status: 'Published', updated: today, effective: today, nextReview: Q.addYears(today, 1) });
           Q.S.workflows = Q.S.workflows.filter(x => x.id !== w.id);
           log(`published ${d.title} Rev ${w.rev}`);
