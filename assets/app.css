@@ -939,7 +939,7 @@ body .sb .sb-item.sb-sub { padding-left: 42px; justify-content: flex-start; }
 .vtab a:hover { color: var(--text); text-decoration: none; }
 .vtab:not(.on):hover { background: rgba(255,255,255,.6); }
 .vtab.on { background: var(--surface); border-color: var(--border); }
-.vtab.on a { color: var(--text); font-weight: 600; }
+.vtab.on a { color: var(--text); font-weight: 600; border-bottom: 3px solid var(--accent); }
 .vtab.on::before, .vtab.on::after { content: ""; position: absolute; left: 10px; right: 10px; height: 2px; border-radius: 2px; background: var(--accent); }
 .vtab.on::before { bottom: 0; z-index: 2; }
 .vtab.on::after { top: -1px; border-radius: 0 0 2px 2px; }
