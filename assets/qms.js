@@ -248,7 +248,7 @@
     { key: 'target', label: 'Target', type: 'number', cls: 'c-num', get: k => k.target, sort: k => k.target, render: k => `${esc(k.dir)} ${Q.kpiFmt(k.target, k)}` },
     { key: 'actual', label: 'Actual', type: 'number', cls: 'c-num', get: k => k.actual, sort: k => k.actual, render: k => `<span class="kpi-val" style="color:${Q.kpiOk(k) ? 'inherit' : 'var(--danger)'}">${Q.kpiFmt(k.actual, k)}</span>` },
     { key: 'trend', label: 'Trend (6 periods)', type: 'number', get: kDelta, sort: kDelta,
-      render: k => { const dlt = kDelta(k); return `<span style="display:inline-flex;align-items:center;gap:8px">${Q.sparkline(k.trend, Q.kpiOk(k))}<span class="small muted tnum">${dlt > 0 ? '▲' : dlt < 0 ? '▼' : '■'} ${Math.abs(dlt)}${esc(k.unit)}</span></span>`; } },
+      render: k => { const dlt = kDelta(k); return `<span class="small muted tnum">${Math.abs(dlt)}${esc(k.unit)}</span>`; } },
     { key: 'owner', label: 'Owner', type: 'person', get: k => k.owner, sort: k => Q.pname(k.owner), render: k => `<span class="nowrap">${esc(Q.pname(k.owner))}</span>` },
     { key: 'period', label: 'Period', type: 'enum', options: () => [...new Set(Q.S.kpis.map(k => k.period))].sort(), get: k => k.period, sort: k => k.period, render: k => `<span class="nowrap">${esc(k.period)}</span>` },
     { key: 'status', label: 'Status', type: 'enum', options: () => ['On target', 'Below target'], get: k => Q.kpiOk(k) ? 'On target' : 'Below target', sort: k => Q.kpiOk(k) ? 1 : 0, render: k => Q.kpiOk(k) ? Q.st('On target', 'success') : Q.st('Below target', 'danger') }
