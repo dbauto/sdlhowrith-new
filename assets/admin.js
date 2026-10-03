@@ -49,6 +49,7 @@
 
   /* ---------- Process Structure ---------- */
   let selected = null;
+  const PROCESS_ICONS = ['landmark', 'workflow', 'package', 'users', 'shield-alert', 'target', 'network', 'handshake', 'cloud', 'files'];
   function processes(q) {
     const S = Q.S, L = S.organization.hierarchyLabels;
     if (q.select && Q.proc(q.select)) selected = q.select;
@@ -72,6 +73,7 @@
             <label class="field"><span>Process owner <span class="req">*</span></span><select class="select" name="owner" required>${Q.peopleOptions(p.owner)}</select></label>
             <label class="field"><span>Category${p.parent_process_id ? '' : ' <span class="req">*</span>'}</span>${p.parent_process_id ? `<span class="input" style="display:flex;align-items:center;gap:8px;background:var(--surface-2)">${Q.catChip(Q.catOf(p))}<span class="small muted">inherited from ${esc(Q.proc(p.parent_process_id).process_code)}</span></span>` : `<select class="select" name="category" required>${Q.categories().map(c => `<option value="${c.id}"${c.id === p.category ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`}<span class="help">${p.parent_process_id ? 'Subprocesses use their parent’s category.' : `Groups the process on QMS → Processes. <a href="#/settings/processes?cats=1">Manage categories</a>`}</span></label>
             <label class="field"><span>Department</span><input class="input" name="department" value="${esc(p.department)}"></label>
+            <div class="field full"><span>Process icon</span><div class="swatches icons process-icons" role="radiogroup" aria-label="Process icon">${PROCESS_ICONS.map(x => `<label><input type="radio" name="processIcon" value="${x}" ${(p.icon || 'landmark') === x ? 'checked' : ''} aria-label="${x}"><span>${icon(x)}</span></label>`).join('')}</div><span class="help">Choose an icon for the process card.</span></div>
             <label class="field"><span>ISO 9001 clauses</span><input class="input" name="iso" value="${esc(p.iso.join(', '))}"><span class="help">Comma-separated.</span></label>
             <label class="field full"><span>Purpose</span><textarea class="textarea" name="purpose">${esc(p.purpose)}</textarea></label>
             <details class="full explain"><summary>${icon('chevron-right')}Inputs, outputs and roles</summary><div class="form-grid" style="margin-top:12px">
@@ -100,7 +102,7 @@
         if (v.parent && Q.children(p.process_id, true).length) { main.querySelector('#procStatus').textContent = 'A process with subprocesses cannot be moved under another process. Move its subprocesses first.'; main.querySelector('#procStatus').style.color = 'var(--danger)'; return; }
         const lines = s => (s || '').split('\n').map(x => x.trim()).filter(Boolean);
         if (v.category) p.category = v.category;
-        Object.assign(p, { process_code: v.code, name: v.name, parent_process_id: v.parent || null, owner: v.owner, department: v.department, purpose: v.purpose, iso: v.iso.split(',').map(x => x.trim()).filter(Boolean), inputs: lines(v.inputs), outputs: lines(v.outputs), roles: lines(v.roles) });
+        Object.assign(p, { process_code: v.code, name: v.name, parent_process_id: v.parent || null, owner: v.owner, department: v.department, icon: v.processIcon || p.icon || 'landmark', purpose: v.purpose, iso: v.iso.split(',').map(x => x.trim()).filter(Boolean), inputs: lines(v.inputs), outputs: lines(v.outputs), roles: lines(v.roles) });
         Q.save(); Q.renderSidebar(); Q.render({ noFocus: true }); Q.toast('Process saved', `${v.code} ${v.name}`);
       });
       main.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', () => {
@@ -132,13 +134,14 @@
         <label class="field"><span>Process owner <span class="req">*</span></span><select class="select" name="owner" required>${Q.peopleOptions(parent?.owner || Q.me())}</select></label>
         ${parent ? '' : `<label class="field"><span>Category <span class="req">*</span></span><select class="select" name="category" required>${Q.categories().map(c => `<option value="${c.id}"${c.id === d.category ? ' selected' : ''}>${esc(c.name)} — ${esc(c.description)}</option>`).join('')}</select></label>`}
         <label class="field"><span>Department</span><input class="input" name="department" value="${esc(parent?.department || '')}"></label>
+        <div class="field full"><span>Process icon</span><div class="swatches icons process-icons" role="radiogroup" aria-label="Process icon">${PROCESS_ICONS.map((x, i) => `<label><input type="radio" name="processIcon" value="${x}" ${i === 0 ? 'checked' : ''} aria-label="${x}"><span>${icon(x)}</span></label>`).join('')}</div><span class="help">Choose an icon for the process card.</span></div>
         <label class="field full"><span>Purpose</span><textarea class="textarea" name="purpose" placeholder="What this process achieves"></textarea></label></div></form>`,
       foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Add</button>` });
     m.querySelector('[data-ok]').addEventListener('click', () => {
       const f = m.querySelector('form'); if (!Q.validate(f)) return; const v = Q.formValues(f);
       if (Q.S.processes.some(x => x.process_code === v.code)) { Q.toast('Code already used', 'Choose a unique display code.'); return; }
       const id = Q.uid('p');
-      Q.S.processes.push({ process_id: id, organization_id: Q.S.organization.organization_id, parent_process_id: parent?.process_id || null, display_order: order, process_code: v.code, name: v.name, owner: v.owner, department: v.department, iso: [], purpose: v.purpose || '', inputs: [], outputs: [], roles: [], elements: [], status: 'active', category: parent ? parent.category : v.category });
+      Q.S.processes.push({ process_id: id, organization_id: Q.S.organization.organization_id, parent_process_id: parent?.process_id || null, display_order: order, process_code: v.code, name: v.name, owner: v.owner, department: v.department, icon: v.processIcon || 'landmark', iso: [], purpose: v.purpose || '', inputs: [], outputs: [], roles: [], elements: [], status: 'active', category: parent ? parent.category : v.category });
       selected = id; Q.save(); Q.closeAllModals(); Q.renderSidebar(); Q.go('#/settings/processes'); Q.render({ noFocus: true }); Q.toast(`${L[parent ? 1 : 0]} added`, `${v.code} ${v.name} now appears in navigation.`);
     });
   };

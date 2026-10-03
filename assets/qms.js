@@ -191,6 +191,7 @@
       const members = team(p);
       return `<a class="proc-card pc2 tone-${tone}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
         <div class="pc2-head">
+          <span class="pc2-icon" aria-hidden="true">${icon(p.icon || 'landmark')}</span>
           <span class="pc2-code tnum">${esc(p.process_code)}</span>
           <h3 id="pc-${p.id}">${esc(p.name)}</h3>
           ${Q.ui.info(p.purpose || p.name)}
