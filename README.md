@@ -280,6 +280,21 @@ The sidebar item **Internal Audit** is now **Audits**, covering the complete aud
 - Fixed-height content scrolls inside its component. Register and process-status tables therefore scroll vertically and horizontally without making the whole page excessively long.
 - At phone widths every component becomes full width, regardless of its saved desktop width.
 
+## Update 15 — Audit Management corrective redesign (one audit = one process)
+
+Update 14 let one audit hold several "areas" (processes) with their own auditors, checklists and area reports, then a consolidated report. That mixed planning with execution and made ownership, scheduling and reporting unclear. Now:
+
+- **One audit = one process.** An **Audit Programme** (Draft → For Approval → Approved → Active → Completed → Archived) only plans: which process, when, why, who and status. It contains many process audits and has a **Programme Summary** (completion, overdue, major/minor/open NCs, repeat findings, overdue corrective actions) for the annual view.
+- **Audit trigger** replaces "type": *Planned* (programme + planned period) or *Triggered* (Risk, Nonconformity, Corrective Action Follow-up, Customer Complaint, Incident, Performance/KPI Issue, Previous Audit Finding, Management Request, Other) with the related record and reason. A risk's row menu and details offer **Create Audit**, prefilled as a triggered audit; the risk and the NC link back to audits they triggered.
+- **Audit Plan Builder** (`#/audits/new`): a full page with 8 steps — Process, Trigger, Plan, Clauses, Schedule, Auditors, Checklist, Review & Create — with the process context (owner, clauses, documents, evidence, risks, KPIs, previous audits/findings, open NCs/CAs) beside it. **Save Draft** keeps a `DRAFT-nnn` you can resume from the Audit Register.
+- **Process ↔ ISO clause matrix** is master data in **Settings → Process ↔ ISO Clauses**. The Clauses step suggests them; changes there apply to that audit only.
+- **Sessions and calendar:** an audit has one or more sessions (date, time, location, auditors, notes). **Audits → Calendar** has month, week and agenda views, filters (programme, process, auditor, status, trigger, date range), a details drawer with Open Audit / Open Plan / Reschedule (no drag), planned vs triggered markers and **scheduling-conflict warnings** when an auditor is in two sessions at once (warn, not block).
+- **Auditor assignments:** Lead Auditor, Auditor, Technical Expert, Observer, each with assigned clauses (or a technical scope) and an independence status (Independent / Potential Conflict / Needs Confirmation). Questions follow the assigned clauses; only the assigned auditor can answer them.
+- **Checklist builder and templates:** sections and questions like a form builder (assessment, yes/no/N/A, text, multiple choice, numeric, date, evidence review, document reference, section heading, instruction), with add/edit/duplicate/delete/reorder, assignee, clause, expected evidence and required flag. Start from the process default, a template, or blank. **Checklist Templates** can be created, edited, duplicated and archived.
+- **Execution:** workspace tabs Overview, Plan, Checklist, Findings & NCs, Report, Activity. Each auditor gets **My Checklist** and **Submit Audit Work** (not possible with unanswered required questions; N/A needs a reason). **Complete Fieldwork** is only possible when every required question is answered and every assignment is submitted, and lists the exact blockers otherwise.
+- **Process Audit Report:** one controlled report per audit, generated from the records in 19 sections (plus Executive Summary), including each auditor's contribution. Only Executive Summary, Auditor Comments, Lead Auditor Conclusion and Follow-up Requirements are editable. Generate Draft → Edit → Submit → Review → Approve → Publish → PDF. Publishing moves the audit to Follow-up; it closes only when the report is published and every NC is closed after effectiveness verification.
+- **Migration (auditModel 1 → 2):** runs once on load. Single-area audits are converted in place; multi-area audits are split into `IA-…A`, `IA-…B`… (one per process), keeping programme, dates (as sessions), team, findings, NCs, evidence, report history and activity. Findings follow their process; a finding whose process was not one of the audit's areas stays on the original audit and is flagged **Migration review required** (resolve it in Findings & NCs). The old multi-area audit remains as a read-only pointer to its split audits, and a previously published consolidated report is kept as the revision history of each split audit.
+
 ## Files
 
 | File | Change |
@@ -294,10 +309,12 @@ The sidebar item **Internal Audit** is now **Audits**, covering the complete aud
 | `assets/data.js` | Added process categories, organization context & scope, quality policy, management reviews |
 | `assets/settings-extra.js` | **New.** Regional, Branding, Security, Notifications, API & Webhooks, Data Privacy, Audit Log, Data Export & Backup, Billing & Plan, About System |
 | `assets/orgchart.js` | **New.** Organization chart component, person details and reporting lines, chart in the QMS-ORG-001 preview |
-| `assets/audit-data.js` | **New.** Audit programmes, audits, findings, NCs, discussions, qualified auditors and area-clause mappings |
-| `assets/audits.js` | **New.** Audit model, migration, permissions, programme, workspace, checklist and evidence snapshots |
+| `assets/audit-data.js` | Audit programmes, one-process audits with sessions and assignments, findings, NCs, discussions, qualified auditors, checklist templates (Update 15) |
+| `assets/audits.js` | Audit model v2, v1 → v2 migration, permissions, overview, programme and summary, calendar, register, clause matrix in Settings |
+| `assets/audit-builder.js` | **New (Update 15).** Audit Plan Builder, session editor, checklist builder, checklist templates |
+| `assets/audit-workspace.js` | **New (Update 15).** Process audit workspace: plan, assignments, My Checklist, submit work, fieldwork, findings |
 | `assets/audit-nc.js` | **New.** NC register, monitoring, discussions, corrective action, verification and effectiveness |
-| `assets/audit-report.js` | **New.** Area/consolidated reports, editor, workflow, revisions and A4 print/PDF layout |
+| `assets/audit-report.js` | Process Audit Report (19 sections), editor, workflow, revisions and A4 print/PDF layout |
 | `assets/theme.js` | **New.** Theme switch and Material welcome banner |
 | `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
 | `assets/app.css` | Styles for the above |

@@ -1,4 +1,4 @@
-/* iQMS — Audit Management: Nonconformity register, area monitoring and the NC workspace
+/* iQMS — Audit Management: Nonconformity register, monitoring by process and the NC workspace
  * (details, discussion with @mentions and QMS references, corrective action, verification,
  * effectiveness, evidence snapshots, activity). An NC closes only after the auditor has
  * verified implementation and confirmed effectiveness — never because a response was entered. */
@@ -31,9 +31,9 @@
       ['Total NCs', all.length, `#/audits/nc?s=all`], ['Major', all.filter(f => f.nc.classification === 'Major').length, '#/audits/nc?s=all&cls=Major', 'bad'], ['Minor', all.filter(f => f.nc.classification === 'Minor').length, '#/audits/nc?s=all&cls=Minor'],
       ['Open', open.length, '#/audits/nc'], ['Overdue', all.filter(AM.ncOverdue).length, '#/audits/nc?s=overdue', 'bad'], ['Awaiting Verification', all.filter(f => f.nc.status === 'Verification Required').length, '#/audits/nc?s=verify', 'warn']
     ].map(([k, v, h, t]) => `<a role="listitem" href="${h}"><span class="k">${k}</span><span class="v${v && t ? ' ' + t : ''}">${v}</span></a>`).join('')}</div>`;
-    const vt = AM.tabs([['register', 'Register', '#/audits/nc'], ['areas', 'By area', '#/audits/nc?view=areas']], view, 'Nonconformity view', 'tabs-sub');
+    const vt = AM.tabs([['register', 'Register', '#/audits/nc'], ['areas', 'By process', '#/audits/nc?view=areas']], view, 'Nonconformity view', 'tabs-sub');
     const head = AM.chrome('nc', { title: 'Nonconformities', crumbs: [['Audits', '#/audits'], ['Nonconformities']], sub: 'Every nonconformity raised in audits, with its corrective action and verification. Owners respond and auditors verify inside each NC.' });
-    if (view === 'areas') return { title: 'Nonconformities by area · Audits', nav: 'audits', html: head + strip + vt + byArea(q) };
+    if (view === 'areas') return { title: 'Nonconformities by process · Audits', nav: 'audits', html: head + strip + vt + byArea(q) };
     const segs = { open: AM.ncOpen, overdue: AM.ncOverdue, response: AM.needsResponse, verify: f => f.nc.status === 'Verification Required', closed: f => !AM.ncOpen(f) };
     const seg = segs[q.s] ? q.s : q.s === 'all' ? 'all' : 'open';
     const opt = (list, sel) => list.map(([v, l]) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(l)}</option>`).join('');
@@ -44,7 +44,7 @@
       search: f => `${f.nc.no} ${f.id} ${f.title} ${f.statement} ${f.clause} ${Q.pname(f.nc.owner)} ${f.audit}`,
       tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search NCs" aria-label="Search nonconformities"></div>
         <select class="select" data-filter="audit" aria-label="Audit"><option value="all">All audits</option>${opt(audits.map(x => [x, x]), q.audit)}</select>
-        <select class="select" data-filter="area" aria-label="Area"><option value="all">All areas</option>${opt(areas.map(x => [x, Q.proc(x)?.name]), q.area)}</select>
+        <select class="select" data-filter="area" aria-label="Process"><option value="all">All processes</option>${opt(areas.map(x => [x, Q.proc(x)?.name]), q.area)}</select>
         <select class="select" data-filter="clause" aria-label="Clause"><option value="all">All clauses</option>${opt(clauses.map(x => [x, x]), q.clause)}</select>
         <select class="select" data-filter="auditor" aria-label="Auditor"><option value="all">All auditors</option>${opt(auditors.map(x => [x, Q.pname(x)]), q.auditor)}</select>
         <select class="select" data-filter="owner" aria-label="Owner"><option value="all">All owners</option>${opt(owners.map(x => [x, Q.pname(x)]), q.owner)}</select>
@@ -54,7 +54,7 @@
       columns: [
         { key: 'no', label: 'NC Number', cls: 'c-id', sort: f => f.nc.no, render: f => `${esc(f.nc.no)}<span class="sub">${esc(f.id)}</span>` },
         { key: 'audit', label: 'Audit', sort: f => f.audit, render: f => `<a class="tnum nowrap" href="#/audits/a/${f.audit}">${esc(f.audit)}</a>` },
-        { key: 'area', label: 'Area', sort: f => Q.proc(f.process)?.process_code, render: f => `<span class="nowrap">${esc(Q.proc(f.process)?.name)}</span>` },
+        { key: 'area', label: 'Process', sort: f => Q.proc(f.process)?.process_code, render: f => `<span class="nowrap">${esc(Q.proc(f.process)?.name)}</span>` },
         { key: 'cl', label: 'ISO Clause', sort: f => Q.clauseSort(f.clause), render: f => `<span class="clause">${esc(f.clause)}</span>` },
         { key: 't', label: 'Nonconformity', sort: f => f.title, render: f => `<span class="title">${esc(f.title)}</span>` },
         { key: 'k', label: 'Classification', sort: f => f.nc.classification, render: clsBadge },
@@ -72,7 +72,7 @@
     const who = AM.actor(), mine = q.mine === '1';
     const list = AM.ncs().filter(f => !mine || (f.nc.ca?.owner || f.nc.owner) === who || f.auditor === who);
     const groups = Object.entries(list.reduce((o, f) => { const r = Q.rootId(f.process); (o[r] = o[r] || []).push(f); return o; }, {})).sort((a, b) => b[1].filter(AM.ncOpen).length - a[1].filter(AM.ncOpen).length);
-    return `<div class="am-mon-tools"><label class="checkbox"><input type="checkbox" data-mine ${mine ? 'checked' : ''}>Only NCs where ${esc(Q.pname(who))} is the owner or auditor</label><span class="small muted">Lead auditors and the QMS Manager see every area; area owners see what needs their response.</span></div>
+    return `<div class="am-mon-tools"><label class="checkbox"><input type="checkbox" data-mine ${mine ? 'checked' : ''}>Only NCs where ${esc(Q.pname(who))} is the owner or auditor</label><span class="small muted">Lead auditors and the QMS Manager see every process; process owners see what needs their response.</span></div>
       ${groups.map(([pid, fs]) => { const p = Q.proc(pid), open = fs.filter(AM.ncOpen); return `<section class="panel am-mon section"><div class="panel-head"><h2><b class="tnum">${esc(p.process_code)}</b> ${esc(p.name)}</h2>
         <span class="am-mon-stats"><span><b>${fs.length}</b> NC${fs.length === 1 ? '' : 's'}</span><span><b>${open.length}</b> open</span><span><b>${fs.filter(f => f.nc.status === 'Verification Required').length}</b> awaiting verification</span><span class="${fs.some(AM.ncOverdue) ? 'bad' : ''}"><b>${fs.filter(AM.ncOverdue).length}</b> overdue</span></span>
         <div class="actions"><a class="btn sm ghost" href="#/audits/nc?s=all&area=${pid}">In register</a></div></div>
@@ -115,7 +115,8 @@
         <dl class="dl-list dl-wide" style="margin-top:16px"><dt>Finding</dt><dd class="tnum">${esc(f.id)}</dd><dt>Audit</dt><dd><a href="#/audits/a/${f.audit}">${esc(f.audit)}</a> ${esc(a?.title || '')}</dd><dt>Area</dt><dd>${Q.pcell(f.process)}</dd><dt>Clause</dt><dd><span class="clause">${esc(f.clause)}</span> ${esc(AM.clTitle(f.clause))}</dd>
         <dt>Classification</dt><dd>${clsBadge(f)}</dd><dt>Raised by</dt><dd>${esc(Q.pname(f.auditor))} · ${Q.fmt(f.raised)}</dd><dt>Responsible owner</dt><dd>${esc(Q.pname(n.owner))}</dd><dt>Due date</dt><dd>${Q.dueDate(n.due, ['Verification Required', 'Verified', 'Closed'].includes(n.status))}</dd><dt>Status</dt><dd>${ncSt(f)}</dd>
         ${f.action ? `<dt>Corrective action</dt><dd><a href="#/capa?focus=${esc(f.action)}">${esc(f.action)}</a> in Corrective Action</dd>` : ''}
-        ${item ? `<dt>Checklist question</dt><dd><a href="#/audits/a/${f.audit}/checklist?area=${item.area}">${esc(item.sub)}</a> ${esc(item.question)}</dd>` : ''}</dl></div></section>
+        ${AM.triggeredBy(n.no).length ? `<dt>Triggered audits</dt><dd>${AM.triggeredBy(n.no).map(x => `<a class="tnum" href="#/audits/a/${x.id}">${esc(x.id)}</a> ${esc(x.status)}`).join(', ')}</dd>` : ''}
+        ${item ? `<dt>Checklist question</dt><dd><a href="#/audits/a/${f.audit}/checklist?q=${item.id}">${esc(item.clause)}</a> ${esc(item.question)}</dd>` : ''}</dl></div></section>
       <div><section class="panel"><div class="panel-head"><h2>Where it stands</h2></div><ul class="nc-steps">${[
         ['Raised and owner notified', true, `${Q.fmt(f.raised)}`],
         ['Owner response: correction and root cause', !!(n.ca?.rootCause), n.ca?.rootCause ? 'Recorded' : 'Waiting for the owner'],
