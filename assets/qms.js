@@ -247,7 +247,7 @@
     { key: 'process', label: 'Process', type: 'process', get: k => k.process, sort: k => Q.proc(k.process)?.process_code, render: k => Q.pcell(k.process) },
     { key: 'target', label: 'Target', type: 'number', cls: 'c-num', get: k => k.target, sort: k => k.target, render: k => `${esc(k.dir)} ${Q.kpiFmt(k.target, k)}` },
     { key: 'actual', label: 'Actual', type: 'number', cls: 'c-num', get: k => k.actual, sort: k => k.actual, render: k => `<span class="kpi-val" style="color:${Q.kpiOk(k) ? 'inherit' : 'var(--danger)'}">${Q.kpiFmt(k.actual, k)}</span>` },
-    { key: 'trend', label: 'Trend (6 periods)', type: 'number', get: kDelta, sort: kDelta,
+    { key: 'trend', label: 'Trend (6 periods)', cls: 'c-trend', type: 'number', get: kDelta, sort: kDelta,
       render: k => { const dlt = kDelta(k), tone = dlt > 0 ? 'positive' : dlt < 0 ? 'negative' : 'neutral', marker = dlt > 0 ? '▲' : dlt < 0 ? '▼' : '■'; return `<span class="kpi-trend-delta ${tone} small tnum"><span aria-hidden="true">${marker}</span> ${Math.abs(dlt)}${esc(k.unit)}</span>`; } },
     { key: 'owner', label: 'Owner', type: 'person', get: k => k.owner, sort: k => Q.pname(k.owner), render: k => `<span class="nowrap">${esc(Q.pname(k.owner))}</span>` },
     { key: 'period', label: 'Period', type: 'enum', options: () => [...new Set(Q.S.kpis.map(k => k.period))].sort(), get: k => k.period, sort: k => k.period, render: k => `<span class="nowrap">${esc(k.period)}</span>` },

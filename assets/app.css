@@ -2727,3 +2727,5 @@ html[data-ui="material"] .pc-meter i { background: #E7EAEE; }
 .kpi-trend-delta.positive { color: var(--success); }
 .kpi-trend-delta.negative { color: var(--danger); }
 .kpi-trend-delta.neutral { color: var(--text-3); }
+.c-trend { text-align: center; }
+.c-trend .kpi-trend-delta { justify-content: center; }
