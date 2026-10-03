@@ -169,7 +169,7 @@
       return `<svg class="pc-ring ${tone}" viewBox="0 0 28 28" aria-hidden="true">${Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + i / n * Math.PI * 2, c = Math.cos(a), si = Math.sin(a); return `<line x1="${(14 + c * 9).toFixed(2)}" y1="${(14 + si * 9).toFixed(2)}" x2="${(14 + c * 13).toFixed(2)}" y2="${(14 + si * 13).toFixed(2)}"${i < on ? ' class="on"' : ''}/>`; }).join('')}</svg>`; };
     const arrow = up => `<svg viewBox="0 0 24 24" aria-hidden="true">${up ? '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' : '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>'}</svg>`;
     const trend = (up, good, text, val) => `<span class="pc-trend ${good ? 'good' : 'bad'}">${arrow(up)}<span>${esc(text)}</span>${val ? `<b>${esc(val)}</b>` : ''}</span>`;
-    const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main">${ringHtml}<b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
+    const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main"><b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
     const card = p => {
       const s = p.s, [label, cls] = STATUS[s.health], tone = TONE[s.health], pct = s.iso.pct;
       const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
