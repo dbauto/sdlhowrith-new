@@ -304,6 +304,7 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 /* Overview ISO 9001 readiness gauge card */
 .iso-ready-card{
   width:100%;
+  height:100%;
   min-height:340px;
   display:flex;
   flex-direction:column;
@@ -328,7 +329,7 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
   outline-offset:2px
 }
 .irc-head{
-  min-height:56px;
+  min-height:58px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -337,35 +338,35 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
   border-bottom:1px solid var(--border)
 }
 .irc-title{
-  font-size:18px;
+  font-size:20px;
   font-weight:700;
   line-height:1.2;
-  letter-spacing:-.01em
+  letter-spacing:-.015em
 }
 .irc-details{
   margin-left:auto;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  min-height:34px;
-  padding:0 13px;
+  min-height:36px;
+  padding:0 14px;
   border:1px solid var(--border);
   border-radius:8px;
   background:var(--surface-2);
   color:var(--text-2);
-  font-size:13px;
+  font-size:14px;
   font-weight:600;
   line-height:1
 }
 .irc-gauge-section{
   display:grid;
   place-items:center;
-  padding:24px 20px 8px
+  padding:22px 20px 4px
 }
 .irc-gauge-wrap{
   position:relative;
   display:grid;
-  width:min(100%,420px);
+  width:min(100%,390px);
   place-items:center
 }
 .rd-gauge{
@@ -374,7 +375,7 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
   height:auto
 }
 .rd-gauge line{
-  stroke-width:6;
+  stroke-width:6.3;
   stroke-linecap:butt
 }
 .rd-gauge line.complete{stroke:#0FA68A}
@@ -383,10 +384,10 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 .irc-center{
   position:absolute;
   left:50%;
-  bottom:10px;
+  bottom:8px;
   transform:translateX(-50%);
   display:flex;
-  min-width:160px;
+  min-width:170px;
   flex-direction:column;
   align-items:center;
   justify-content:center;
@@ -394,52 +395,57 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 }
 .irc-center-label{
   color:var(--text-3);
-  font-size:14px;
-  line-height:18px;
+  font-size:15px;
+  line-height:19px;
   margin-bottom:4px
 }
 .irc-pct{
   color:var(--text);
-  font-size:42px;
+  font-size:44px;
   font-weight:700;
   line-height:1
 }
 .irc-pct small{
   margin-left:3px;
   color:var(--text-3);
-  font-size:18px;
+  font-size:19px;
   font-weight:600
 }
 .irc-metrics{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  margin:16px 18px 18px;
+  width:calc(100% - 28px);
+  margin:auto 14px 0;
   border-top:1px solid var(--border)
 }
 .irc-metric{
   display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  gap:12px;
   min-width:0;
-  min-height:82px;
-  padding:16px 14px 6px
+  min-height:104px;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:14px 10px 12px;
+  text-align:center
 }
 .irc-metric+.irc-metric{
   border-left:1px solid var(--border)
 }
 .irc-metric-icon{
   display:grid;
-  width:38px;
-  height:38px;
+  width:44px;
+  height:44px;
   flex:none;
   place-items:center;
-  border-radius:10px;
+  margin-bottom:3px;
+  border-radius:11px;
   background:var(--surface-2)
 }
 .irc-metric-icon svg.lucide{
-  width:19px;
-  height:19px
+  width:22px;
+  height:22px;
+  stroke-width:2
 }
 .irc-metric-icon.complete{color:#0FA68A}
 .irc-metric-icon.partial{color:#D89A12}
@@ -448,20 +454,20 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
   display:flex;
   min-width:0;
   flex-direction:column;
-  justify-content:center;
-  align-items:flex-start
+  align-items:center;
+  justify-content:center
 }
 .irc-metric-copy span{
   color:var(--text-3);
-  font-size:13px;
+  font-size:14px;
   line-height:18px;
   white-space:nowrap
 }
 .irc-metric-copy b{
   margin-top:2px;
   color:var(--text);
-  font-size:24px;
-  line-height:1.1;
+  font-size:26px;
+  line-height:30px;
   font-weight:700
 }
 
@@ -534,33 +540,44 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 
 @media(max-width:760px){
   .irc-head{
-    min-height:52px;
+    min-height:54px;
     padding:0 14px
   }
-  .irc-title{font-size:16px}
+  .irc-title{font-size:17px}
   .irc-details{
     min-height:32px;
     padding:0 11px;
     font-size:12px
   }
-  .irc-gauge-wrap{width:min(100%,340px)}
+  .irc-gauge-wrap{width:min(100%,330px)}
   .irc-center-label{font-size:13px}
   .irc-pct{font-size:36px}
   .irc-pct small{font-size:16px}
   .irc-metrics{
     grid-template-columns:1fr;
-    margin-top:12px
+    width:calc(100% - 24px);
+    margin-left:12px;
+    margin-right:12px
   }
   .irc-metric{
-    min-height:68px;
-    padding:12px 10px
+    min-height:78px;
+    flex-direction:row;
+    justify-content:flex-start;
+    gap:12px;
+    padding:12px
   }
   .irc-metric+.irc-metric{
     border-left:0;
     border-top:1px solid var(--border)
   }
+  .irc-metric-icon{
+    width:40px;
+    height:40px;
+    margin:0
+  }
+  .irc-metric-copy{align-items:flex-start}
   .irc-metric-copy span{font-size:13px}
-  .irc-metric-copy b{font-size:22px}
+  .irc-metric-copy b{font-size:23px}
   .rd-modal-summary{grid-template-columns:1fr}
   .rd-gap-list li{grid-template-columns:58px minmax(0,1fr)}
   .rd-gap-list li .st{
