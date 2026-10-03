@@ -44,7 +44,7 @@
       const y1 = (cy + Math.sin(a0) * inner).toFixed(2);
       const x2 = (cx + Math.cos(a0) * outer).toFixed(2);
       const y2 = (cy + Math.sin(a0) * outer).toFixed(2);
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" style="--rd-i:${i}"/>`;
     }).join('');
     return `<svg class="rd-gauge" viewBox="0 0 220 112" role="img" aria-label="ISO 9001 readiness ${score.pct ?? 0}%">${segs}</svg>`;
   };
