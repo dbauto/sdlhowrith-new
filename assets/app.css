@@ -320,14 +320,15 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 .irc-pct{color:var(--text);font-size:25px;font-weight:650;line-height:29px}
 .irc-pct small{margin-left:1px;color:var(--text-3);font-size:12px;font-weight:500}
 .irc-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:10px 14px 14px;border-top:1px solid var(--border)}
-.irc-metric{display:flex;min-width:0;align-items:center;gap:8px;padding:12px 8px 2px}
+.irc-metric{display:flex;min-width:0;align-items:center;justify-content:center;gap:8px;padding:12px 8px 2px}
 .irc-metric+.irc-metric{border-left:1px solid var(--border)}
+.irc-metric{box-sizing:border-box}
 .irc-metric-icon{display:grid;width:26px;height:26px;flex:none;place-items:center;border-radius:7px;background:var(--surface-2)}
 .irc-metric-icon svg.lucide{width:13px;height:13px}
 .irc-metric-icon.complete{color:#0FA68A}
 .irc-metric-icon.partial{color:#D89A12}
 .irc-metric-icon.gap{color:#E45B17}
-.irc-metric-copy{display:flex;min-width:0;flex-direction:column}
+.irc-metric-copy{display:flex;min-width:0;flex-direction:column;align-items:flex-start}
 .irc-metric-copy span{overflow:hidden;color:var(--text-3);font-size:10px;line-height:13px;text-overflow:ellipsis;white-space:nowrap}
 .irc-metric-copy b{color:var(--text);font-size:13px;line-height:17px;font-weight:650}
 
