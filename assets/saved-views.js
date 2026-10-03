@@ -318,6 +318,12 @@
     const bar = main.querySelector('.vtabs'), tab = main.querySelector('.vtab.on');
     if (!bar) return;
     if (tab) bar.scrollLeft = Math.max(0, tab.offsetLeft - bar.clientWidth + tab.offsetWidth + 140);
+    let scrollTimer;
+    bar.addEventListener('scroll', () => {
+      bar.classList.add('is-scrolling');
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => bar.classList.remove('is-scrolling'), 300);
+    }, { passive: true });
     let dragId = null;
     const clear = () => bar.querySelectorAll('.drop-before, .drop-after, .dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
     bar.addEventListener('dragstart', e => { const t = e.target.closest('.vtab'); if (!t) return; dragId = t.dataset.vid; t.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); Q.closeMenus(); });
