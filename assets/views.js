@@ -30,6 +30,47 @@
   };
   document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) Q.go(b.dataset.go); });
 
+
+  const readinessGauge = pct => {
+    const total = 34, on = Math.round(total * Math.max(0, Math.min(100, pct || 0)) / 100);
+    const cx = 110, cy = 104, inner = 67, outer = 84;
+    const segs = Array.from({ length: total }, (_, i) => {
+      const a = Math.PI + Math.PI * i / (total - 1);
+      const x1 = (cx + Math.cos(a) * inner).toFixed(2);
+      const y1 = (cy + Math.sin(a) * inner).toFixed(2);
+      const x2 = (cx + Math.cos(a) * outer).toFixed(2);
+      const y2 = (cy + Math.sin(a) * outer).toFixed(2);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${i < on ? 'on' : 'off'}"/>`;
+    }).join('');
+    return `<svg class="rd-gauge" viewBox="0 0 220 112" role="img" aria-label="ISO 9001 readiness ${pct ?? 0}%">${segs}</svg>`;
+  };
+
+  Q.actions['readiness-detail'] = () => {
+    const S = Q.S, s = Q.isoScore(S.iso);
+    const gaps = S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status));
+    Q.openModal({
+      size: 'l',
+      title: 'ISO 9001 readiness',
+      sub: `${esc(S.organization.standard)} · ${s.pct ?? '—'}% readiness`,
+      body: `<div class="modal-body">
+        <div class="rd-modal-summary">
+          <div class="rd-modal-score">
+            <span class="rd-modal-status">${s.pct >= 80 ? 'On track' : s.pct >= 60 ? 'Needs attention' : 'At risk'}</span>
+            <div class="rd-modal-pct tnum">${s.pct ?? '—'}<small>%</small></div>
+            <p>${s.points} of ${s.applicable} applicable requirements</p>
+          </div>
+          ${readinessGauge(s.pct)}
+        </div>
+        ${Q.readinessBlock(S.iso)}
+        <div class="rd-gap-list">
+          <h3>Largest gaps</h3>
+          ${gaps.length ? `<ul>${gaps.map(r => `<li><span class="clause">${esc(r.clause)}</span><span>${esc(r.title)}</span>${Q.st(r.status, Q.ISO_KIND[r.status])}</li>`).join('')}</ul>` : '<p class="muted">No missing or at-risk requirements.</p>'}
+        </div>
+      </div>`,
+      foot: `<span class="left">Readiness is an internal QMS indicator, not a certification result.</span><button class="btn" type="button" data-close>Close</button><a class="btn primary" href="#/evidence?view=clause" data-close>Open by clause</a>`
+    });
+  };
+
   /* =================== Overview =================== */
   Q.views.overview = () => {
     const S = Q.S, me = Q.me(), today = Q.today();
@@ -85,8 +126,21 @@
     Q.overviewParts = {
       welcome: Q.themeOverview?.() || '',
       attention: strip,
-      readiness: `<section class="panel"><div class="panel-head"><h2>ISO 9001 readiness</h2><span class="muted small">${esc(S.organization.standard)}</span><div class="actions"><a class="btn sm" href="#/evidence?view=clause">Open by clause</a></div></div><div class="panel-pad">${Q.readinessBlock(S.iso)}
-        <p class="small" style="margin-top:14px"><b>Largest gaps:</b> ${S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status)).map(r => `<a href="#/evidence?view=clause&c=${r.clause}">${r.clause} ${esc(r.title)}</a>`).join(' · ')}</p></div></section>`,
+      readiness: (() => {
+        const rs = Q.isoScore(S.iso);
+        const gaps = S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status)).length;
+        return `<button class="iso-ready-card" type="button" data-action="readiness-detail" aria-label="Open ISO 9001 readiness details">
+          <span class="irc-head"><span class="irc-title">ISO 9001 readiness</span><span class="irc-details">Details</span></span>
+          <span class="irc-body">
+            <span class="irc-copy">
+              <span class="irc-state">${rs.pct >= 80 ? 'On track' : rs.pct >= 60 ? 'Needs attention' : 'At risk'}</span>
+              <span class="irc-sub">${rs.points} of ${rs.applicable} applicable requirements</span>
+              <span class="irc-meta">${gaps ? `${gaps} gap${gaps === 1 ? '' : 's'} need review` : 'No critical gaps'}</span>
+            </span>
+            <span class="irc-gauge-wrap">${readinessGauge(rs.pct)}<span class="irc-pct tnum">${rs.pct ?? '—'}<small>%</small></span></span>
+          </span>
+        </button>`;
+      })(),
       work: `<section class="panel"><div class="panel-head"><h2>Needs your action</h2><span class="muted small">${work.length}</span></div>${workHtml}</section>`,
       processes: `<section class="panel"><div class="panel-head"><h2>Process status</h2><span class="muted small">Which processes have problems?</span></div>${procTable}</section>`,
       reviews: `<section class="panel"><div class="panel-head"><h2>Upcoming document reviews</h2><span class="muted small">next 60 days</span><div class="actions"><a class="btn sm ghost" href="#/documents?status=overdue">View overdue</a></div></div>
