@@ -171,6 +171,18 @@
     const trend = (up, good, text, val) => `<span class="pc-trend ${good ? 'good' : 'bad'}">${arrow(up)}<span>${esc(text)}</span>${val ? `<b>${esc(val)}</b>` : ''}</span>`;
     const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main"><b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
     const card = p => {
+      const [label] = STATUS[p.s.health], tone = TONE[p.s.health];
+      const clauses = p.iso || [], visibleClauses = clauses.slice(0, 3), moreClauses = Math.max(0, clauses.length - visibleClauses.length);
+      return `<a class="proc-card pc2 clean-card tone-${tone}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
+        <span class="pc2-icon" aria-hidden="true">${icon(p.icon || 'landmark')}</span>
+        <h3 id="pc-${p.id}">${esc(p.name)}</h3>
+        <p class="pc2-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
+        <span class="pc2-progress" role="img" aria-label="ISO readiness ${p.s.iso.pct ?? 0}%"><i style="width:${Math.max(0, Math.min(100, p.s.iso.pct || 0))}%"></i></span>
+        <div class="pc2-tags" aria-label="Process tags"><span class="pc2-tag code">${esc(p.process_code)}</span><span class="pc2-tag status-${tone}">${esc(label)}</span>${visibleClauses.map(c => `<span class="pc2-tag">${esc(c)}</span>`).join('')}${moreClauses ? `<span class="pc2-tag">+${moreClauses}</span>` : ''}</div>
+      </a>`;
+    };
+    /* Legacy dense-card renderer retained below for reference during migration. */
+    const legacyCard = p => {
       const s = p.s, [label, cls] = STATUS[s.health], tone = TONE[s.health], pct = s.iso.pct;
       const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
       const kpi = Q.S.kpis.filter(k => Q.inProc(k.process, p.id)).sort((a, b) => Q.kpiOk(a) - Q.kpiOk(b))[0];

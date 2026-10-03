@@ -2731,3 +2731,26 @@ html[data-ui="material"] .pc-meter i { background: #E7EAEE; }
 .kpi-trend-delta.neutral { color: var(--text-3); }
 .c-trend { text-align: center; }
 .c-trend .kpi-trend-delta { justify-content: center; }
+
+/* Update 19 — clean project-style process cards */
+.pc2-grid { grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 14px; }
+.proc-card.pc2.clean-card { align-items: center; text-align: center; min-height: 220px; padding: 26px 20px 22px; border-radius: 10px; }
+.clean-card .pc2-icon { width: 50px; height: 50px; margin: 0 auto 16px; border-radius: 50%; background: #eef4ff; color: #4677ff; }
+.clean-card:nth-child(4n + 2) .pc2-icon { background: #f7efff; color: #d84fe2; }
+.clean-card:nth-child(4n + 3) .pc2-icon { background: #fff0f1; color: #ef6268; }
+.clean-card:nth-child(4n + 4) .pc2-icon { background: #eafaf3; color: #21a267; }
+.clean-card .pc2-icon svg.lucide { width: 20px; height: 20px; }
+.clean-card > h3 { margin: 0; max-width: 230px; font-size: 15px; line-height: 20px; font-weight: 600; }
+.clean-card .pc2-desc { max-width: 230px; margin: 9px auto 0; white-space: normal; line-height: 17px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.pc2-progress { display: block; width: 100%; max-width: 230px; height: 4px; margin: 17px auto 0; overflow: hidden; border-radius: 999px; background: #edf0f3; }
+.pc2-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .6s ease; }
+.tone-warning .pc2-progress i { background: #e3a42f; }
+.tone-danger .pc2-progress i { background: #e35b5b; }
+.pc2-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: auto; padding-top: 16px; }
+.pc2-tag { padding: 3px 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--muted-bg); color: var(--text-2); font-size: 10.5px; line-height: 14px; font-variant-numeric: tabular-nums; }
+.pc2-tag.code { color: var(--text-3); }
+.pc2-tag.status-success { border-color: #c6ead7; background: #edf9f2; color: #16804d; }
+.pc2-tag.status-warning { border-color: #f1ddb2; background: #fff8e9; color: #a86f08; }
+.pc2-tag.status-danger { border-color: #f2caca; background: #fff0f0; color: #c53636; }
+@media (max-width: 700px) { .pc2-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .pc2-grid { grid-template-columns: 1fr; } }
