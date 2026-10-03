@@ -599,7 +599,7 @@
    * and "Restore default views" brings the seeded ones back.
    * filters: [{ field, op, value }] — all must match. group: none | process | clause. */
   const DOC_COLS = ['id', 'title', 'process', 'type', 'rev', 'status', 'owner', 'updated', 'nextReview'];
-  const KPI_COLS = ['name', 'process', 'target', 'actual', 'trend', 'owner', 'period', 'status'];
+  const KPI_COLS = ['name', 'process', 'target', 'actual', 'trend', 'period', 'status', 'method', 'owner'];
   const RISK_COLS = ['id', 'title', 'process', 'kind', 'rating', 'owner', 'due', 'status'];
   const V = (id, name, filters = [], extra = {}) => ({ id, name, seed: true, scope: 'shared', owner: 'maria', filters, columns: DOC_COLS, group: 'none', sort: null, ...extra });
   const savedViews = {
