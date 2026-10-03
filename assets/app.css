@@ -2723,3 +2723,7 @@ html[data-ui="material"] .pc-meter i { background: #E7EAEE; }
 @media (max-width: 420px) { .pc-metric { padding: 8px; } .pc-m-main b { font-size: 15px; } .pc-ring { width: 20px; height: 20px; } .pc2-pct { font-size: 28px; } }
 .pc2-score .pc2-status { margin-left: auto; align-self: center; }
 .pc-trend.muted { color: var(--text-3); }
+.kpi-trend-delta { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
+.kpi-trend-delta.positive { color: var(--success); }
+.kpi-trend-delta.negative { color: var(--danger); }
+.kpi-trend-delta.neutral { color: var(--text-3); }
