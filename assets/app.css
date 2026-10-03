@@ -936,7 +936,8 @@ body .sb .sb-item.sb-sub { padding-left: 42px; justify-content: flex-start; }
 /* ============ Saved views: one card = view tabs + toolbar + table ============ */
 .view-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 2px rgba(16,40,30,.04), 0 8px 24px -14px rgba(16,40,30,.14); overflow: clip; }
 .table-wrap.bare { border: 0; border-radius: 0; box-shadow: none; }
-.vtabs { position: relative; display: flex; align-items: flex-end; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); background: var(--surface-2); overflow-x: auto; scrollbar-width: thin; }
+.vtabs { position: relative; display: flex; align-items: flex-end; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); background: var(--surface-2); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.vtabs::-webkit-scrollbar { display: none; }
 .vtab { position: relative; display: flex; align-items: center; flex: none; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
 .vtab a { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 4px 0 12px; color: var(--text-2); font-weight: 500; white-space: nowrap; }
 .vtab a:hover { color: var(--text); text-decoration: none; }
