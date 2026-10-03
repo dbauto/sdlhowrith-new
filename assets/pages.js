@@ -81,18 +81,26 @@
         <button class="btn" type="button" data-action="pb-cancel">Cancel</button><button class="btn primary" type="button" data-action="pb-save">${icon('check')}Save layout</button></div></div>`;
   };
   /* A page built from its layout. `actions` are the page's own header buttons. */
-  Q.pageView = (pageId, { title, sub = '', crumbs = null, actions = '', nav, intro = '' }) => {
+  Q.pageView = (pageId, { title, sub = '', crumbs = null, actions = '', nav, intro = '', customize = true }) => {
     if (EDIT && EDIT.page !== pageId) EDIT = null; // leaving a page discards an unsaved draft
     const editing = EDIT?.page === pageId;
     const L = editing ? EDIT.draft : Q.pageLayout(pageId);
     const custom = `<button class="btn" type="button" data-action="pb-customize" data-page="${esc(pageId)}" title="Choose which components this page shows and where">${icon('layout-template')}Customize page</button>`;
     return { title, nav,
-      html: Q.pageHead({ crumbs, title, sub, actions: editing ? '' : actions + custom }) + (editing ? editBar(pageId) : intro) + Q.pageBody(pageId),
+      html: Q.pageHead({ crumbs, title, sub, actions: editing ? '' : actions + (customize ? custom : '') }) + (editing ? editBar(pageId) : intro) + Q.pageBody(pageId),
       after: main => {
         all(L).forEach(b => Q.COMPONENTS[b.type]?.after?.(main, b));
         if (editing) { wireDrag(main); wireResize(main); }
         if (EDIT?.flash) { const el = main.querySelector(`[data-b="${EDIT.flash}"]`); EDIT.flash = null; if (el) { el.classList.add('pb-new'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }
       } };
+  };
+
+  /* One pre-made component outside a layout — used by tabbed pages, which show one topic per tab.
+   * Returns { html, after(main) } so the component keeps its tables, edits and exports. */
+  Q.renderComp = (type, { page = '', zone = 'main', id = `t-${type}`, opts } = {}) => {
+    const c = Q.COMPONENTS[type], b = { id, type, ...(opts ? { opts } : {}) };
+    if (!c) return { html: '', after: () => {} };
+    return { html: c.render(b, { page, zone, editing: false, title: d => d, q: Q.route().q }) || '', after: main => c.after?.(main, b) };
   };
 
   /* ---------------- Drag and drop (the arrow and "move to" buttons do the same by keyboard) ---------------- */

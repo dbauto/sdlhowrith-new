@@ -25,14 +25,15 @@
 
   /* ====================================================================== register */
   AM.ncRegister = q => {
-    const S = Q.S, all = AM.ncs(), view = q.view === 'areas' ? 'areas' : 'register';
+    const S = Q.S, all = AM.ncs(), view = ['areas', 'trends'].includes(q.view) ? q.view : 'register';
     const open = all.filter(AM.ncOpen);
     const strip = `<div class="am-strip" role="list">${[
       ['Total NCs', all.length, `#/audits/nc?s=all`], ['Major', all.filter(f => f.nc.classification === 'Major').length, '#/audits/nc?s=all&cls=Major', 'bad'], ['Minor', all.filter(f => f.nc.classification === 'Minor').length, '#/audits/nc?s=all&cls=Minor'],
       ['Open', open.length, '#/audits/nc'], ['Overdue', all.filter(AM.ncOverdue).length, '#/audits/nc?s=overdue', 'bad'], ['Awaiting Verification', all.filter(f => f.nc.status === 'Verification Required').length, '#/audits/nc?s=verify', 'warn']
     ].map(([k, v, h, t]) => `<a role="listitem" href="${h}"><span class="k">${k}</span><span class="v${v && t ? ' ' + t : ''}">${v}</span></a>`).join('')}</div>`;
-    const vt = AM.tabs([['register', 'Register', '#/audits/nc'], ['areas', 'By process', '#/audits/nc?view=areas']], view, 'Nonconformity view', 'tabs-sub');
+    const vt = AM.tabs([['register', 'Register', '#/audits/nc'], ['areas', 'By process', '#/audits/nc?view=areas'], ['trends', 'Trends', '#/audits/nc?view=trends']], view, 'Nonconformity view', 'tabs-sub');
     const head = AM.chrome('nc', { title: 'Nonconformities', crumbs: [['Audits', '#/audits'], ['Nonconformities']], sub: 'Every nonconformity raised in audits, with its corrective action and verification. Owners respond and auditors verify inside each NC.' });
+    if (view === 'trends') return { title: 'Nonconformity trends · Audits', nav: 'audits', html: head + strip + vt + AM.ncTrends() };
     if (view === 'areas') return { title: 'Nonconformities by process · Audits', nav: 'audits', html: head + strip + vt + byArea(q) };
     const segs = { open: AM.ncOpen, overdue: AM.ncOverdue, response: AM.needsResponse, verify: f => f.nc.status === 'Verification Required', closed: f => !AM.ncOpen(f) };
     const seg = segs[q.s] ? q.s : q.s === 'all' ? 'all' : 'open';

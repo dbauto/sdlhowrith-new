@@ -12,7 +12,7 @@
   const findA = d => AM.audit(d.id);
   const opts = (list, sel) => list.map(x => { const [v, l] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}"${String(v) === String(sel) ? ' selected' : ''}>${esc(l)}</option>`; }).join('');
 
-  const WTABS = [['overview', 'Overview'], ['plan', 'Plan'], ['checklist', 'Checklist'], ['findings', 'Findings & NCs'], ['report', 'Report'], ['activity', 'Activity']];
+  const WTABS = [['overview', 'Summary'], ['plan', 'Plan'], ['checklist', 'Checklist'], ['findings', 'Findings & NCs'], ['report', 'Report'], ['activity', 'Activity']];
   AM.workspace = (id, tab, q, sub) => {
     const a = AM.audit(id);
     if (!a) {
@@ -64,17 +64,18 @@
     const pending = a.assignments.filter(s => s.role !== 'Observer' && AM.itemsOf(a, s.who).length && !s.submitted);
     return { req, by, pending, noEvidence: AM.counted(a).filter(i => i.type === 'assessment' && i.result && i.result !== 'N/A' && !(i.reviewed || []).length && !(i.external || []).length) };
   };
+  // Each item: [kind, text, href] — the row links to where it is fixed.
   function attention(a) {
-    const out = [], me = AM.actor();
-    if (['Planned', 'Scheduled'].includes(a.status)) AM.prepGaps(a).forEach(g => out.push(['info', `To get ready: ${g}.`]));
-    a.assignments.filter(s => AM.indep(a, s) === 'Potential Conflict').forEach(s => out.push(['bad', `${Q.pname(s.who)} has a potential independence conflict (${AM.conflictOf(s.who, a.process)}).`]));
-    const nc = a.assignments.filter(s => AM.indep(a, s) === 'Needs Confirmation'); if (nc.length && !['Reporting', 'Follow-up', 'Closed'].includes(a.status)) out.push(['warn', `Independence not yet confirmed by ${nc.map(s => Q.pname(s.who)).join(', ')}.`]);
-    const conf = (a.sessions || []).flatMap(s => AM.sessionConflicts(a, s)); if (conf.length && a.status !== 'Closed') out.push(['bad', `${conf.length} scheduling conflict${conf.length === 1 ? '' : 's'} — see the Plan.`]);
-    if (a.status === 'In Progress') { const b = AM.fieldworkBlockers(a); if (b.req.length) out.push(['warn', `${b.req.length} required question${b.req.length === 1 ? '' : 's'} not answered.`]); if (b.pending.length) out.push(['warn', `Audit work not yet submitted by ${b.pending.map(s => Q.pname(s.who)).join(', ')}.`]); }
-    if (a.status === 'Reporting') out.push(['info', `Report ${a.report.status === 'Not started' ? 'not yet generated' : a.report.status.toLowerCase()}.`]);
-    AM.findingsOf(a.id).filter(f => f.migrationReview && !f.migrationReview.resolved).forEach(f => out.push(['bad', `Migration review required: ${f.id} — ${f.migrationReview.reason}`]));
-    AM.findingsOf(a.id).filter(AM.ncOverdue).forEach(f => out.push(['bad', `${f.nc.no} overdue — owner ${Q.pname(f.nc.owner)}.`]));
-    if (AM.asg(a, me) && a.status === 'In Progress' && !AM.asg(a, me).submitted && AM.itemsOf(a, me).length) out.push(['info', `You have ${AM.itemsOf(a, me).filter(i => !AM.complete(i)).length} question${AM.itemsOf(a, me).filter(i => !AM.complete(i)).length === 1 ? '' : 's'} left in your checklist.`]);
+    const out = [], me = AM.actor(), at = t => `#/audits/a/${a.id}/${t}`;
+    if (['Planned', 'Scheduled'].includes(a.status)) AM.prepGaps(a).forEach(g => out.push(['info', `To get ready: ${g}`, /checklist|question/i.test(g) ? at('checklist') : /session/i.test(g) ? at('plan#sessions') : at('plan')]));
+    a.assignments.filter(s => AM.indep(a, s) === 'Potential Conflict').forEach(s => out.push(['bad', `${Q.pname(s.who)} has a potential independence conflict (${AM.conflictOf(s.who, a.process)})`, at('plan')]));
+    const nc = a.assignments.filter(s => AM.indep(a, s) === 'Needs Confirmation'); if (nc.length && !['Reporting', 'Follow-up', 'Closed'].includes(a.status)) out.push(['warn', `Independence not yet confirmed by ${nc.map(s => Q.pname(s.who)).join(', ')}`, at('plan')]);
+    const conf = (a.sessions || []).flatMap(s => AM.sessionConflicts(a, s)); if (conf.length && a.status !== 'Closed') out.push(['bad', `${conf.length} scheduling conflict${conf.length === 1 ? '' : 's'}`, at('plan#sessions')]);
+    if (a.status === 'In Progress') { const b = AM.fieldworkBlockers(a); if (b.req.length) out.push(['warn', `${b.req.length} required question${b.req.length === 1 ? '' : 's'} not answered`, at('checklist')]); if (b.pending.length) out.push(['warn', `Audit work not yet submitted by ${b.pending.map(s => Q.pname(s.who)).join(', ')}`, at('plan')]); }
+    if (a.status === 'Reporting') out.push(['info', `Report ${a.report.status === 'Not started' ? 'not yet generated' : a.report.status.toLowerCase()}`, at('report')]);
+    AM.findingsOf(a.id).filter(f => f.migrationReview && !f.migrationReview.resolved).forEach(f => out.push(['bad', `Migration review required: ${f.id} — ${f.migrationReview.reason}`, at('findings')]));
+    AM.findingsOf(a.id).filter(AM.ncOverdue).forEach(f => out.push(['bad', `${f.nc.no} overdue — owner ${Q.pname(f.nc.owner)}`, `#/audits/nc/${f.nc.no}`]));
+    if (AM.asg(a, me) && a.status === 'In Progress' && !AM.asg(a, me).submitted && AM.itemsOf(a, me).length) { const left = AM.itemsOf(a, me).filter(i => !AM.complete(i)).length; if (left) out.push(['info', `You have ${left} question${left === 1 ? '' : 's'} left in your checklist`, at('checklist?view=mine')]); }
     return out;
   }
   AM.progressTable = a => {
@@ -82,17 +83,24 @@
     const all = AM.counted(a), done = all.filter(AM.complete).length, sub = a.assignments.filter(s => s.submitted).length, need = a.assignments.filter(s => AM.itemsOf(a, s.who).length).length;
     return `<div class="table-scroll"><table class="dt"><caption class="sr-only">Auditor progress</caption><thead><tr><th>Auditor</th><th>Assigned clauses / scope</th><th>Questions</th><th>Status</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Overall</th><td class="small">${sub} / ${need} assignments submitted</td><td>${all.length ? `${Q.miniProgress(Math.round(done / all.length * 100))}<span class="sub">${done} / ${all.length}</span>` : '—'}</td><td></td></tr></tfoot></table></div>`;
   };
+  /* Update 20 — Summary: stage, checklist progress, findings and next session, then one attention list.
+   * Auditor progress moved to Plan → Audit team (answered / total per auditor). */
   function wsOverview(a) {
-    const fs = AM.findingsOf(a.id), att = attention(a), next = AM.sortedSessions(a).find(s => s.date >= Q.today());
-    return { html: `<div class="grid-halves">
-        <section class="panel"><div class="panel-head"><h2>What and why</h2><div class="actions"><a class="btn sm ghost" href="#/audits/a/${a.id}/plan">Open Plan</a></div></div><div class="panel-pad"><dl class="dl-list dl-wide">
-          <dt>Process</dt><dd>${Q.pcell(a.process)} · owner ${esc(Q.pname(Q.proc(a.process)?.owner))}</dd><dt>Trigger</dt><dd>${AM.triggerChip(a)}${a.trigger?.type === 'Triggered' ? `<div class="small">${AM.recordLink(a.trigger.source, a.trigger.record)}</div><div class="small muted">${esc(a.trigger.reason || '')}</div>` : ''}</dd>
-          <dt>Programme</dt><dd>${a.programme ? `<a href="#/audits/programme?p=${a.programme}">${esc(AM.progName(a.programme))}</a>` : '<span class="muted">Not in a programme</span>'}</dd><dt>Objective</dt><dd>${esc(a.objective)}</dd><dt>Applicable clauses</dt><dd class="tnum">${esc(a.clauses.join(', '))}</dd></dl></div></section>
-        <section class="panel"><div class="panel-head"><h2>Needs attention</h2><span class="muted small">${att.length}</span></div>${att.length ? `<ul class="am-att">${att.map(([k, t]) => `<li class="${k}">${icon(k === 'bad' ? 'triangle-alert' : k === 'warn' ? 'clock-3' : 'info')}<span>${esc(t)}</span></li>`).join('')}</ul>` : '<div class="empty small">Nothing needs attention.</div>'}</section></div>
-      <div class="grid-halves section">
-        <section class="panel"><div class="panel-head"><h2>Auditor progress</h2><span class="muted small">${a.checklist ? `${AM.counted(a).filter(AM.complete).length} / ${AM.counted(a).length} questions` : 'checklist not built'}</span></div>${AM.progressTable(a)}</section>
-        <section class="panel"><div class="panel-head"><h2>When</h2></div><div class="panel-pad"><dl class="dl-list dl-wide"><dt>Schedule</dt><dd>${AM.dateRange(a)} · ${esc(a.mode || 'On-site')}${a.location ? ` · ${esc(a.location)}` : ''}</dd><dt>Sessions</dt><dd>${(a.sessions || []).length}</dd><dt>Next session</dt><dd>${next ? `${Q.fmt(next.date)} ${esc(next.start)}–${esc(next.end)} · ${esc(next.title)}` : '<span class="muted">—</span>'}</dd>
-          <dt>Findings</dt><dd>${fs.length} · ${fs.filter(f => f.nc).length} NC (${fs.filter(AM.ncOpen).length} open) · ${fs.filter(f => f.type === 'Observation').length} observation · ${fs.filter(f => f.type === 'Opportunity for improvement').length} OFI</dd><dt>Report</dt><dd>${Q.st(a.report.status, AM.REPORT_KIND[a.report.status])}${a.report.rev != null && a.report.status !== 'Not started' ? ` Rev ${a.report.rev}` : ''}</dd></dl></div></section></div>` };
+    const fs = AM.findingsOf(a.id), ncs = fs.filter(f => f.nc), openNc = fs.filter(AM.ncOpen), next = AM.sortedSessions(a).find(s => s.date >= Q.today());
+    const all = AM.counted(a), done = all.filter(AM.complete).length, steps = AM.STATUSES.slice(1), ci = steps.indexOf(a.status);
+    const KIND = { bad: ['triangle-alert', 'danger', 'Action needed', 'danger'], warn: ['clock-3', 'warning', 'Pending', 'warning'], info: ['info', 'info', 'Next step', ''] };
+    const TYPE = h => /nc\//.test(h) ? 'Nonconformity' : /checklist/.test(h) ? 'Checklist' : /sessions/.test(h) ? 'Schedule' : /report/.test(h) ? 'Report' : /findings/.test(h) ? 'Finding' : 'Plan';
+    const rows = attention(a).sort((x, y) => ['bad', 'warn', 'info'].indexOf(x[0]) - ['bad', 'warn', 'info'].indexOf(y[0]))
+      .map(([k, t, href]) => ({ icon: KIND[k][0], title: t, kind: TYPE(href), href, right: Q.ui.badge(KIND[k][2], KIND[k][1]), tone: KIND[k][3] }));
+    const bars = a.assignments.filter(s => AM.itemsOf(a, s.who).length).map(s => { const it = AM.itemsOf(a, s.who), d = it.filter(AM.complete).length, p = Math.round(d / it.length * 100);
+      return { label: Q.pname(s.who), pct: p, value: `${d}/${it.length}`, note: s.submitted ? `${s.role} · submitted` : s.role, href: `#/audits/a/${a.id}/plan`, tone: p < 100 && a.status === 'In Progress' ? 'warning' : '' }; });
+    return { html: Q.ui.summary({
+      stats: [
+        { label: 'Stage', value: a.status, icon: 'activity', note: ci >= 0 && ci < steps.length - 1 ? `Next: ${steps[ci + 1]}` : 'complete' },
+        { label: 'Findings', value: fs.length, icon: 'search-check', href: `#/audits/a/${a.id}/findings`, tone: openNc.length ? 'warning' : null, note: `${ncs.length} NC · ${openNc.length} open` },
+        { label: 'Next session', value: next ? Q.fmt(next.date).replace(/ \d{4}$/, '') : '—', icon: 'calendar', href: `#/audits/a/${a.id}/plan#sessions`, note: next ? `${next.start}–${next.end} · ${next.title}` : `${(a.sessions || []).length} sessions` }],
+      breakdown: { title: 'Checklist progress', link: { href: `#/audits/a/${a.id}/checklist`, text: 'Checklist' }, donut: { pct: all.length ? done / all.length * 100 : 0, label: a.checklist && all.length ? `${done} of ${all.length} answered` : 'Checklist not built' }, bars, empty: 'No questions assigned yet.' },
+      attention: rows, search: 'Search…', empty: 'Nothing needs attention.' }) };
   }
 
   /* ====================================================================== plan */
@@ -100,7 +108,7 @@
     const can = AM.can('plan', a), me = AM.actor(), def = (Q.proc(a.process)?.iso || []).slice().sort(AM.clSort).join(), custom = a.clauses.slice().sort(AM.clSort).join() !== def;
     const conf = (a.sessions || []).flatMap(s => AM.sessionConflicts(a, s));
     const team = a.assignments.map(s => { const st = AM.indep(a, s), c = AM.conflictOf(s.who, a.process), n = AM.itemsOf(a, s.who).length, answered = AM.itemsOf(a, s.who).filter(AM.complete).length; return `<tr><td><span class="user-cell"><span class="avatar sm">${esc(Q.initials(s.who))}</span><span><span class="title">${esc(Q.pname(s.who))}</span><span class="sub">${esc(Q.person(s.who).title)}</span></span></span></td><td>${esc(s.role)}</td>
-      <td class="small tnum">${s.clauses?.length ? esc(s.clauses.join(', ')) : esc(s.scope || (s.role === 'Lead Auditor' ? 'Questions not assigned to others' : s.role === 'Observer' ? 'Observer' : '—'))}</td><td class="c-num">${n || '<span class="zero">—</span>'}</td><td class="small">${(a.sessions || []).filter(x => x.auditors.includes(s.who)).length}</td>
+      <td class="small tnum">${s.clauses?.length ? esc(s.clauses.join(', ')) : esc(s.scope || (s.role === 'Lead Auditor' ? 'Questions not assigned to others' : s.role === 'Observer' ? 'Observer' : '—'))}</td><td class="c-num">${n ? `${Q.miniProgress(Math.round(answered / n * 100))}<span class="sub tnum">${answered} / ${n}</span>` : '<span class="zero">—</span>'}</td><td class="small">${(a.sessions || []).filter(x => x.auditors.includes(s.who)).length}</td>
       <td>${Q.st(st, AM.INDEP_KIND[st])}${c ? `<span class="sub">${esc(c)}</span>` : ''}${s.confirmedAt ? `<span class="sub">${AM.at(s.confirmedAt)}</span>` : ''}${s.who === me && st !== 'Independent' && st !== 'Not required' && a.status !== 'Closed' ? ` <button class="btn sm" type="button" data-action="am-independence" data-id="${a.id}">Confirm</button>` : ''}</td>
       <td class="c-actions">${can && !s.submitted ? `<button class="btn sm" type="button" data-action="am-asg-edit" data-id="${a.id}" data-who="${s.who}">Edit</button>${s.role !== 'Lead Auditor' && !answered ? `<button class="icon-btn" type="button" data-action="am-asg-rm" data-id="${a.id}" data-who="${s.who}" aria-label="Remove ${esc(Q.pname(s.who))}">${icon('x')}</button>` : ''}` : s.submitted ? '<span class="small muted">Submitted</span>' : ''}</td></tr>`; }).join('');
     return { html: `<div class="grid-halves">
@@ -113,7 +121,7 @@
         ${AM.sessionTable(a.sessions || [], can, conf, a.id)}
         ${conf.length ? `<div class="callout warning small" style="margin:12px var(--s5)">${icon('triangle-alert')}<span><b>Scheduling conflict</b>${conf.map(c => { const o = c.x.a === a ? c.y : c.x, m = c.x.a === a ? c.x : c.y; return `${esc(Q.pname(c.who))}: “${esc(m.s.title)}” ${Q.fmt(m.s.date)} ${esc(m.s.start)}–${esc(m.s.end)} overlaps ${esc(o.a.id)} “${esc(o.s.title)}” ${esc(o.s.start)}–${esc(o.s.end)}.`; }).join(' ')} Reschedule one of the sessions, or keep it if the overlap is intended.</span></div>` : ''}</section>
       <section class="panel section"><div class="panel-head"><h2>Audit team and assignments</h2><span class="muted small">${a.assignments.length} people</span>${can ? `<div class="actions"><button class="btn sm" type="button" data-action="am-asg-add" data-id="${a.id}">${icon('user-plus')}Add Auditor</button></div>` : ''}</div>
-        <div class="table-scroll"><table class="dt"><caption class="sr-only">Auditor assignments</caption><thead><tr><th>Auditor</th><th>Role</th><th>Assigned clauses / scope</th><th class="c-num">Questions</th><th>Sessions</th><th>Independence</th><th class="c-actions">Actions</th></tr></thead><tbody>${team}</tbody></table></div>
+        <div class="table-scroll"><table class="dt"><caption class="sr-only">Auditor assignments</caption><thead><tr><th>Auditor</th><th>Role</th><th>Assigned clauses / scope</th><th class="c-num">Answered</th><th>Sessions</th><th>Independence</th><th class="c-actions">Actions</th></tr></thead><tbody>${team}</tbody></table></div>
         <p class="panel-pad small muted" style="border-top:1px solid var(--border)">${icon('shield-check')} Each auditor confirms: “I am not auditing work for which I am directly responsible.” Potential conflicts are flagged from process ownership and department; the Lead Auditor decides. Clause assignments decide which questions appear in each auditor’s checklist — nobody else can answer them.</p></section>` };
   }
   Q.actions['am-edit-plan'] = d => {

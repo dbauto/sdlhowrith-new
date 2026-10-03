@@ -14,34 +14,123 @@
   /* ============================== 1. QMS ============================== */
   Q.views.qms = (parts, q) => {
     const sec = parts[0] || 'scope';
+    if (sec === 'objectives' && parts[1] && Q.K) { const v = Q.K.route(parts.slice(1), q); if (v) return v; }
     const fn = { scope: scopePage, policies: policiesPage, processes: processesPage, objectives: objectivesPage }[sec] || scopePage;
-    return fn(q);
+    return fn(q, parts.slice(1));
   };
+
+  /* Update 20 — Organization & Scope and Policies are tabbed: one topic per tab, a short Summary first.
+   * Each tab shows the same pre-made components as before, so tables, edits and exports behave the same. */
+  const tabbedPage = ({ page, title, crumb, sub, actions, base, tabs, cur, body }) => {
+    const t = tabs.find(x => x.key === cur) || tabs[0];
+    const parts = body(t.key), comps = parts.filter(x => typeof x === 'object');
+    const html = parts.map(x => typeof x === 'object' ? x.html : x).join('');
+    return { title: `${title} · ${t.label}`.replace(/ · Summary$/, ''), nav: 'qms',
+      html: Q.pageHead({ crumbs: qmsCrumbs(title), title, sub, actions })
+        + Q.ui.tabs(tabs.map(x => ({ ...x, href: `${base}/${x.key}` })), t.key, `${title} sections`) + `<div class="tab-panel" role="tabpanel">${html}</div>`,
+      after: main => comps.forEach(c => c.after(main)) };
+  };
+  const C = (type, zone = 'main') => Q.renderComp(type, { zone });
+  const split = (mainHtml, sideHtml) => `<div class="tab-split"><div class="tab-stack">${mainHtml}</div><div class="tab-stack">${sideHtml}</div></div>`;
+  // split() for components: keeps their after() hooks.
+  const splitC = (mains, sides) => [`<div class="tab-split"><div class="tab-stack">`, ...mains, `</div><div class="tab-stack">`, ...sides, `</div></div>`];
+  const soon = d => d?.nextReview && !Q.docOverdue(d) && Q.days(Q.today(), d.nextReview) <= 30;
+  const docRow = d => {
+    const over = Q.docOverdue(d), wf = !over && !soon(d) && d.status !== 'Published';
+    return { icon: wf ? 'git-branch' : 'file-text', title: d.title, meta: `${d.id} · Rev ${wf && d.workingRev ? `${d.rev || '—'} → ${d.workingRev}` : d.rev || '—'}`, kind: 'Document', owner: d.owner, due: d.nextReview,
+      action: 'open-doc', data: { id: d.id }, right: over ? Q.ui.badge('Review overdue', 'danger') : wf ? Q.ui.badge(d.status, 'info') : Q.ui.badge('Review due soon', 'warning'), tone: over ? 'danger' : '' };
+  };
+  const docNeeds = d => d && (Q.docOverdue(d) || soon(d) || (d.status !== 'Published' && d.status !== 'Obsolete' && !!d.workingRev));
+  const pctOf = (n, t) => t ? Math.round(n / t * 100) : 100;
+  const objOwner = name => Q.S.objectives?.find(o => o.name === name)?.owner;
 
   /* The four QMS pages are layouts of pre-made components (see pages.js). The functions
    * below only set the page header; what the page shows comes from its layout.         */
   const P = (type, extra = {}) => ({ id: `d-${type}`, type, ...extra });
-  Q.page('scope', { title: 'Organization & Scope', route: '#/qms/scope', layout: { layout: '2-1', zones: {
+  Q.page('scope', { fixed: true, title: 'Organization & Scope', route: '#/qms/scope', layout: { layout: '2-1', zones: {
     top: [P('context-review-alert')], main: [P('scope-statement'), P('sites'), P('context-issues'), P('parties')], side: [P('org-facts'), P('exclusions'), P('structure-docs')], bottom: [P('org-chart')] } } });
-  Q.page('policies', { title: 'Policies', route: '#/qms/policies', layout: { layout: '2-1', zones: {
+  Q.page('policies', { fixed: true, title: 'Policies', route: '#/qms/policies', layout: { layout: '2-1', zones: {
     main: [P('quality-policy'), P('other-policies')], side: [P('policy-ack'), P('objectives-health')] } } });
-  Q.page('processes', { title: 'Processes', route: '#/qms/processes', layout: { layout: '1', zones: { top: [P('process-map')] } } });
-  Q.page('objectives', { title: 'Objectives & KPIs', route: '#/qms/objectives', layout: { layout: '1', zones: { top: [P('kpi-views')] } } });
+  Q.page('processes', { fixed: true, title: 'Processes', route: '#/qms/processes', layout: { layout: '1', zones: { top: [P('process-map')] } } });
+  Q.page('objectives', { fixed: true, title: 'Objectives & KPIs', route: '#/qms/objectives', layout: { layout: '1', zones: { top: [P('kpi-views')] } } });
 
-  function scopePage() {
-    return Q.pageView('scope', { title: 'Organization & Scope', nav: 'qms', crumbs: qmsCrumbs('Organization & Scope'), sub: 'Who we are, what the QMS covers, and the context it operates in — ISO 9001 clauses 4.1–4.4.',
-      actions: `<a class="btn" href="#/settings/organization">${icon('pencil')}Edit Organization</a>` });
+  function scopePage(q, [tab] = []) {
+    const S = Q.S, c = S.context;
+    const ctxDoc = Q.doc(c.contextDoc), scopeDoc = Q.doc(c.scopeDoc);
+    const structDocs = [c.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(Q.doc).filter(Boolean);
+    const issues = c.issues.internal.length + c.issues.external.length;
+    const tabs = [
+      { key: 'summary', label: 'Summary' },
+      { key: 'scope', label: 'Scope', n: c.sites.length },
+      { key: 'context', label: 'Context', n: issues, tone: ctxDoc && Q.docOverdue(ctxDoc) ? 'danger' : '' },
+      { key: 'parties', label: 'Interested Parties', n: c.parties.length },
+      { key: 'organization', label: 'Organization' }];
+    return tabbedPage({ page: 'scope', title: 'Organization & Scope', base: '#/qms/scope', tabs, cur: tab || 'summary',
+      sub: 'Who we are, what the QMS covers, and the context it operates in — ISO 9001 clauses 4.1–4.4.',
+      actions: `<a class="btn" href="#/settings/organization">${icon('pencil')}Edit Organization</a>`,
+      body: k => {
+        if (k === 'scope') return splitC([C('scope-statement'), C('sites')], [C('exclusions', 'side')]);
+        if (k === 'context') return [C('context-review-alert'), C('context-issues')];
+        if (k === 'parties') return [C('parties')];
+        if (k === 'organization') return ['<div class="tab-stack"><div class="grid-halves">', C('org-facts', 'side'), C('structure-docs', 'side'), '</div>', C('org-chart'), '</div>'];
+        // Summary (board): stat tiles + breakdown on the left, one table of what needs attention on the right.
+        const keyDocs = [scopeDoc, ctxDoc, ...structDocs].filter((d, i, a) => d && a.indexOf(d) === i);
+        const att = keyDocs.filter(docNeeds).map(docRow);
+        c.parties.filter(x => !String(x.monitoring || '').trim()).forEach(x => att.push({ icon: 'users', title: x.party, meta: 'No monitoring method recorded', kind: 'Interested party', href: '#/qms/scope/parties', right: Q.ui.badge('Incomplete', 'warning') }));
+        if (!c.issues.internal.length || !c.issues.external.length) att.push({ icon: 'globe', title: 'Context issues incomplete', meta: `${c.issues.internal.length} internal · ${c.issues.external.length} external`, kind: 'Context', href: '#/qms/scope/context', right: Q.ui.badge('Incomplete', 'warning') });
+        const cur = keyDocs.filter(d => !Q.docOverdue(d)).length, mon = c.parties.filter(x => String(x.monitoring || '').trim()).length, act = c.sites.filter(x => String(x.activities || '').trim()).length;
+        return [Q.ui.summary({
+          stats: [
+            { label: 'Sites in scope', value: c.sites.length, icon: 'building-2', href: '#/qms/scope/scope', note: `${c.exclusions.length} exclusion${c.exclusions.length === 1 ? '' : 's'}` },
+            { label: 'Context issues', value: issues, icon: 'globe', href: '#/qms/scope/context', tone: ctxDoc && Q.docOverdue(ctxDoc) ? 'danger' : null, note: `${c.issues.internal.length} internal · ${c.issues.external.length} external` },
+            { label: 'Interested parties', value: c.parties.length, icon: 'users', href: '#/qms/scope/parties', note: `${mon} monitored` }],
+          breakdown: { title: 'Scope health', donut: { pct: pctOf(cur, keyDocs.length), label: 'Key documents current' },
+            bars: [
+              { label: 'Key documents current', pct: pctOf(cur, keyDocs.length), value: `${cur}/${keyDocs.length}`, note: 'scope, context, structure', href: '#/qms/scope/organization', tone: cur < keyDocs.length ? 'warning' : '' },
+              { label: 'Parties with monitoring', pct: pctOf(mon, c.parties.length), value: `${mon}/${c.parties.length}`, note: 'clause 4.2', href: '#/qms/scope/parties' },
+              { label: 'Sites with activities', pct: pctOf(act, c.sites.length), value: `${act}/${c.sites.length}`, note: 'clause 4.3', href: '#/qms/scope/scope' }] },
+          attention: att, search: 'Search documents, parties…', empty: 'Scope, context and parties are up to date.',
+          action: `<button class="btn primary" type="button" data-action="ctx-add" data-kind="parties">${icon('plus')}Add Interested Party</button>` })];
+      } });
   }
-  function policiesPage() {
-    const d = Q.doc(Q.S.policies.quality.doc);
-    return Q.pageView('policies', { title: 'Policies', nav: 'qms', crumbs: qmsCrumbs('Policies'), sub: 'The quality policy and other policies that set direction for the QMS — ISO 9001 clause 5.2.',
-      actions: `<button class="btn" type="button" data-action="create-revision" data-id="${d.id}">${icon('git-branch-plus')}Revise Quality Policy</button>` });
+  function policiesPage(q, [tab] = []) {
+    const S = Q.S, pol = S.policies.quality, d = Q.doc(pol.doc), a = pol.communicated, pct = Math.round(a.acknowledged / a.total * 100);
+    const others = S.documents.filter(x => x.type === 'Policy' && x.id !== pol.doc);
+    const objs = [...new Set(S.kpis.map(k => k.objective))];
+    const objBelow = objs.filter(o => S.kpis.some(k => k.objective === o && !Q.kpiOk(k)));
+    const tabs = [
+      { key: 'summary', label: 'Summary' },
+      { key: 'quality', label: 'Quality Policy' },
+      { key: 'other', label: 'Other Policies', n: others.length },
+      { key: 'objectives', label: 'Objectives', n: objs.length }];
+    return tabbedPage({ page: 'policies', title: 'Policies', base: '#/qms/policies', tabs, cur: tab || 'summary',
+      sub: 'The quality policy and other policies that set direction for the QMS — ISO 9001 clause 5.2.',
+      actions: `<button class="btn" type="button" data-action="create-revision" data-id="${d.id}">${icon('git-branch-plus')}Revise Quality Policy</button>`,
+      body: k => {
+        if (k === 'quality') return splitC([C('quality-policy')], [C('policy-ack', 'side')]);
+        if (k === 'other') return [C('other-policies')];
+        if (k === 'objectives') return [C('objectives-health')];
+        const att = [d, ...others].filter(docNeeds).map(docRow);
+        if (a.acknowledged < a.total) att.push({ icon: 'send', title: `${a.total - a.acknowledged} people have not acknowledged the Quality Policy`, meta: `Rev ${d.rev} · last campaign ${Q.fmt(a.lastCampaign)}`, kind: 'Communication', owner: d.owner, href: '#/qms/policies/quality', right: Q.ui.badge(`${pct}% acknowledged`, pct >= 90 ? 'success' : 'warning') });
+        objBelow.forEach(o => { const n = S.kpis.filter(k => k.objective === o && !Q.kpiOk(k)).length; att.push({ icon: 'target', title: o, meta: (n2 => `${n2} KPI${n2 === 1 ? '' : 's'}`)(S.kpis.filter(k => k.objective === o).length), kind: 'Objective', owner: objOwner(o), href: Q.K ? '#/qms/objectives/goals' : '#/qms/policies/objectives', right: Q.ui.badge(`${n} KPI${n === 1 ? '' : 's'} below`, 'danger'), tone: 'danger' }); });
+        const objPct = o => { const ks = S.kpis.filter(k => k.objective === o); return pctOf(ks.filter(Q.kpiOk).length, ks.length); };
+        const bars = objs.map(o => ({ o, p: objPct(o) })).sort((x, y) => x.p - y.p).slice(0, 5)
+          .map(({ o, p }) => ({ label: o, pct: p, value: `${p}%`, note: 'KPIs on target', href: '#/qms/policies/objectives', tone: p < 50 ? 'danger' : p < 100 ? 'warning' : '' }));
+        return [Q.ui.summary({
+          stats: [
+            { label: 'Quality Policy', value: `Rev ${d.rev}`, icon: 'scroll-text', href: '#/qms/policies/quality', tone: Q.docOverdue(d) ? 'danger' : null, note: `Next review ${Q.fmt(d.nextReview)}` },
+            { label: 'Other policies', value: others.length, icon: 'library', href: '#/qms/policies/other', note: `${others.filter(Q.docOverdue).length} review overdue` },
+            { label: 'Objectives on target', value: `${objs.length - objBelow.length}/${objs.length}`, icon: 'target', href: '#/qms/policies/objectives', tone: objBelow.length ? 'warning' : null, note: 'all KPIs at or above target' }],
+          breakdown: { title: 'Policy communication', donut: { pct, label: 'Quality Policy acknowledged' }, bars },
+          attention: att, search: 'Search policies, objectives…', empty: 'All policies are current and acknowledged.',
+          action: `<button class="btn primary" type="button" data-action="toast" data-title="Reminder sent" data-msg="${a.total - a.acknowledged} employees will be asked to read and acknowledge the Quality Policy.">${icon('send')}Remind ${a.total - a.acknowledged} People</button>` })];
+      } });
   }
   function processesPage(q) {
     // Old links (?view=table) set the display once; the Cards/Register switch remembers it after that.
     if (q.view) { Q.UI.procView = q.view === 'table' ? 'table' : 'map'; Q.saveUI(); location.replace('#/qms/processes'); return { title: 'Processes', nav: 'qms', html: '' }; }
     return Q.pageView('processes', { title: 'Processes', nav: 'qms', crumbs: qmsCrumbs('Processes'), sub: 'The processes of the QMS and how they interact — ISO 9001 clause 4.4. Open a process for its documents, risks, KPIs, evidence and audits.',
-      actions: `<a class="btn" href="#/settings/processes">${icon('network')}Edit Process Structure</a>` });
+      actions: `<a class="btn" href="#/settings/processes">${icon('network')}Edit Process Structure</a>`, customize: false });
   }
 
   /* ---------------- Organization & context components ---------------- */
@@ -122,7 +211,7 @@
   Q.component('structure-docs', { group: G1, name: 'Structure & responsibilities', icon: 'network', desc: 'The organization chart, responsibilities matrix and process map (clause 5.3).',
     render: (b, ctx) => Q.panel({ title: ctx.title('Structure & responsibilities'), tag: '5.3',
       body: `<ul class="link-list" style="padding:4px 20px">${[Q.S.context.orgChartDoc, 'QMS-PRO-002', 'QMS-MAP-001'].map(Q.doc).filter(Boolean).map(d => `<li>${icon('file-text')}<div class="ll-main"><b>${esc(d.title)}</b><span>${esc(d.id)} · Rev ${esc(d.rev)}${d.workingRev && d.status !== 'Published' ? ` → ${esc(d.workingRev)} ${esc(d.status.toLowerCase())}` : ''}</span></div>${d.id === Q.S.context.orgChartDoc ? `<button class="btn sm ghost" type="button" data-action="oc-scroll">View Chart</button>` : ''}<button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open</button></li>`).join('')}</ul>` }) });
-  Q.actions['oc-scroll'] = () => { const el = document.getElementById('org-chart'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.querySelector('.oc-node, .oc-li')?.focus({ preventScroll: true }); } else Q.toast('Organization chart', 'Add the “Organization chart” component to this page with Customize page.'); };
+  Q.actions['oc-scroll'] = () => { if (!location.hash.startsWith('#/qms/scope/organization') && location.hash.startsWith('#/qms/scope')) { location.hash = '#/qms/scope/organization'; setTimeout(() => Q.actions['oc-scroll'](), 60); return; } const el = document.getElementById('org-chart'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.querySelector('.oc-node, .oc-li')?.focus({ preventScroll: true }); } else location.hash = '#/qms/scope/organization'; };
 
   /* ---------------- Policy components ---------------- */
   const G2 = 'Policy';
@@ -255,20 +344,25 @@
   Q.RECORDS.kpis = () => Q.S.kpis;
   Q.FIELDS.kpis = [
     { key: 'name', label: 'KPI', type: 'text', locked: true, min: '240px', get: k => k.name, sort: k => k.name,
-      render: k => `<button type="button" class="doc-link" data-expand title="Show details">${esc(k.name)}</button><span class="sub">Objective: ${esc(k.objective)}</span>` },
+      render: k => `<a class="doc-link" href="#/qms/objectives/k/${esc(k.id)}">${esc(k.name)}</a><span class="sub kp-sub1" title="Objective: ${esc(k.objective)}">${esc(k.objective)}</span>` },
     { key: 'objective', label: 'Objective', type: 'enum', options: () => [...new Set(Q.S.kpis.map(k => k.objective))].sort(), get: k => k.objective, sort: k => k.objective, render: k => esc(k.objective) },
     { key: 'process', label: 'Process', type: 'process', get: k => k.process, sort: k => Q.proc(k.process)?.process_code, render: k => Q.pcell(k.process) },
     { key: 'target', label: 'Target', type: 'number', cls: 'c-num', get: k => k.target, sort: k => k.target, render: k => `${esc(k.dir)} ${Q.kpiFmt(k.target, k)}` },
-    { key: 'actual', label: 'Actual', type: 'number', cls: 'c-num', get: k => k.actual, sort: k => k.actual, render: k => `<span class="kpi-val" style="color:${Q.kpiOk(k) ? 'inherit' : 'var(--danger)'}">${Q.kpiFmt(k.actual, k)}</span>` },
-    { key: 'trend', label: 'Trend (6 periods)', cls: 'c-trend', type: 'number', get: kDelta, sort: kDelta,
-      render: k => { const dlt = kDelta(k), tone = dlt > 0 ? 'positive' : dlt < 0 ? 'negative' : 'neutral', marker = dlt > 0 ? '▲' : dlt < 0 ? '▼' : '■'; return `<span class="kpi-trend-delta ${tone} small tnum"><span aria-hidden="true">${marker}</span> ${Math.abs(dlt)}${esc(k.unit)}</span>`; } },
+    { key: 'department', label: 'Department', type: 'enum', options: () => [...new Set(Q.S.kpis.map(k => k.department).filter(Boolean))].sort(), get: k => k.department || '', sort: k => k.department || '', render: k => k.department ? `<span class="nowrap">${esc(k.department)}</span>` : '<span class="zero">—</span>' },
+    { key: 'actual', label: 'Current Result', type: 'number', cls: 'c-num', get: k => k.actual, sort: k => k.actual, render: k => `<span class="kpi-val" style="color:${Q.kpiOk(k) ? 'inherit' : 'var(--danger)'}">${Q.kpiFmt(k.actual, k)}</span>` },
+    { key: 'trend', label: 'Trend', type: 'number', get: kDelta, sort: kDelta,
+      render: k => { const dlt = kDelta(k); return `<span style="display:inline-flex;align-items:center;gap:8px">${Q.sparkline(k.trend, Q.kpiOk(k))}<span class="small muted tnum">${dlt > 0 ? '▲' : dlt < 0 ? '▼' : '■'} ${Math.abs(dlt)}${esc(k.unit)}</span></span>`; } },
     { key: 'owner', label: 'Owner', type: 'person', get: k => k.owner, sort: k => Q.pname(k.owner), render: k => `<span class="nowrap">${esc(Q.pname(k.owner))}</span>` },
     { key: 'period', label: 'Period', type: 'enum', options: () => [...new Set(Q.S.kpis.map(k => k.period))].sort(), get: k => k.period, sort: k => k.period, render: k => `<span class="nowrap">${esc(k.period)}</span>` },
+    { key: 'method', label: 'Source Method', type: 'enum', options: () => ['Final result', 'Manual records', 'Excel / CSV import', 'Survey', 'Internal QMS', 'Integration'], get: k => Q.K ? Q.K.METHODS[Q.K.methodOf(k)].label : '', sort: k => k.method || '', render: k => Q.K ? Q.K.methodChip(Q.K.methodOf(k)) : '' },
+    { key: 'frequency', label: 'Frequency', type: 'enum', options: () => ['Monthly', 'Quarterly', 'Semiannual', 'Annual', 'YTD'], get: k => k.frequency || '', sort: k => k.frequency || '', render: k => esc(k.frequency || '—') },
     { key: 'status', label: 'Status', type: 'enum', options: () => ['On target', 'Below target'], get: k => Q.kpiOk(k) ? 'On target' : 'Below target', sort: k => Q.kpiOk(k) ? 1 : 0, render: k => Q.kpiOk(k) ? Q.st('On target', 'success') : Q.st('Below target', 'danger') }
   ];
   const kpiMenu = k => Q.menu(`Actions for ${k.name}`, [
-    { label: 'Record new value…', icon: 'plus', data: { action: 'kpi-record', id: k.id } },
-    { label: 'Edit KPI', icon: 'pencil', data: { action: 'toast', title: 'Edit KPI', msg: 'The KPI definition form is not part of this mock.' } },
+    { label: 'Open KPI', icon: 'arrow-right', data: { action: 'go', href: `#/qms/objectives/k/${k.id}` } },
+    { label: 'Record Result…', icon: 'plus', data: { action: 'kpi-record', id: k.id } },
+    { label: 'Collect Data…', icon: 'table', data: { action: 'kpi-collect', id: k.id } },
+    { label: 'Edit KPI', icon: 'pencil', data: { action: 'kpi-edit', id: k.id } },
     '-',
     { label: 'Open process workspace', icon: 'workflow', data: { action: 'go', href: `#/process/${k.process}/kpis` } },
     { label: 'Open Quality Objectives plan', icon: 'file-text', data: { action: 'open-doc', id: 'QOB-PLN-001' } }
@@ -281,10 +375,10 @@
         <div class="kpi-hist" aria-label="Last 6 periods">${k.trend.map((x, i) => `<span class="${i === k.trend.length - 1 ? 'now' : ''}"><b class="tnum">${x}${esc(k.unit)}</b><i>${i === k.trend.length - 1 ? 'Latest' : `−${k.trend.length - 1 - i}`}</i></span>`).join('')}</div></div>
       <div><h4>Objective</h4><p>${esc(k.objective)}</p><h4 style="margin-top:10px">Owner</h4><p>${esc(Q.pname(k.owner))} · ${esc(Q.plabel(k.process))}</p></div>
       <div><h4>In this process</h4><ul><li>${risks.length} open risk${risks.length === 1 ? '' : 's'} &amp; opportunities</li><li>${cas.length} open corrective action${cas.length === 1 ? '' : 's'}</li><li>Method: <button class="link-btn" type="button" data-action="open-doc" data-id="KPI-PRO-003">KPI-PRO-003</button></li></ul></div>
-      <div class="acts"><button class="btn sm primary" type="button" data-action="kpi-record" data-id="${k.id}">${icon('plus')}Record new value</button><a class="btn sm" href="#/process/${k.process}/kpis">${icon('workflow')}Open process workspace</a></div></div>`;
+      <div class="acts"><button class="btn sm primary" type="button" data-action="kpi-record" data-id="${k.id}">${icon('plus')}Record Result</button><a class="btn sm" href="#/qms/objectives/k/${k.id}">Open KPI</a><a class="btn sm" href="#/process/${k.process}/kpis">${icon('workflow')}Open process workspace</a></div></div>`;
   };
   const kpiSel = keys => keys.length === 1
-    ? `<button class="btn sm primary" type="button" data-action="kpi-record" data-id="${keys[0]}">${icon('plus')}Record new value</button><button class="btn sm" type="button" data-action="go" data-href="#/process/${Q.S.kpis.find(k => k.id === keys[0]).process}/kpis">${icon('workflow')}Open process workspace</button>`
+    ? `<button class="btn sm primary" type="button" data-action="kpi-record" data-id="${keys[0]}">${icon('plus')}Record Result</button><a class="btn sm" href="#/qms/objectives/k/${keys[0]}">Open KPI</a><button class="btn sm" type="button" data-action="go" data-href="#/process/${Q.S.kpis.find(k => k.id === keys[0]).process}/kpis">${icon('workflow')}Open process workspace</button>`
     : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} KPIs were asked to record this period's values.">${icon('bell')}Ask owners for values</button>`;
   // One KPI table for the register page and the process workspace tab.
   Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0 } = {}) => {
@@ -298,19 +392,7 @@
       tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}`,
       empty: '<h3>No KPIs match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
   };
-  Q.actions['kpi-record'] = d => {
-    const k = Q.S.kpis.find(x => x.id === d.id);
-    const m = Q.openModal({ size: 's', title: 'Record new value', sub: `${esc(k.name)} · target ${esc(k.dir)} ${Q.kpiFmt(k.target, k)}`,
-      body: `<form class="modal-body"><div class="form-grid" style="grid-template-columns:1fr 1fr">
-        <label class="field"><span>Value${k.unit ? ` (${esc(k.unit)})` : ''} <span class="req">*</span></span><input class="input" type="number" step="any" name="val" required autofocus value=""></label>
-        <label class="field"><span>Period <span class="req">*</span></span><input class="input" name="period" required value="${esc(k.period)}"></label></div>
-        <p class="small muted" style="margin-top:10px">Previous: ${Q.kpiFmt(k.actual, k)} (${esc(k.period)}). The trend keeps the last 6 periods.</p></form>`,
-      foot: `<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" data-ok>Record Value</button>` });
-    const ok = () => { const f = m.querySelector('form'); if (!Q.validate(f)) return; const v = Q.formValues(f), n = Number(v.val);
-      k.trend = [...k.trend.slice(1), n]; k.actual = n; k.period = v.period; Q.save(); Q.closeAllModals(); Q.render({ noFocus: true });
-      Q.toast('Value recorded', `${k.name}: ${Q.kpiFmt(n, k)} — ${Q.kpiOk(k) ? 'on target' : 'below target'}`); };
-    m.querySelector('[data-ok]').addEventListener('click', ok); m.querySelector('form').addEventListener('submit', e => { e.preventDefault(); ok(); });
-  };
+  // Record Result, Collect Data, KPI detail and the definition editor: kpi.js, kpi-ui.js, kpi-pages.js (Update 19).
 
   Q.viewPage(KT, { route: '#/qms/objectives', noun: 'KPIs',
     legacy: q => q.focus ? { id: 'k-all', extra: { focus: q.focus } } : q.status === 'below' ? { id: 'k-below', fallback: 'k-all' } : q.status === 'on' ? { id: 'k-on', fallback: 'k-all' } : q.process ? { group: 'process', fallback: 'k-all', extra: { p: q.process } } : null });
@@ -343,10 +425,10 @@
     const k = kpiCard(q);
     if (k.redirect) { location.replace(k.redirect); return { title: 'Objectives & KPIs', nav: 'qms', html: '' }; }
     const { v, leaf } = k, plan = Q.doc('QOB-PLN-001'), objs = [...new Set(Q.S.kpis.map(x => x.objective))];
-    return Q.pageView('objectives', { title: 'Objectives & KPIs', nav: 'qms', intro: Q.themeObjectives?.() || '',
+    return Q.pageView('objectives', { customize: false, title: 'Objectives & KPIs', nav: 'qms', intro: Q.themeObjectives?.() || '',
       crumbs: [['QMS', '#/qms/scope'], ['Objectives & KPIs', '#/qms/objectives?v=' + (Q.viewList(KT)[0]?.id || '')], ...(leaf ? [[v.name, Q.vwHash(KT, v)], [leaf]] : [[v.name]])],
       sub: `Quality objectives and how each process is measured against them — ISO 9001 clauses 6.2 and 9.1. ${objs.length} objectives · ${Q.S.kpis.length} KPIs.`,
-      actions: `<button class="btn" type="button" data-action="open-doc" data-id="${plan.id}">${icon('file-text')}${esc(plan.title)}</button><button class="btn primary" type="button" data-action="toast" data-title="Add KPI" data-msg="KPI entry form is not part of this mock.">${icon('plus')}Add KPI</button>` });
+      actions: `<a class="btn" href="#/qms/objectives/goals">${icon('list-checks')}Quality Objectives</a><button class="btn" type="button" data-action="open-doc" data-id="${plan.id}">${icon('file-text')}${esc(plan.title)}</button><button class="btn primary" type="button" data-action="kpi-new">${icon('plus')}Add KPI</button>` });
   }
 
   /* ============================== 3. Risks & Opportunities ============================== */

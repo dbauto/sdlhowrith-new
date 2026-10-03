@@ -543,39 +543,49 @@
       <line class="mc-base" x1="20" x2="${W - 6}" y1="${H - 22}" y2="${H - 22}"/>${vals.map((v, i) => { const x = 24 + i * step + (step - bw) / 2, h = v / max * (H - 40), y = H - 22 - h; return `${v ? `<path class="mc-bar" d="M${x} ${H - 22}V${y + 3}q0 -3 3 -3h${bw - 6}q3 0 3 3V${H - 22}Z"/>` : ''}<text class="mc-v" x="${x + bw / 2}" y="${y - 4}" text-anchor="middle">${v || ''}</text><text class="mc-l" x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${esc(labels[i])}</text><rect class="hit" x="${x - 6}" y="10" width="${bw + 12}" height="${H - 32}" data-tip="${esc(`${labels[i]}: ${v} nonconformit${v === 1 ? 'y' : 'ies'} raised`)}"/>`; }).join('')}</svg>`;
   };
   AM.sessionLine = ({ a, s }, conflicts = []) => `<li><div class="w-main"><div class="w-title"><span class="tnum">${esc(s.start)}–${esc(s.end)}</span> · <a href="#/audits/a/${a.id}">${esc(a.id)}</a> ${esc(AM.pname(a))} — ${esc(s.title)}</div><div class="w-meta">${Q.fmt(s.date)} · ${s.auditors.map(Q.pname).map(esc).join(', ')}${s.location ? ` · ${esc(s.location)}` : ''}</div>${conflicts.length ? `<div class="inds"><span class="ind ind-bad">Scheduling conflict</span></div>` : ''}</div>${AM.triggerChip(a)}<a class="btn sm" href="#/audits/a/${a.id}">Open Audit</a></li>`;
-  AM.route('overview', () => {
-    const S = Q.S, A = S.audits.filter(a => a.status !== 'Draft');
-    const n = st => A.filter(a => st.includes(a.status)).length, over = A.filter(AM.overdue);
-    const ncs = AM.ncs(), open = ncs.filter(AM.ncOpen), ver = ncs.filter(f => f.nc.status === 'Verification Required');
-    const overCA = S.actions.filter(c => Q.actionOverdue(c) && S.findings.some(f => f.action === c.id && f.nc));
-    const audStrip = strip([['Planned', n(['Planned']), 'no sessions yet', '#/audits/list?s=planned'], ['Scheduled', n(['Scheduled', 'Preparation']), `${n(['Preparation'])} ready to start`, '#/audits/list?s=scheduled'], ['In Progress', n(['In Progress']), 'fieldwork', '#/audits/list?s=progress', 'warn'],
-      ['Reporting', n(['Reporting']), 'report in preparation', '#/audits/list?s=reporting'], ['Follow-up', n(['Follow-up']), 'report published, NCs open', '#/audits/list?s=followup'], ['Closed', n(['Closed']), 'complete', '#/audits/list?s=closed'], ['Overdue', over.length, 'past first session', '#/audits/list?s=overdue', 'bad']]);
-    const upcoming = AM.allSessions().filter(x => x.s.date >= Q.today() && !['Closed'].includes(x.a.status)).sort((x, y) => (x.s.date + x.s.start) < (y.s.date + y.s.start) ? -1 : 1).slice(0, 7);
-    const conf = AM.conflicts().filter(c => c.x.s.date >= Q.addDays(Q.today(), -7));
-    const attention = open.slice().sort((x, y) => (AM.ncOverdue(y) - AM.ncOverdue(x)) || (x.nc.due < y.nc.due ? -1 : 1)).slice(0, 6);
-    const yr = Q.today().slice(0, 4), prog = S.auditProgrammes.find(p => p.year === +yr && !['Archived'].includes(p.status)) || S.auditProgrammes[0];
-    const pa = prog ? AM.progAudits(prog.id) : [], pdone = pa.filter(a => ['Follow-up', 'Closed'].includes(a.status)).length;
-    const months = Array.from({ length: 6 }, (_, i) => Q.addDays(Q.today().slice(0, 8) + '15', -30 * (5 - i)).slice(0, 7)), MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const byProc = Object.entries(S.findings.filter(f => f.status !== 'Closed' && AM.audit(f.audit)).reduce((o, f) => { const r = Q.rootId(f.process); (o[r] = o[r] || []).push(f); return o; }, {})).sort((a, b) => b[1].length - a[1].length).slice(0, 6)
+  AM.hbars = hbars;
+  // NC trend and open findings by process — shown on Nonconformities → Trends (Update 20).
+  AM.ncTrends = () => {
+    const S = Q.S, ncs = AM.ncs(), MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = Array.from({ length: 6 }, (_, i) => Q.addDays(Q.today().slice(0, 8) + '15', -30 * (5 - i)).slice(0, 7));
+    const byProc = Object.entries(S.findings.filter(f => f.status !== 'Closed' && AM.audit(f.audit)).reduce((o, f) => { const r = Q.rootId(f.process); (o[r] = o[r] || []).push(f); return o; }, {})).sort((a, b) => b[1].length - a[1].length).slice(0, 8)
       .map(([pid, list]) => [`<b class="tnum">${esc(Q.proc(pid)?.process_code)}</b> ${esc(Q.proc(pid)?.name)}`, list.length, `${list.filter(f => AM.isNcType(f.type)).length} NC · ${list.filter(f => !AM.isNcType(f.type)).length} other`, `#/audits/nc?s=all&area=${pid}`]);
+    return `<div class="am-charts two">
+      <section class="panel"><div class="panel-head"><h2>NC trend</h2><span class="muted small">raised per month</span></div><div class="panel-pad">${AM.monthBars(months.map(m => ncs.filter(f => f.raised.startsWith(m)).length), months.map(m => MON[+m.slice(5, 7) - 1]), 'Nonconformities raised per month')}</div></section>
+      <section class="panel"><div class="panel-head"><h2>Open findings by process</h2></div><div class="panel-pad">${hbars(byProc, '#/audits/nc')}</div></section></div>`;
+  };
+  /* Update 20 — the Audits landing page is a short Summary: four numbers, one "Needs attention" list
+   * and the next sessions. Status counts live in Audits, charts in Nonconformities → Trends. */
+  AM.route('overview', () => {
+    const S = Q.S, A = S.audits.filter(a => a.status !== 'Draft'), today = Q.today();
+    const over = A.filter(AM.overdue), active = A.filter(a => ['In Progress', 'Reporting'].includes(a.status));
+    const ncs = AM.ncs(), open = ncs.filter(AM.ncOpen), ncOver = ncs.filter(AM.ncOverdue), ver = ncs.filter(f => f.nc.status === 'Verification Required');
+    const overCA = S.actions.filter(c => Q.actionOverdue(c) && S.findings.some(f => f.action === c.id && f.nc));
+    const conf = AM.conflicts().filter(c => c.x.s.date >= Q.addDays(today, -7));
+    const yr = today.slice(0, 4), prog = S.auditProgrammes.find(p => p.year === +yr && !['Archived'].includes(p.status)) || S.auditProgrammes[0];
+    const pa = prog ? AM.progAudits(prog.id) : [], pdone = pa.filter(a => ['Follow-up', 'Closed'].includes(a.status)).length;
     const review = S.findings.filter(f => f.migrationReview && !f.migrationReview.resolved);
-    return { title: 'Audits', nav: 'audits', html: AM.chrome('overview', { title: 'Audits', sub: 'Internal audits, one process per audit — ISO 9001 clause 9.2. Nonconformities and corrective actions — clause 10.2.', actions: procDoc + `<a class="btn" href="#/audits/calendar">${icon('calendar')}Calendar</a>` + AM.createBtn() }) +
-      (review.length ? `<div class="callout warning small" style="margin-bottom:12px">${icon('triangle-alert')}<span><b>Migration review required</b>${review.length} finding${review.length === 1 ? '' : 's'} from the old multi-area audits could not be matched to a process audit: ${review.map(f => `<a href="#/audits/a/${f.audit}/findings">${esc(f.id)}</a>`).join(', ')}.</span></div>` : '') +
-      `<h2 class="am-h">Audits</h2>${audStrip}<h2 class="am-h">Nonconformities</h2>${strip([['Open NCs', open.length, `${open.filter(f => f.nc.classification === 'Major').length} major`, '#/audits/nc'], ['Awaiting verification', ver.length, 'auditor to verify', '#/audits/nc?s=verify', 'warn'], ['Overdue NCs', ncs.filter(AM.ncOverdue).length, 'owner response late', '#/audits/nc?s=overdue', 'bad'], ['Overdue corrective actions', overCA.length, 'from audit NCs', '#/capa?status=overdue', 'bad']])}
-      <div class="grid-halves section">
-        <section class="panel"><div class="panel-head"><h2>Upcoming audit sessions</h2><span class="muted small">${upcoming.length}</span><div class="actions"><a class="btn sm ghost" href="#/audits/calendar?view=agenda">Agenda</a></div></div>
-          ${upcoming.length ? `<ul class="worklist">${upcoming.map(x => AM.sessionLine(x, AM.sessionConflicts(x.a, x.s))).join('')}</ul>` : '<div class="empty small">No sessions scheduled.</div>'}</section>
-        <div class="stack-panels">
-          <section class="panel"><div class="panel-head"><h2>Auditor schedule conflicts</h2><span class="muted small">${conf.length}</span></div>
-            ${conf.length ? `<ul class="worklist">${conf.map(c => `<li><div class="w-main"><div class="w-title"><b>${esc(Q.pname(c.who))}</b> — ${Q.fmt(c.x.s.date)}</div><div class="w-meta">${esc(c.x.a.id)} ${esc(c.x.s.title)} ${esc(c.x.s.start)}–${esc(c.x.s.end)} overlaps ${esc(c.y.a.id)} ${esc(c.y.s.title)} ${esc(c.y.s.start)}–${esc(c.y.s.end)}</div></div><a class="btn sm" href="#/audits/calendar?m=${c.x.s.date.slice(0, 7)}&auditor=${c.who}">Review</a></li>`).join('')}</ul>` : '<div class="empty small">No overlapping sessions.</div>'}</section>
-          <section class="panel"><div class="panel-head"><h2>${prog ? esc(prog.name) : 'Programme'}</h2>${prog ? Q.st(prog.status, AM.PROG_KIND[prog.status]) : ''}<div class="actions"><a class="btn sm ghost" href="#/audits/programme${prog ? `?p=${prog.id}&view=summary` : ''}">Summary</a></div></div>
-            <div class="panel-pad"><p class="small muted">${pdone} of ${pa.length} process audits reported</p><div class="meter" role="meter" aria-valuemin="0" aria-valuemax="${pa.length}" aria-valuenow="${pdone}" aria-label="Programme completion"><span style="width:${pa.length ? pdone / pa.length * 100 : 0}%"></span></div></div></section></div></div>
-      <div class="grid-halves section">
-        <section class="panel"><div class="panel-head"><h2>Open NCs needing attention</h2><span class="muted small">${open.length} open</span><div class="actions"><a class="btn sm ghost" href="#/audits/nc?view=areas">By process</a></div></div>
-          ${attention.length ? `<ul class="worklist">${attention.map(f => `<li><div class="w-main"><div class="w-title"><span class="tnum">${esc(f.nc.no)}</span> · ${esc(f.title)}</div><div class="w-meta">${esc(Q.proc(f.process)?.name)} · clause ${esc(f.clause)} · owner ${esc(Q.pname(f.nc.owner))} · due ${Q.dueDate(f.nc.due, ['Verification Required', 'Verified'].includes(f.nc.status))}</div>${AM.ncBadges(f)}</div><a class="btn sm" href="#/audits/nc/${f.nc.no}">Open NC</a></li>`).join('')}</ul>` : '<div class="empty small">No open nonconformities.</div>'}</section>
-        <div class="am-charts two">
-          <section class="panel"><div class="panel-head"><h2>NC trend</h2><span class="muted small">raised per month</span></div><div class="panel-pad">${AM.monthBars(months.map(m => ncs.filter(f => f.raised.startsWith(m)).length), months.map(m => MON[+m.slice(5, 7) - 1]), 'Nonconformities raised per month')}</div></section>
-          <section class="panel"><div class="panel-head"><h2>Open findings by process</h2></div><div class="panel-pad">${hbars(byProc, '#/audits/nc')}</div></section></div></div>` };
+    const upcoming = AM.allSessions().filter(x => x.s.date >= today && !['Closed'].includes(x.a.status)).sort((x, y) => (x.s.date + x.s.start) < (y.s.date + y.s.start) ? -1 : 1);
+    const att = [
+      ...review.map(f => ({ icon: 'triangle-alert', title: f.title, meta: `${f.id} · could not be matched to a process audit`, kind: 'Migration review', owner: AM.audit(f.audit)?.auditor, href: `#/audits/a/${f.audit}/findings`, right: Q.ui.badge('Review', 'warning'), tone: 'warning' })),
+      ...over.map(a => ({ icon: 'clipboard-check', title: `${AM.pname(a)} audit`, meta: `${a.id} · ${a.status}`, kind: 'Audit', owner: a.auditor, due: AM.sortedSessions(a)[0]?.date, href: `#/audits/a/${a.id}`, right: Q.ui.badge('Overdue', 'danger'), tone: 'danger' })),
+      ...ncOver.map(f => ({ icon: 'search-check', title: f.title, meta: `${f.nc.no} · ${Q.proc(f.process)?.name || ''}`, kind: 'Nonconformity', owner: f.nc.owner, due: f.nc.due, href: `#/audits/nc/${f.nc.no}`, right: Q.ui.badge('Response overdue', 'danger'), tone: 'danger' })),
+      ...overCA.map(c => ({ icon: 'list-checks', title: c.title, meta: `${c.id} · from an audit NC`, kind: 'Corrective action', owner: c.owner, due: c.due, href: `#/capa?status=overdue`, right: Q.ui.badge('Overdue', 'danger'), tone: 'danger' })),
+      ...ver.map(f => ({ icon: 'badge-check', title: f.title, meta: `${f.nc.no} · ${Q.proc(f.process)?.name || ''}`, kind: 'Verification', owner: AM.audit(f.audit)?.auditor, due: f.nc.due, href: `#/audits/nc/${f.nc.no}`, right: Q.ui.badge('To verify', 'warning') })),
+      ...conf.map(c => ({ icon: 'users', title: `${Q.pname(c.who)} double-booked`, meta: `${c.x.a.id} ${c.x.s.start}–${c.x.s.end} overlaps ${c.y.a.id} ${c.y.s.start}–${c.y.s.end}`, kind: 'Schedule conflict', owner: c.who, due: c.x.s.date, href: `#/audits/calendar?m=${c.x.s.date.slice(0, 7)}&auditor=${c.who}`, right: Q.ui.badge('Conflict', 'warning') }))];
+    // Breakdown: checklist progress of the audits that are running now.
+    const live = A.filter(a => ['Preparation', 'In Progress', 'Reporting'].includes(a.status)).slice(0, 5);
+    const bars = live.map(a => { const all = AM.counted(a), d = all.filter(AM.complete).length, p = all.length ? Math.round(d / all.length * 100) : 0; return { label: `${a.id} ${AM.pname(a)}`, pct: p, value: all.length ? `${d}/${all.length}` : '—', note: `${a.status} · checklist`, href: `#/audits/a/${a.id}/checklist`, tone: AM.overdue(a) ? 'danger' : '' }; });
+    const progPct = pa.length ? Math.round(pdone / pa.length * 100) : 0;
+    return { title: 'Audits', nav: 'audits', html: AM.chrome('overview', { title: 'Audits', sub: 'Internal audits, one process per audit — ISO 9001 clause 9.2. Nonconformities and corrective actions — clause 10.2.', actions: procDoc + `<a class="btn" href="#/audits/calendar">${icon('calendar')}Calendar</a>` }) +
+      Q.ui.summary({
+        stats: [
+          { label: 'Audits in progress', value: active.length, icon: 'clipboard-check', href: '#/audits/list?s=progress', note: `${A.filter(a => ['Scheduled', 'Preparation'].includes(a.status)).length} scheduled next` },
+          { label: 'Open nonconformities', value: open.length, icon: 'search-check', href: '#/audits/nc', tone: open.some(f => f.nc.classification === 'Major') ? 'danger' : null, note: `${open.filter(f => f.nc.classification === 'Major').length} major · ${ver.length} to verify` },
+          { label: 'Overdue items', value: over.length + ncOver.length + overCA.length, icon: 'calendar-clock', tone: over.length + ncOver.length + overCA.length ? 'danger' : null, href: '#/audits/nc?s=overdue', note: `${over.length} audit${over.length === 1 ? '' : 's'} · ${ncOver.length} NC${ncOver.length === 1 ? '' : 's'} · ${overCA.length} action${overCA.length === 1 ? '' : 's'}` },
+          { label: 'Sessions next 14 days', value: upcoming.filter(x => x.s.date <= Q.addDays(today, 14)).length, icon: 'calendar', href: '#/audits/calendar?view=agenda', note: upcoming[0] ? `next ${Q.fmt(upcoming[0].s.date)}` : 'none scheduled' }],
+        breakdown: { title: prog ? prog.name : 'Audit programme', link: { href: `#/audits/programme${prog ? `?p=${prog.id}&view=summary` : ''}`, text: 'Programme' }, donut: { pct: progPct, label: `${pdone} of ${pa.length} audits reported` }, bars, empty: 'No audits running.' },
+        attention: att, search: 'Search audits, NCs, actions…', empty: 'Nothing overdue. No NCs waiting for verification.', action: AM.createBtn() }) };
   });
 
   /* ====================================================================== programme */

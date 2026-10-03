@@ -313,6 +313,77 @@ Pages felt crowded: two lines of text in every row, a button on every row, dashe
   - List rows are a single line with hover highlight, and their buttons stay quiet until the row is hovered.
   - Card headers are calmer.
 
+## Update 19: Objectives & KPIs — one generic KPI engine
+
+A KPI result no longer has to be typed in as a bare number. The module now follows this chain:
+
+Quality objective → KPI definition → collection method → measurement records (optional) → calculation → **period result** → review → evidence.
+
+**Data** (`assets/kpi.js`, sample configuration in `assets/kpi-data.js`)
+- **Objectives:** `objectives` holds the quality objectives.
+- **KPI definitions:** the existing `kpis` records are extended with department, data owner, reviewer, frequency, aggregation, collection method, formula, minimum sample, dimensions and consolidation levels.
+- **Period results:** `kpiResults` has one record per KPI per period, with value, method, source (type, system, reference, link), records used, calculation, approval status and who recorded/reviewed it. A new approved result for a period keeps the earlier one as *Superseded*.
+- **Measurement records:** `kpiRecords` holds optional underlying records with generic dimensions (person, team, department, project, customer, supplier, site …), numerator/denominator or value.
+- **Supporting collections:** `kpiCycles` (collection cycles: Draft → Collecting → Ready to Calculate → Calculated → For Review → Approved → Closed), `kpiImports` (import batches with rejected rows), `kpiSurveys` (survey / evaluation sources) and `kpiLog` (definition, target, method, import and approval history).
+- **Backward compatible:** on first load every existing KPI's six values become period results ("Existing KPI record"), and `actual`, `period` and `trend` stay as a cache of the approved results. Overview, process workspace, process cards, management review, audits and search keep working unchanged.
+
+**Aggregation:** average, weighted average, percentage (Σ numerator ÷ Σ denominator), ratio, sum, count, min, max, median, latest, pass rate, custom formula, or no calculation (final result provided externally). Percentages are only averaged when the rule says Average. Optional consolidation follows the configured levels, e.g. person → team → department → organization.
+
+**Screens**
+- **Register:** gains Department, Source Method and Frequency fields. The KPI name opens the new detail page. *Add KPI* opens a 7-section editor (Basic Information, Scope, Target, Measurement, Collection, Responsibility, Review). *Quality Objectives* lists and edits objectives.
+- **KPI detail** (`#/qms/objectives/k/<id>`), with six tabs:
+  - **Overview:** current/target/previous/difference/records used, trend chart with target line, definition.
+  - **Measurements:** records by period, consolidation, add / import / export.
+  - **Collection:** method, formula, owners, dimensions, method history, collection cycles.
+  - **Results:** period results; click one for its traceability.
+  - **Evidence:** source references, links, imported files, survey batches, iQMS records, cycles.
+  - **History.**
+- **Record Result** (the fast path): period, result, source, system, reference, link, optional numerator/denominator, notes, live status preview, optional review, Save Draft.
+- **Collect Data:**
+  - Manual entry: spreadsheet-like grid, add/duplicate/delete rows, paste from Excel.
+  - Excel/CSV import: 5 steps (file, map columns, validate, review calculation, import), with downloadable error rows.
+  - Survey / evaluation source.
+  - Internal QMS data: corrective actions closed on time, from the CAPA register.
+  - External integration: configuration and status only; no live connection in this demo.
+- **Result traceability:** clicking any result answers "where did this number come from?": the source, the import file, the survey responses, the CAPA records, the calculation and the approval.
+- **Collection cycle** (`#/qms/objectives/c/<id>`): expected/received/missing, completion, contributors with Send Reminder, records, Calculate → Submit for Review → Approve → Close.
+
+**Sample data** covers each case:
+- Customer satisfaction: Q3 2026 calculated from 42 survey responses.
+- Supplier on-time delivery: external results in 2025 → Excel import Jan–Jun 2026 → ERP integration from Jul 2026.
+- Training completion: imported from an HRIS file, 48 rows, 2 rejected.
+- Corrective actions closed on time: calculated from CAPA.
+- Management actions closed: final results only, with SharePoint links.
+- New K-16 Installation productivity: 24 installers in 3 teams and 2 departments, with a September collection cycle in progress.
+
+## Update 20: tabbed QMS, process and audit pages
+
+The QMS sub-pages, the process workspace and the audit pages were dashboards with many panels on one screen. Each page now uses **pill tabs** (a rounded segmented group; the active tab is a filled pill) with one topic per tab, and opens on a **Summary** tab built on one fixed board layout:
+
+- **Left column:** up to four stacked stat tiles (coloured icon square, label with a short note, big number) and one breakdown card (a ring chart plus up to five progress bars).
+- **Right:** one table card titled *Needs attention*, with search, a type filter, an optional primary button and page numbers (8 rows per page). Columns: Item · Type · Owner (avatar) · Due · Status pill. Clicking a row opens the record.
+
+The app's own colours are kept. The other tabs show the same components as before (tables, editing, export), in rounded cards.
+
+| Page | Tabs |
+|---|---|
+| QMS → Organization & Scope (`#/qms/scope/<tab>`) | Summary · Scope (statement, sites, exclusions) · Context (issues, register alert) · Interested Parties · Organization (facts, structure documents, full-width org chart) |
+| QMS → Policies (`#/qms/policies/<tab>`) | Summary · Quality Policy (policy + acknowledgement) · Other Policies · Objectives |
+| Process workspace (`#/process/<id>/<tab>`) | **Summary** (health, documents overdue, high risks, KPIs below target; ISO readiness ring + documents/evidence/KPIs/actions bars; attention table) · **Definition** (purpose, inputs, outputs, roles, elements, subprocesses, clauses) · Documents · Risks · KPIs · Evidence · Audit & Actions · ISO Mapping (readiness lives here only) · **Activity** |
+| Audits (`#/audits`) | Summary: audits in progress, open NCs, overdue items, sessions in the next 14 days; programme ring + checklist progress of running audits; table of overdue audits/NCs/actions, NCs to verify and auditor conflicts. Status counts are in *Audits*; the NC trend chart and findings-by-process moved to **Nonconformities → Trends** (`#/audits/nc?view=trends`). |
+| Audit workspace (`#/audits/a/<id>`) | **Summary** replaces Overview: stage, findings, next session; checklist ring + progress per auditor; attention table with links. Auditor progress moved into **Plan → Audit team** (Answered column shows answered / total). |
+
+**Board kit:** Settings → Workspace → UI Components has a *Board kit (Update 20)* section. It shows the eight page rules and a live demo of each piece, with its usage line: pill tabs, stat tile, ring chart, breakdown card, attention table, and the full Summary board. The board stacks based on the width of the area it sits in (a container query), so it also fits narrow areas such as the settings column.
+
+Other changes
+- **Customize page** is removed from the four QMS pages (kept on Overview). Settings → Page Layouts lists only Overview. Saved layouts already in local storage are kept but no longer used by those pages.
+- Settings → Process Workspace has the two new tabs. Saved workspace configurations are migrated once (`workspace.v20`): Definition is added after the first tab, Activity at the end, and an unchanged "Overview" label becomes "Summary"; renamed tabs keep their names.
+- Process tabs with a warning show only the warning ("1 overdue") instead of count + warning, so all tabs fit.
+- The page subtitle tooltip opens on hover only (it used to open over the tabs after every navigation, because the title gets focus).
+- Fixed the NC trend chart bars rendering black (`.mini-chart .hit` had no fill).
+- Shared helpers: `Q.ui.tabs`, `Q.ui.summary` (board), `Q.ui.tile`, `Q.ui.donut`, `Q.ui.breakdown`, `Q.ui.btable` (ui-kit.js) and `Q.renderComp` (pages.js — renders a pre-made component inside a tab, keeping its tables, edits and exports).
+- Re-applied the Update 19 routing in `qms.js` that the main-branch merge had left out (`#/qms/objectives/k/<id>`, `/goals`, `/c/<cycle>`, KPI register links and actions).
+
 ## Files
 
 | File | Change |

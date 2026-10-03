@@ -633,7 +633,8 @@
    * their names and order. emptyTabs: 'mute' shows empty tabs greyed, 'hide' hides them. */
   const workspace = {
     emptyTabs: 'mute',
-    tabs: [['overview', 'Overview'], ['documents', 'Documents'], ['risks', 'Risks & Opportunities'], ['kpis', 'Objectives & KPIs'], ['evidence', 'Evidence'], ['audit', 'Audit & Actions'], ['iso', 'ISO Mapping']]
+    v20: true, // Update 20: Summary first, Definition and Activity as their own tabs
+    tabs: [['overview', 'Summary'], ['definition', 'Definition'], ['documents', 'Documents'], ['risks', 'Risks & Opportunities'], ['kpis', 'Objectives & KPIs'], ['evidence', 'Evidence'], ['audit', 'Audit & Actions'], ['iso', 'ISO Mapping'], ['activity', 'Activity']]
       .map(([key, label]) => ({ key, label, visible: true }))
   };
 

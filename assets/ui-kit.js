@@ -70,6 +70,85 @@
     return `<span class="ui-date tnum">${Q.fmt(date)}</span>`;
   };
 
+  // Top underline tabs. items: [{ key, label, href, n, tone }] — `n` is a quiet count, tone 'danger' colours it.
+  UI.tabs = (items, cur, label) => `<nav class="tabs ui-tabs" role="tablist" aria-label="${esc(label)}">${items.map(t =>
+    `<a role="tab" href="${esc(t.href)}" aria-selected="${t.key === cur}"${t.key === cur ? ' aria-current="page"' : ''}>${esc(t.label)}${t.n ? `<span class="tab-n${t.tone ? ' ' + kind(t.tone) : ''}">${t.n}</span>` : ''}</a>`).join('')}</nav>`;
+
+  /* ---------- Update 20b: "board" summary layout ----------
+   * Left column: stacked stat tiles + one breakdown card (ring + progress bars).
+   * Right: one table card with search, type filter, an optional primary button and pagination. */
+  // Stat tile: icon square, two-line label, big number on the right.
+  UI.tile = o => {
+    const tag = o.href ? 'a' : 'div';
+    return `<${tag} class="ui-tile${o.tone ? ' tone-' + kind(o.tone) : ''}"${o.href ? ` href="${esc(o.href)}"` : ''}${o.note ? ` title="${esc(o.note)}"` : ''}>
+      <span class="ui-tile-icon">${icon(o.icon || 'circle')}</span><span class="ui-tile-label">${esc(o.label)}${o.note ? `<small>${esc(o.note)}</small>` : ''}</span>
+      <span class="ui-tile-value tnum${typeof o.value === 'string' && o.value.length > 5 ? ' text' : ''}">${esc(String(o.value))}${o.unit ? `<small>${esc(o.unit)}</small>` : ''}</span></${tag}>`;
+  };
+  // Ring chart with the value in the middle.
+  UI.donut = (pct, label) => {
+    const v = Math.max(0, Math.min(100, Math.round(pct || 0))), r = 52, c = 2 * Math.PI * r;
+    return `<div class="ui-donut" role="img" aria-label="${esc(label)} ${v}%"><svg viewBox="0 0 140 140" aria-hidden="true"><circle class="trk" cx="70" cy="70" r="${r}"/>${v ? `<circle class="val" cx="70" cy="70" r="${r}" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 70 70)"/>` : ''}</svg>
+      <span class="ui-donut-c"><small>${esc(label)}</small><b class="tnum">${v}%</b></span></div>`;
+  };
+  // Breakdown card: { title, link, donut: {pct, label}, bars: [{ label, pct, value, note, href, tone }] }
+  UI.breakdown = o => `<section class="ui-bd">
+    <header><h2>${esc(o.title)}</h2>${o.link ? `<a class="ui-link" href="${esc(o.link.href)}">${esc(o.link.text)}${icon('chevron-right')}</a>` : ''}</header>
+    ${o.donut ? UI.donut(o.donut.pct, o.donut.label) : ''}
+    ${(o.bars || []).length ? `<ul class="ui-bars">${o.bars.map(x => { const v = Math.max(0, Math.min(100, Math.round(x.pct || 0))), inner = `<span class="ui-bar-l"><i class="dot${x.tone ? ' ' + kind(x.tone) : ''}"></i>${esc(x.label)}</span><span class="ui-bar-t"><i class="${x.tone ? kind(x.tone) : ''}" style="width:${v}%"></i></span><span class="ui-bar-f"><span>${esc(x.note || '')}</span><b class="tnum">${esc(x.value != null ? String(x.value) : v + '%')}</b></span>`;
+      return `<li>${x.href ? `<a href="${esc(x.href)}">${inner}</a>` : inner}</li>`; }).join('')}</ul>` : (o.empty ? `<p class="small muted">${esc(o.empty)}</p>` : '')}
+  </section>`;
+
+  // Table rows: { icon, title, meta, kind, owner (person id), due (ISO date) | dueText, right (status html), href | action+data, tone }
+  const PAGE = 8;
+  const pager = (page, pages) => {
+    if (pages <= 1) return '';
+    const nums = []; for (let i = 1; i <= pages; i++) if (i === 1 || i === pages || Math.abs(i - page) <= 1) nums.push(i); else if (nums.at(-1) !== '…') nums.push('…');
+    return `<button type="button" class="ui-pg" data-bt-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="Previous page">${icon('chevron-left')}</button>${nums.map(n => n === '…' ? '<span class="ui-pg-gap">…</span>' : `<button type="button" class="ui-pg${n === page ? ' on' : ''}" data-bt-page="${n}" ${n === page ? 'aria-current="page"' : ''}>${n}</button>`).join('')}<button type="button" class="ui-pg" data-bt-page="${page + 1}" ${page >= pages ? 'disabled' : ''} aria-label="Next page">${icon('chevron-right')}</button>`;
+  };
+  UI.btable = ({ title = 'Needs attention', rows = [], action = '', search = 'Search items', empty = 'Nothing needs attention.' }) => {
+    const kinds = [...new Set(rows.map(r => r.kind).filter(Boolean))];
+    const hasOwner = rows.some(r => r.owner), hasDue = rows.some(r => r.due || r.dueText), hasKind = kinds.length > 0;
+    const tr = (r, i) => {
+      const go = r.href ? `<a class="ui-bt-title" href="${esc(r.href)}">${esc(r.title)}</a>` : `<button type="button" class="ui-bt-title" data-action="${esc(r.action)}"${Object.entries(r.data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('')}>${esc(r.title)}</button>`;
+      return `<tr data-bt-row data-kind="${esc(r.kind || '')}" data-text="${esc(`${r.title} ${r.meta || ''} ${r.kind || ''} ${r.owner ? Q.pname(r.owner) : ''}`.toLowerCase())}"${i >= PAGE ? ' hidden' : ''} class="${r.tone ? 'tone-' + kind(r.tone) : ''}">
+        <td><span class="ui-bt-item"><span class="ui-bt-icon">${icon(r.icon || 'circle')}</span><span class="ui-bt-main">${go}${r.meta ? `<span class="ui-bt-meta">${esc(r.meta)}</span>` : ''}</span></span></td>
+        ${hasKind ? `<td class="ui-bt-kind">${esc(r.kind || '—')}</td>` : ''}
+        ${hasOwner ? `<td>${r.owner ? `<span class="user-cell"><span class="avatar sm">${esc(Q.initials(r.owner))}</span><span class="nowrap">${esc(Q.pname(r.owner))}</span></span>` : '<span class="muted">—</span>'}</td>` : ''}
+        ${hasDue ? `<td class="nowrap">${r.due ? `<span class="ui-date tnum${Q.days(Q.today(), r.due) < 0 ? ' od' : ''}">${Q.fmt(r.due)}</span>` : r.dueText ? `<span class="ui-date">${esc(r.dueText)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+        <td class="ui-bt-status">${r.right || ''}</td></tr>`;
+    };
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    return `<div class="ui-bt" data-bt>
+      <div class="ui-bt-bar"><h2>${esc(title)}<span class="ui-count tnum">${rows.length}</span></h2>
+        ${rows.length > 3 ? `<label class="ui-bt-search">${icon('search')}<input type="search" data-bt-search placeholder="${esc(search)}" aria-label="${esc(search)}"></label>` : ''}
+        ${kinds.length > 1 ? `<label class="ui-bt-filter">${icon('filter')}<select data-bt-filter aria-label="Filter by type"><option value="">All types</option>${kinds.map(k => `<option>${esc(k)}</option>`).join('')}</select>${icon('chevron-down')}</label>` : ''}
+        <span class="ui-bt-sp"></span>${action}</div>
+      ${rows.length ? `<div class="table-scroll"><table class="dt ui-btable"><caption class="sr-only">${esc(title)}</caption><thead><tr><th>Item</th>${hasKind ? '<th>Type</th>' : ''}${hasOwner ? '<th>Owner</th>' : ''}${hasDue ? '<th>Due</th>' : ''}<th>Status</th></tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>
+        <div class="ui-bt-empty" hidden>${icon('search')}<span>No items match.</span></div>
+        <footer class="ui-bt-foot"><span class="small muted" data-bt-info>Showing ${Math.min(PAGE, rows.length)} of ${rows.length}</span><span class="ui-pager" data-bt-pager>${pager(1, pages)}</span></footer>`
+        : `<div class="ui-empty">${icon('circle-check')}<span>${esc(empty)}</span></div>`}
+    </div>`;
+  };
+  const btUpdate = (root, page = 1) => {
+    const q = (root.querySelector('[data-bt-search]')?.value || '').trim().toLowerCase(), f = root.querySelector('[data-bt-filter]')?.value || '';
+    const rows = [...root.querySelectorAll('[data-bt-row]')], match = rows.filter(r => (!q || r.dataset.text.includes(q)) && (!f || r.dataset.kind === f));
+    const pages = Math.max(1, Math.ceil(match.length / PAGE)); page = Math.max(1, Math.min(pages, page));
+    rows.forEach(r => { r.hidden = true; }); match.slice((page - 1) * PAGE, page * PAGE).forEach(r => { r.hidden = false; });
+    root.querySelector('[data-bt-info]').textContent = match.length ? `Showing ${(page - 1) * PAGE + 1}–${Math.min(page * PAGE, match.length)} of ${match.length}` : 'Showing 0';
+    root.querySelector('[data-bt-pager]').innerHTML = pager(page, pages); root.querySelector('.ui-bt-empty').hidden = !!match.length; Q.refreshIcons();
+  };
+  document.addEventListener('input', e => { const s = e.target.closest?.('[data-bt-search]'); if (s) btUpdate(s.closest('[data-bt]')); });
+  document.addEventListener('change', e => { const s = e.target.closest?.('[data-bt-filter]'); if (s) btUpdate(s.closest('[data-bt]')); });
+  document.addEventListener('click', e => {
+    const pg = e.target.closest?.('[data-bt-page]'); if (pg) { btUpdate(pg.closest('[data-bt]'), +pg.dataset.btPage); return; }
+    const tr = e.target.closest?.('tr[data-bt-row]'); if (tr && !e.target.closest('a, button, input, select')) tr.querySelector('.ui-bt-title')?.click();
+  });
+
+  // Summary tab: { stats (max 4), breakdown, attention rows, action, empty, title }
+  UI.summary = ({ stats = [], breakdown = null, attention = [], action = '', empty = 'Nothing needs attention.', title = 'Needs attention', search }) =>
+    `<div class="ui-board"><aside class="ui-board-side">${stats.slice(0, 4).map(UI.tile).join('')}${breakdown ? UI.breakdown(breakdown) : ''}</aside>
+      <section class="ui-board-main">${UI.btable({ title, rows: attention, action, empty, search })}</section></div>`;
+
   // Keyboard support for role="button" rows.
   document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('a.ui-row[role="button"]')) { e.preventDefault(); e.target.click(); } });
 })();
@@ -77,7 +156,7 @@
 /* UI Library — Settings → Workspace → UI Components. Shows every kit component with live sample data and the rules. */
 (() => {
   'use strict';
-  const { esc } = Q, U = Q.ui;
+  const { esc, icon } = Q, U = Q.ui;
   const code = s => `<code class="ui-code">${esc(s)}</code>`;
   const demo = (title, note, body, usage) => `<section class="ui-demo"><header><h3>${esc(title)}</h3><p>${esc(note)}</p></header><div class="ui-demo-body">${body}</div>${usage ? `<footer>${code(usage)}</footer>` : ''}</section>`;
   Q.settingsViews = Q.settingsViews || {};
@@ -97,6 +176,50 @@
       ${demo('Info tip', 'Explanations live behind ⓘ (hover or keyboard focus) instead of sentences on the page.', `<span class="ui-demo-row">Process status ${U.info('Counts include subprocesses. Status reflects open items; ISO readiness is scored separately.')}</span>`, 'Q.ui.info(text)')}
       ${demo('List card', 'One line per row with a due badge on the right. The whole row opens the record; no buttons inside rows.', `<div style="max-width:560px">${U.card({ title: 'Upcoming reviews', count: docs.length, link: { href: '#/documents', text: 'View all' }, flush: true, body: U.list(docs.map(d => ({ icon: 'file-text', title: d.title, meta: `${d.id} · Rev ${d.rev}`, action: 'open-doc', data: { id: d.id }, right: U.due(d.nextReview) }))) })}</div>`, "Q.ui.card({ title, count, info, link, body: Q.ui.list(items), flush: true })")}
       ${demo('Empty state', 'Short, positive, no instructions.', `<div style="max-width:560px" class="panel">${U.list([], { empty: 'Nothing needs your action today.' })}</div>`, "Q.ui.list([], { empty })")}
-      </div>` };
+      </div>
+      ${boardKit()}` };
   };
+
+  /* ---------- Update 20 board kit: pill tabs + Summary board, with the rules that go with them ---------- */
+  function boardKit() {
+    const S = Q.S, cur = Q.route().q.tab || 'summary';
+    const docs = S.documents.filter(d => d.nextReview && d.owner).slice(0, 11);
+    const rows = docs.map((d, i) => ({ icon: 'file-text', title: d.title, meta: `${d.id} · Rev ${d.rev || '—'}`, kind: i % 3 === 0 ? 'Document' : i % 3 === 1 ? 'Risk' : 'KPI', owner: d.owner, due: d.nextReview,
+      action: 'open-doc', data: { id: d.id }, right: Q.docOverdue(d) ? U.badge('Review overdue', 'danger') : U.badge('Current', 'success'), tone: Q.docOverdue(d) ? 'danger' : '' }));
+    const tiles = [
+      { label: 'Documents overdue', value: 3, icon: 'files', tone: 'danger', note: 'of 42 documents', href: '#/documents' },
+      { label: 'Open risks', value: 12, icon: 'shield-alert', note: '2 high' },
+      { label: 'Process health', value: 'Needs attention', icon: 'activity', tone: 'warning', note: 'text values shrink to fit' }];
+    const bd = { title: 'Process controls', link: { href: '#/settings/ui-library', text: 'Link' }, donut: { pct: 72, label: 'ISO 9001 readiness' },
+      bars: [{ label: 'Documents current', pct: 90, value: '9/10', note: 'not overdue' }, { label: 'Evidence linked', pct: 60, value: '3/5', note: 'no missing links', tone: 'warning' }, { label: 'KPIs on target', pct: 25, value: '1/4', note: 'Sep 2026', tone: 'danger' }] };
+    const rule = (t, d) => `<li><b>${esc(t)}</b><span>${esc(d)}</span></li>`;
+    const tabsDemo = U.tabs([{ key: 'summary', label: 'Summary' }, { key: 'definition', label: 'Definition' }, { key: 'documents', label: 'Documents', n: 4 }, { key: 'risks', label: 'Risks', n: 2, tone: 'danger' }, { key: 'activity', label: 'Activity' }]
+      .map(t => ({ ...t, href: `#/settings/ui-library?tab=${t.key}` })), cur, 'Demo tabs');
+    return `<div class="section-head" style="margin-top:32px"><h2>Board kit (Update 20)</h2><span class="sub">Pill tabs and the Summary board used by Organization & Scope, Policies, the process workspace, Audits and the audit workspace.</span></div>
+      <div class="ui-lib">
+      ${demo('Page rules', 'How a tabbed page is put together. Follow these when adding a new page.', `<ul class="kit-rules">
+        ${rule('One topic per tab', 'A page is a pill tab group. Each tab shows one subject: a table, a form or a chart, never a dashboard.')}
+        ${rule('Summary first', 'The first tab is always Summary and is the default route (#/page). Other tabs are #/page/<tab>.')}
+        ${rule('Left column: numbers', 'At most 4 stat tiles, then one breakdown card (one ring + up to 5 bars). Nothing else on the left.')}
+        ${rule('Right: one table', 'One “Needs attention” table: Item · Type · Owner · Due · Status. 8 rows per page, search, type filter.')}
+        ${rule('One primary button', 'The table bar carries the one action people take most on this page. Other actions stay in the page header.')}
+        ${rule('Colour = status only', 'Red for overdue or failing, amber for pending, green for done. Tile icons follow the same rule.')}
+        ${rule('Rows open records', 'The whole row opens the record where the item is fixed. No buttons inside rows.')}
+        ${rule('Counts on tabs', 'A tab shows its record count, or its warning (“1 overdue”) instead when there is one. Empty tabs show “—”.')}</ul>`)}
+      ${demo('Pill tabs', 'Rounded tab group; the selected tab is a filled pill. Counts are small pills; a danger count turns red. Click to try.', tabsDemo,
+        "Q.ui.tabs([{ key, label, href, n, tone }], currentKey, ariaLabel)")}
+      ${demo('Stat tile', 'Icon square, label with a short note, big number on the right. Tone colours the icon and number. Max 4, stacked.', `<div class="kit-col">${tiles.map(U.tile).join('')}</div>`,
+        "Q.ui.tile({ label, value, unit, icon, tone: 'danger'|'warning'|null, note, href })")}
+      ${demo('Ring chart', 'One percentage with its label inside. Use for the single number the page is judged by.', `<div class="kit-row">${U.donut(86.8, 'Recovery rate average')}${U.donut(42, '5 of 12 audits reported')}${U.donut(0, 'Checklist not built')}</div>`,
+        "Q.ui.donut(pct, label)")}
+      ${demo('Breakdown card', 'Ring plus up to five progress bars, each with a note and value. Bars link to the tab with the detail.', `<div class="kit-col">${U.breakdown(bd)}</div>`,
+        "Q.ui.breakdown({ title, link: { href, text }, donut: { pct, label }, bars: [{ label, pct, value, note, href, tone }], empty })")}
+      ${demo('Attention table', 'Search, type filter, primary button, pagination (8 per page). Columns without data are left out. Try search, filter and page 2.',
+        `<div class="ui-board-main">${U.btable({ title: 'Needs attention', rows, search: 'Search documents…', action: `<button class="btn primary" type="button" data-action="toast" data-title="Primary action" data-msg="One primary action per table.">${icon('plus')}Primary Action</button>` })}</div>`,
+        "Q.ui.btable({ title, rows: [{ icon, title, meta, kind, owner, due | dueText, right, href | action+data, tone }], search, action, empty })")}
+      ${demo('Summary board', 'The full Summary tab: tiles and breakdown on the left, attention table on the right. Stacks on tablets and phones.',
+        U.summary({ stats: tiles, breakdown: bd, attention: rows.slice(0, 5), search: 'Search…', action: `<button class="btn primary" type="button" data-action="toast" data-title="Primary action" data-msg="One primary action per table.">${icon('plus')}Add</button>` }),
+        "Q.ui.summary({ stats, breakdown, attention, action, search, empty, title })")}
+      </div>`;
+  }
 })();

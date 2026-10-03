@@ -287,10 +287,20 @@
    * (show/hide, rename, reorder); each tab shows how many records it holds, and empty
    * tabs are muted or hidden. Documents, Risks and KPIs tabs use the same saved views
    * as their main pages, filtered to this process (and its subprocesses).          */
-  Q.WS_TABS = { overview: 'Overview', documents: 'Documents', risks: 'Risks & Opportunities', kpis: 'Objectives & KPIs', evidence: 'Evidence', audit: 'Audit & Actions', iso: 'ISO Mapping' };
+  Q.WS_TABS = { overview: 'Summary', definition: 'Definition', documents: 'Documents', risks: 'Risks & Opportunities', kpis: 'Objectives & KPIs', evidence: 'Evidence', audit: 'Audit & Actions', iso: 'ISO Mapping', activity: 'Activity' };
+  const NO_COUNT = new Set(['overview', 'definition', 'activity']);
   Q.wsConfig = () => {
-    if (!Q.S.workspace) { Q.S.workspace = JSON.parse(JSON.stringify(window.QMS_DATA.workspace)); Q.save(); }
-    return Q.S.workspace;
+    const S = Q.S;
+    if (!S.workspace) { S.workspace = JSON.parse(JSON.stringify(window.QMS_DATA.workspace)); Q.save(); }
+    // Update 20: saved configurations get the new Definition and Activity tabs once; a renamed Overview keeps its name.
+    if (!S.workspace.v20) {
+      const t = S.workspace.tabs, ov = t.find(x => x.key === 'overview');
+      if (ov && ov.label === 'Overview') ov.label = 'Summary';
+      if (!t.some(x => x.key === 'definition')) t.splice(t.findIndex(x => x.key === 'overview') + 1, 0, { key: 'definition', label: 'Definition', visible: true });
+      if (!t.some(x => x.key === 'activity')) t.push({ key: 'activity', label: 'Activity', visible: true });
+      S.workspace.v20 = true; Q.save();
+    }
+    return S.workspace;
   };
   const tabCount = (k, s) => ({ documents: s.docs, risks: Q.S.risks.filter(r => Q.inProc(r.process, s.pid)).length, kpis: s.kpis, evidence: s.evidence,
     audit: Q.S.findings.filter(f => Q.inProc(f.process, s.pid)).length + Q.S.actions.filter(a => Q.inProc(a.process, s.pid)).length + Q.S.improvements.filter(i => Q.inProc(i.process, s.pid)).length, iso: s.iso.total })[k];
@@ -305,9 +315,9 @@
     const label = k => (cfg.tabs.find(t => t.key === k)?.label) || Q.WS_TABS[k];
     const note = { documents: s.docsOverdue ? `${s.docsOverdue} overdue` : '', risks: s.highRisks ? `${s.highRisks} high` : '', kpis: s.kpisBelow ? `${s.kpisBelow} below` : '', evidence: s.evGaps ? `${s.evGaps} missing` : '', audit: s.actionsOverdue ? `${s.actionsOverdue} overdue` : '', iso: s.isoGaps ? `${s.isoGaps} gaps` : '' };
     const tabsHtml = `<div class="tabs ws-tabs" role="tablist" aria-label="Process workspace">${shown.map(t => {
-      const n = t.key === 'overview' ? null : tabCount(t.key, s), empty = n === 0;
+      const n = NO_COUNT.has(t.key) ? null : tabCount(t.key, s), empty = n === 0;
       if (empty && cfg.emptyTabs === 'hide' && t.key !== tab) return '';
-      return `<a role="tab" href="#/process/${pid}${t.key === 'overview' ? '' : '/' + t.key}" aria-selected="${t.key === tab}" class="${empty ? 'empty' : ''}" ${empty ? 'title="Nothing recorded for this process yet"' : ''}>${esc(t.label || Q.WS_TABS[t.key])}${n != null ? `<span class="tab-n">${empty ? '—' : n}</span>` : ''}${note[t.key] ? `<span class="tab-note">${note[t.key]}</span>` : ''}</a>`;
+      return `<a role="tab" href="#/process/${pid}${t.key === 'overview' ? '' : '/' + t.key}" aria-selected="${t.key === tab}" class="${empty ? 'empty' : ''}" ${empty ? 'title="Nothing recorded for this process yet"' : ''}>${esc(t.label || Q.WS_TABS[t.key])}${note[t.key] ? `<span class="tab-note" title="${n} in total">${note[t.key]}</span>` : n != null ? `<span class="tab-n">${empty ? '—' : n}</span>` : ''}</a>`;
     }).join('')}<a class="ws-config" href="#/settings/workspace" title="Choose which tabs every process shows">${icon('settings')}<span class="sr-only">Configure process workspace tabs</span></a></div>`;
     const crumbs = [['QMS', '#/qms/scope'], ['Processes', '#/qms/processes'], ...(parent ? [[`${parent.process_code} ${parent.name}`, `#/process/${parent.process_id}`]] : []), [`${p.process_code} ${p.name}`, `#/process/${pid}`], ...(tab !== 'overview' ? [[label(tab)]] : [])];
     const head = Q.pageHead({ crumbs, title: `<span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}`,
@@ -331,7 +341,9 @@
       return { html: Q.vwCard(type, v, inner), after: main => Q.vwAfter(type, main) };
     };
     let body = '', after = null, res = null;
-    if (tab === 'overview') body = processOverview(p, s, kids);
+    if (tab === 'overview') body = processSummary(p, s, kids);
+    else if (tab === 'definition') body = processDefinition(p, kids);
+    else if (tab === 'activity') body = processActivity(p);
     else if (tab === 'documents') res = viewTab('documents', Q.docTable, (v, where) => v.group === 'clause' ? `<div class="vc-body"><div class="vc-summary">${Q.vwSummary('documents', v)}</div>${Q.docsByClause(v, v, where, q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0])}</div>` : null);
     else if (tab === 'risks') res = viewTab('risks', Q.riskTable);
     else if (tab === 'kpis') res = viewTab('kpis', Q.kpiTable);
@@ -342,21 +354,44 @@
     else if (tab === 'iso') body = `<section class="panel" style="margin-bottom:20px"><div class="panel-pad">${Q.readinessBlock(Q.isoForProcess(pid), { link: `#/process/${pid}/iso` })}</div></section>` + Q.isoTable('p-iso', { process: pid });
     if (res?.redirect) { location.replace(res.redirect); return { title: p.name, nav: 'process', html: '' }; }
     if (res) { body = res.html; after = res.after; }
-    const empty = tab !== 'overview' && tabCount(tab, s) === 0;
+    const empty = !NO_COUNT.has(tab) && tabCount(tab, s) === 0;
     const emptyNote = empty ? `<div class="callout" style="margin-bottom:16px">${icon('info')}<span><b>Nothing recorded for ${esc(p.name)} yet</b>This tab is part of every process. Add the first record with <b>Add</b> above, or hide empty tabs in <a href="#/settings/workspace">Settings → Process Workspace</a>.</span></div>` : '';
     return { title: `${p.name}${tab !== 'overview' ? ' · ' + label(tab) : ''}`, nav: 'process', html: head + tabsHtml + emptyNote + body, after };
   };
 
-  function processOverview(p, s, kids) {
-    const pid = p.process_id, today = Q.today();
-    const items = [
-      ...Q.S.documents.filter(d => Q.inProc(d.process, pid) && Q.docOverdue(d)).map(d => ['calendar-clock', `Document review overdue: ${d.title}`, `${d.id} · due ${Q.fmt(d.nextReview)}`, `<button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open Document</button>`]),
-      ...Q.S.workflows.filter(w => Q.inProc(Q.doc(w.doc)?.process, pid)).map(w => ['file-check', `${Q.wfStatus(w)}: ${Q.doc(w.doc).title} Rev ${w.rev}`, `Waiting for ${Q.wfAssignees(w).map(Q.pname).join(', ')} · due ${Q.fmt(w.due)}`, `<a class="btn sm" href="#/review/${w.id}">Open Review</a>`]),
-      ...Q.S.risks.filter(r => Q.inProc(r.process, pid) && r.kind === 'Risk' && Q.riskLevel(r) === 'High').map(r => ['shield-alert', `High risk: ${r.title}`, `${r.id} · score ${Q.riskScore(r)} · treatment due ${Q.fmt(r.due)}`, `<a class="btn sm" href="#/process/${pid}/risks">View</a>`]),
-      ...Q.S.kpis.filter(k => Q.inProc(k.process, pid) && !Q.kpiOk(k)).map(k => ['target', `Below target: ${k.name}`, `${Q.kpiFmt(k.actual, k)} vs target ${k.dir} ${Q.kpiFmt(k.target, k)} · ${k.period}`, `<a class="btn sm" href="#/process/${pid}/kpis">View</a>`]),
-      ...Q.S.evidence.filter(e => Q.inProc(e.process, pid) && Q.evGap(e)).map(e => ['paperclip', `${e.status === 'Missing' ? 'Missing evidence' : 'Evidence link unavailable'}: ${e.name}`, `Control: ${e.control} · ISO ${e.iso}`, `<button class="btn sm" type="button" data-action="link-evidence" data-process="${e.process}" data-control="${esc(e.control)}" data-name="${esc(e.name)}" data-replace="${e.id}">Link Evidence</button>`]),
-      ...Q.S.actions.filter(a => Q.inProc(a.process, pid) && !Q.actionClosed(a)).map(a => ['list-checks', `${Q.actionOverdue(a) ? 'Overdue corrective action' : 'Open corrective action'}: ${a.title}`, `${a.id} · ${a.stage} · due ${Q.fmt(a.due)}`, `<a class="btn sm" href="#/process/${pid}/audit">View</a>`])
-    ];
+  /* Update 20 — the workspace opens on a short Summary: four numbers and one "Needs attention" list.
+   * Definition, Activity and ISO readiness have their own tabs. */
+  const HEALTH = { ok: ['On track', 'success'], attn: ['Needs attention', 'warning'], risk: ['At risk', 'danger'] };
+  Q.processAttention = pid => [
+    ...Q.S.documents.filter(d => Q.inProc(d.process, pid) && Q.docOverdue(d)).map(d => ({ icon: 'file-text', title: d.title, meta: `${d.id} · Rev ${d.rev}`, kind: 'Document', owner: d.owner, due: d.nextReview, action: 'open-doc', data: { id: d.id }, right: Q.ui.badge('Review overdue', 'danger'), tone: 'danger', w: 1 })),
+    ...Q.S.risks.filter(r => Q.inProc(r.process, pid) && r.kind === 'Risk' && Q.riskLevel(r) === 'High').map(r => ({ icon: 'shield-alert', title: r.title, meta: `${r.id} · score ${Q.riskScore(r)}`, kind: 'Risk', owner: r.owner, due: r.due, href: `#/process/${pid}/risks?focus=${r.id}`, right: Q.ui.badge('High risk', 'danger'), tone: 'danger', w: 2 })),
+    ...Q.S.actions.filter(a => Q.inProc(a.process, pid) && !Q.actionClosed(a)).map(a => ({ icon: 'list-checks', title: a.title, meta: `${a.id} · ${a.stage}`, kind: 'Corrective action', owner: a.owner, due: a.due, href: `#/process/${pid}/audit`, right: Q.actionOverdue(a) ? Q.ui.badge('Overdue', 'danger') : Q.ui.badge('Open', 'info'), tone: Q.actionOverdue(a) ? 'danger' : '', w: Q.actionOverdue(a) ? 3 : 7 })),
+    ...Q.S.kpis.filter(k => Q.inProc(k.process, pid) && !Q.kpiOk(k)).map(k => ({ icon: 'target', title: k.name, meta: `${Q.kpiFmt(k.actual, k)} vs target ${k.dir} ${Q.kpiFmt(k.target, k)}`, kind: 'KPI', owner: k.owner, dueText: k.period, href: Q.K ? `#/qms/objectives/k/${k.id}` : `#/process/${pid}/kpis`, right: Q.ui.badge('Below target', 'danger'), tone: 'warning', w: 4 })),
+    ...Q.S.evidence.filter(e => Q.inProc(e.process, pid) && Q.evGap(e)).map(e => ({ icon: 'paperclip', title: e.name, meta: `Control: ${e.control} · ISO ${e.iso}`, kind: 'Evidence', owner: Q.proc(e.process)?.owner, action: 'link-evidence', data: { process: e.process, control: e.control, name: e.name, replace: e.id }, right: Q.ui.badge(e.status === 'Missing' ? 'Missing' : 'Unavailable', 'warning'), tone: 'warning', w: 5 })),
+    ...Q.S.workflows.filter(w => Q.inProc(Q.doc(w.doc)?.process, pid)).map(w => ({ icon: 'file-check', title: `${Q.doc(w.doc).title} Rev ${w.rev}`, meta: `Waiting for ${Q.wfAssignees(w).map(Q.pname).join(', ')}`, kind: 'Document review', owner: Q.wfAssignees(w)[0], due: w.due, href: `#/review/${w.id}`, right: Q.ui.badge(Q.wfStatus(w), 'info'), w: 6 }))
+  ].sort((x, y) => x.w - y.w);
+  function processSummary(p, s, kids) {
+    const pid = p.process_id, [hl, hk] = HEALTH[s.health] || HEALTH.ok, S = Q.S, inP = x => Q.inProc(x.process, pid);
+    const pct = (n, t) => t ? Math.round(n / t * 100) : 100;
+    const docs = S.documents.filter(inP), ev = S.evidence.filter(inP), kp = S.kpis.filter(inP), ca = S.actions.filter(inP);
+    const iso = Q.isoForProcess(pid), isoPct = Q.isoScore(iso).pct ?? 0;
+    const bar = (label, n, t, note, tab) => ({ label, pct: pct(n, t), value: t ? `${n}/${t}` : '—', note, href: `#/process/${pid}/${tab}`, tone: t && n < t ? (pct(n, t) < 50 ? 'danger' : 'warning') : '' });
+    return Q.ui.summary({
+      stats: [
+        { label: 'Process health', value: hl, icon: 'activity', tone: hk === 'success' ? null : hk, note: s.findings ? `${s.findings} open audit finding${s.findings === 1 ? '' : 's'}` : 'no open findings', href: `#/process/${pid}/audit` },
+        { label: 'Documents overdue', value: s.docsOverdue, icon: 'files', tone: s.docsOverdue ? 'danger' : null, note: `of ${s.docs} documents`, href: `#/process/${pid}/documents` },
+        { label: 'High risks', value: s.highRisks, icon: 'shield-alert', tone: s.highRisks ? 'danger' : null, note: `${s.openRisks} open risks & opportunities`, href: `#/process/${pid}/risks` },
+        { label: 'KPIs below target', value: s.kpisBelow, icon: 'target', tone: s.kpisBelow ? 'warning' : null, note: `of ${s.kpis} KPIs`, href: `#/process/${pid}/kpis` }],
+      breakdown: { title: 'Process controls', link: { href: `#/process/${pid}/iso`, text: 'ISO Mapping' }, donut: { pct: isoPct, label: 'ISO 9001 readiness' },
+        bars: [
+          bar('Documents current', docs.filter(d => !Q.docOverdue(d)).length, docs.length, 'not overdue for review', 'documents'),
+          bar('Evidence linked', ev.filter(e => !Q.evGap(e)).length, ev.length, 'no missing links', 'evidence'),
+          bar('KPIs on target', kp.filter(Q.kpiOk).length, kp.length, kp[0] ? kp[0].period : 'no KPIs', 'kpis'),
+          bar('Actions on time', ca.filter(a => !Q.actionOverdue(a)).length, ca.length, 'corrective actions', 'audit')] },
+      attention: Q.processAttention(pid), search: 'Search documents, risks, KPIs…', empty: 'Nothing needs attention. Documents are current, KPIs are on target and evidence is linked.',
+      action: `<button class="btn primary" type="button" data-action="link-evidence" data-process="${pid}">${icon('link')}Link Evidence</button>` });
+  }
+  function processDefinition(p, kids) {
     const coverage = e => {
       const d = e.doc && Q.doc(e.doc), ev = e.ev && Q.S.evidence.find(x => x.id === e.ev);
       const parts = [];
@@ -365,36 +400,21 @@
       if (!d && !ev) parts.push(e.kind === 'Activity' || e.kind === 'Record' ? '<span class="muted small">Recorded in registers</span>' : '<span class="st danger">No controlled document linked</span>');
       return parts.join(' · ');
     };
-    const act = Q.S.activity.filter(a => Q.inProc(a.process, pid)).slice(0, 6);
-    const hl = (ic, label, v, href, kind = 'attn') => `<li>${icon(ic)}<a href="${href}">${label}</a><span class="v ${v ? kind : 'zero'}">${v || '—'}</span></li>`;
-    return `<div class="grid-2">
-      <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-        <section class="panel"><div class="panel-head"><h2>Needs attention in this process</h2><span class="muted small">${items.length}</span></div>
-          ${items.length ? `<ul class="worklist">${items.map(([ic, t, m, b]) => `<li><span class="w-kind">${icon(ic)}</span><div class="w-main"><div class="w-title">${esc(t)}</div><div class="w-meta">${esc(m)}</div></div>${b}</li>`).join('')}</ul>` : '<div class="empty"><h3>Nothing needs attention.</h3><p>Documents are current, KPIs are on target and evidence is linked.</p></div>'}</section>
-        <section class="panel"><div class="panel-head"><h2>Process definition</h2></div><div class="panel-pad"><dl class="kv">
-          <dt>Purpose</dt><dd>${esc(p.purpose)}</dd>
-          <dt>Inputs</dt><dd>${p.inputs.map(esc).join(' · ')}</dd>
-          <dt>Outputs</dt><dd>${p.outputs.map(esc).join(' · ')}</dd>
-          <dt>Responsible roles</dt><dd>${p.roles.map(esc).join(' · ')}</dd>
-          <dt>Process owner</dt><dd>${esc(Q.pname(p.owner))}, ${esc(Q.person(p.owner).title)}</dd></dl></div></section>
-        ${kids.length ? `<section class="panel"><div class="panel-head"><h2>Subprocesses</h2></div><ul class="worklist">${kids.map(k => { const ks = Q.stats(k.process_id); return `<li><div class="w-main"><div class="w-title"><a href="#/process/${k.process_id}">${esc(k.process_code)} ${esc(k.name)}</a></div><div class="w-meta">${esc(k.purpose)}</div></div>${Q.health(ks.health)}</li>`; }).join('')}</ul></section>` : ''}
-        <section class="panel"><div class="panel-head"><h2>Process elements</h2><span class="muted small">What this process consists of, and what controls or evidences each element</span></div>
-          <ul class="elements">${p.elements.map(e => `<li><span class="title">${esc(e.name)}</span><span class="kind">${esc(e.kind)}</span><span>${coverage(e)}</span></li>`).join('')}</ul></section>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
-        <section class="panel"><div class="panel-head"><h2>Process health</h2><div class="actions">${Q.health(s.health)}</div></div>
-          <ul class="health-list">
-            ${hl('files', 'Documents overdue for review', s.docsOverdue, `#/process/${pid}/documents`)}
-            ${hl('file-check', 'Documents in workflow', s.docsInWorkflow, `#/process/${pid}/documents`, 'warnv')}
-            ${hl('shield-alert', 'High risks', s.highRisks, `#/process/${pid}/risks`)}
-            ${hl('target', 'KPIs below target', s.kpisBelow, `#/process/${pid}/kpis`, 'warnv')}
-            ${hl('paperclip', 'Evidence gaps', s.evGaps, `#/process/${pid}/evidence`)}
-            ${hl('search-check', 'Open audit findings', s.findings, `#/process/${pid}/audit`, 'warnv')}
-            ${hl('list-checks', 'Overdue corrective actions', s.actionsOverdue, `#/process/${pid}/audit`)}
-          </ul></section>
-        <section class="panel"><div class="panel-head"><h2>ISO 9001 readiness</h2><div class="actions"><a class="btn sm ghost" href="#/process/${pid}/iso">Mapping</a></div></div><div class="panel-pad">${Q.readinessBlock(Q.isoForProcess(pid), { link: `#/process/${pid}/iso`, compact: true })}</div></section>
-        <section class="panel"><div class="panel-head"><h2>Recent activity</h2></div>${act.length ? `<ul class="activity">${act.map(a => `<li><span>${Q.who(a.who)} ${esc(a.text)}</span><span class="when">${Q.fmt(a.date)}</span></li>`).join('')}</ul>` : '<div class="empty small">No recent activity.</div>'}</section>
+    const list = xs => xs?.length ? `<ul class="bullets">${xs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<span class="muted">—</span>';
+    return `<div class="tab-split"><div class="tab-stack">
+        ${Q.ui.card({ title: 'Process definition', info: 'ISO 9001 clause 4.4.1 — inputs, outputs, responsibilities.', actions: `<a class="ui-link" href="#/settings/processes?select=${p.process_id}">Edit${icon('chevron-right')}</a>`, body: `<dl class="kv">
+          <dt>Purpose</dt><dd>${esc(p.purpose)}</dd><dt>Inputs</dt><dd>${list(p.inputs)}</dd><dt>Outputs</dt><dd>${list(p.outputs)}</dd>
+          <dt>Responsible roles</dt><dd>${list(p.roles)}</dd><dt>Process owner</dt><dd>${esc(Q.pname(p.owner))}, ${esc(Q.person(p.owner).title)}</dd></dl>` })}
+        <section class="panel"><div class="panel-head"><h2>Process elements</h2><span class="muted small">${(p.elements || []).length}</span>${Q.ui.info('What this process consists of, and what controls or evidences each element.')}</div>
+          ${(p.elements || []).length ? `<ul class="elements">${p.elements.map(e => `<li><span class="title">${esc(e.name)}</span><span class="kind">${esc(e.kind)}</span><span>${coverage(e)}</span></li>`).join('')}</ul>` : '<div class="empty small">No elements defined.</div>'}</section>
+      </div><div class="tab-stack">
+        ${kids.length ? Q.ui.card({ title: 'Subprocesses', count: kids.length, flush: true, body: Q.ui.list(kids.map(k => ({ icon: 'workflow', title: `${k.process_code} ${k.name}`, meta: k.purpose, href: `#/process/${k.process_id}` }))) }) : ''}
+        ${Q.ui.card({ title: 'ISO 9001 clauses', link: { href: `#/process/${p.process_id}/iso`, text: 'ISO Mapping' }, body: `<div class="ui-demo-row">${(p.iso || []).map(c => Q.ui.badge(c)).join(' ') || '<span class="muted">None mapped.</span>'}</div>` })}
       </div></div>`;
+  }
+  function processActivity(p) {
+    const act = Q.S.activity.filter(a => Q.inProc(a.process, p.process_id));
+    return `<section class="panel" style="max-width:880px"><div class="panel-head"><h2>Activity</h2><span class="muted small">${act.length}</span></div>${act.length ? `<ul class="activity">${act.map(a => `<li><span>${Q.who(a.who)} ${esc(a.text)}</span><span class="when">${Q.fmt(a.date)}</span></li>`).join('')}</ul>` : '<div class="empty small">No activity recorded for this process yet.</div>'}</section>`;
   }
   Q.actions['add-improvement'] = d => {
     const root = Q.proc(Q.rootId(d.process));
