@@ -322,7 +322,7 @@
     bar.addEventListener('scroll', () => {
       bar.classList.add('is-scrolling');
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => bar.classList.remove('is-scrolling'), 300);
+      scrollTimer = setTimeout(() => bar.classList.remove('is-scrolling'), 1000);
     }, { passive: true });
     let dragId = null;
     const clear = () => bar.querySelectorAll('.drop-before, .drop-after, .dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
