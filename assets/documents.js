@@ -202,7 +202,7 @@
     const tableWhere = d => sel === 'none' ? !Q.docIso(d).length : Q.docIso(d).some(c => Q.clauseIn(c, focus || top));
     const body = `<div class="browse-head"><div><h2>${sel === 'none' ? '' : `<span class="proc-code">${esc(focus || top)}</span>`}${esc(clauseTitle)}</h2><p class="sub">${esc(description)}</p></div>
       ${sel === 'none' ? '' : `<div class="actions"><a class="btn sm" href="#/evidence?view=clause&c=${esc(focus || top)}">${icon('paperclip')}Evidence for this clause</a></div>`}</div>
-      ${selected.length ? Q.docTable(Q.vwTableId(T, v, `clause-${String(sel).replace(/[^a-z0-9]+/gi, '_')}`), { columns: dr.columns, where: d => where(d) && tableWhere(d), initialSort: dr.sort }) : '<div class="empty panel"><h3>No documents match this clause</h3><p>Change the view filters or choose another clause.</p></div>'}`;
+      ${selected.length ? Q.docTable(Q.vwTableId(T, v, `clause-${String(sel).replace(/[^a-z0-9]+/gi, '_')}`), { columns: dr.columns, where: d => where(d) && tableWhere(d), pageSize: 10, initialSort: dr.sort }) : '<div class="empty panel"><h3>No documents match this clause</h3><p>Change the view filters or choose another clause.</p></div>'}`;
     return `<div class="browse">${tree}<section>${body}</section></div>`;
   }
 
