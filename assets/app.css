@@ -940,7 +940,9 @@ body .sb .sb-item.sb-sub { padding-left: 42px; justify-content: flex-start; }
 .vtab:not(.on):hover { background: rgba(255,255,255,.6); }
 .vtab.on { background: var(--surface); border-color: var(--border); }
 .vtab.on a { color: var(--text); font-weight: 600; }
-.vtab.on::after { content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px; border-radius: 0 0 2px 2px; background: var(--accent); }
+.vtab.on::before, .vtab.on::after { content: ""; position: absolute; left: 10px; right: 10px; height: 2px; border-radius: 2px; background: var(--accent); }
+.vtab.on::before { bottom: -1px; }
+.vtab.on::after { top: -1px; border-radius: 0 0 2px 2px; }
 .vtab .n { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; font-weight: 500; }
 .vtab svg.lucide { width: 14px; height: 14px; color: var(--text-3); }
 .vtab .vt-lock { width: 12px; height: 12px; }
