@@ -162,49 +162,48 @@
       const others = Q.S.users.filter(u => u.status === 'Active' && u.id !== p.owner && ['manage', 'contribute'].includes(u.access?.[p.id]) && !everywhere(u)).map(u => u.id);
       return [p.owner, ...others];
     };
-    const issues = s => [s.docsOverdue && `${s.docsOverdue} doc${s.docsOverdue > 1 ? 's' : ''} overdue`, s.kpisBelow && `${s.kpisBelow} KPI${s.kpisBelow > 1 ? 's' : ''} below target`, s.highRisks && `${s.highRisks} high risk${s.highRisks > 1 ? 's' : ''}`, s.evGaps && `${s.evGaps} evidence gap${s.evGaps > 1 ? 's' : ''}`, s.actionsOverdue && `${s.actionsOverdue} action${s.actionsOverdue > 1 ? 's' : ''} overdue`].filter(Boolean);
-    const PALETTES = [
-      { bg: '#EEF3F8', border: '#BFD0DF', pill: '#DDE8F1', ink: '#50697C' },
-      { bg: '#F6EEE7', border: '#D8BEA8', pill: '#EEDFD2', ink: '#7A5B45' },
-      { bg: '#F0ECF8', border: '#C7B9DD', pill: '#E3DCF1', ink: '#655681' },
-      { bg: '#EAF5EF', border: '#B8D7C7', pill: '#D8EBDD', ink: '#4E715E' },
-      { bg: '#F5F1E7', border: '#D8CFB2', pill: '#EAE2C9', ink: '#756B48' },
-      { bg: '#EAF1F8', border: '#B9CCE0', pill: '#D9E6F2', ink: '#506985' },
-      { bg: '#EDF4EA', border: '#BDD1B4', pill: '#DDEADB', ink: '#587050' },
-      { bg: '#E8F4F3', border: '#B9D5D1', pill: '#D6EAE7', ink: '#4F716D' }
-    ];
-    const card = (p, index) => {
-      const s = p.s, [label, cls] = STATUS[s.health];
+    // Process card (ReUI-style): readiness meter, three ring metrics with their trend, owner and team.
+    const TONE = { ok: 'success', attn: 'warning', risk: 'danger' };
+    const meter = (pct, tone, n = 34) => { const on = Math.round((pct || 0) / 100 * n); return `<span class="pc-meter ${tone}" role="img" aria-label="ISO readiness ${pct ?? 0}%">${Array.from({ length: n }, (_, i) => `<i${i < on ? ' class="on"' : ''}></i>`).join('')}</span>`; };
+    const ring = (pct, tone) => { const n = 20, on = Math.round(Math.max(0, Math.min(100, pct || 0)) / 100 * n);
+      return `<svg class="pc-ring ${tone}" viewBox="0 0 28 28" aria-hidden="true">${Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + i / n * Math.PI * 2, c = Math.cos(a), si = Math.sin(a); return `<line x1="${(14 + c * 9).toFixed(2)}" y1="${(14 + si * 9).toFixed(2)}" x2="${(14 + c * 13).toFixed(2)}" y2="${(14 + si * 13).toFixed(2)}"${i < on ? ' class="on"' : ''}/>`; }).join('')}</svg>`; };
+    const arrow = up => `<svg viewBox="0 0 24 24" aria-hidden="true">${up ? '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' : '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>'}</svg>`;
+    const trend = (up, good, text, val) => `<span class="pc-trend ${good ? 'good' : 'bad'}">${arrow(up)}<span>${esc(text)}</span>${val ? `<b>${esc(val)}</b>` : ''}</span>`;
+    const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main">${ringHtml}<b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
+    const card = p => {
+      const s = p.s, [label, cls] = STATUS[s.health], tone = TONE[s.health], pct = s.iso.pct;
       const clauses = (p.iso || []).slice(0, 4), moreClauses = Math.max(0, (p.iso || []).length - clauses.length);
-      const pal = PALETTES[index % PALETTES.length];
-      return `<a class="proc-card" href="#/process/${p.id}" style="--pc-bg:${pal.bg};--pc-border:${pal.border};--pc-pill:${pal.pill};--pc-ink:${pal.ink}" aria-labelledby="pc-${p.id}">
-        <div class="pc-card-body">
-          <div class="pc-card-head">
-            <span class="pc-code">${esc(p.process_code)}</span>
-            <span class="pc-badge ${cls}"><span class="pc-status-dot" aria-hidden="true"></span>${label}</span>
-          </div>
-
-          <div class="pc-title-block">
-            <h3 id="pc-${p.id}">${esc(p.name)}</h3>
-            <p class="pc-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
-          </div>
-
-          <div class="pc-tag-row" aria-label="Process details">
-            <span title="Process owner">Owner · ${esc(Q.pname(p.owner))}</span>
-            <span>${s.docs} docs</span>
-            <span>${s.evidence} evidence</span>
-          </div>
-
-          <div class="pc-tag-row pc-clause-row" aria-label="Applicable ISO 9001 clauses">
-            ${clauses.length ? clauses.map(c => `<span>${esc(c)}</span>`).join('') : '<span>Not mapped</span>'}
-            ${moreClauses ? `<span>+${moreClauses} more</span>` : ''}
-          </div>
+      const kpi = Q.S.kpis.filter(k => Q.inProc(k.process, p.id)).sort((a, b) => Q.kpiOk(a) - Q.kpiOk(b))[0];
+      const docOk = s.docs ? Math.round((s.docs - s.docsOverdue) / s.docs * 100) : 100;
+      const evOk = s.evidence ? Math.round((s.evidence - s.evGaps) / s.evidence * 100) : 100;
+      const none = '<span class="pc-trend muted">None linked</span>';
+      const docM = metric('Documents', s.docs, ring(s.docs ? docOk : 0, s.docsOverdue ? 'warning' : 'success'),
+        !s.docs ? none : s.docsOverdue ? trend(false, false, 'overdue', String(s.docsOverdue)) : trend(true, true, 'all current'));
+      let kpiM;
+      if (kpi) {
+        const prev = kpi.trend[kpi.trend.length - 2] ?? kpi.actual, up = kpi.actual >= prev, better = kpi.dir === '≤' ? kpi.actual <= prev : kpi.actual >= prev;
+        const ratio = kpi.dir === '≤' ? (kpi.actual <= kpi.target ? 100 : Math.max(0, 100 - (kpi.actual - kpi.target) / (kpi.target || 1) * 100)) : Math.min(100, kpi.actual / (kpi.target || 1) * 100);
+        kpiM = metric(kpi.name, Q.kpiFmt(kpi.actual, kpi), ring(ratio, Q.kpiOk(kpi) ? 'success' : 'danger'),
+          kpi.actual === prev ? '<span class="pc-trend muted">no change</span>' : trend(up, better, 'from', Q.kpiFmt(prev, kpi)));
+      } else kpiM = metric('KPIs', '—', ring(0, 'neutral'), '<span class="pc-trend muted">Not set</span>');
+      const evM = metric('Evidence', s.evidence, ring(s.evidence ? evOk : 0, s.evGaps ? 'danger' : 'success'),
+        !s.evidence ? none : s.evGaps ? trend(false, false, 'missing', String(s.evGaps)) : trend(true, true, 'all verified'));
+      const members = team(p);
+      return `<a class="proc-card pc2 tone-${tone}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
+        <div class="pc2-head">
+          <span class="pc2-code tnum">${esc(p.process_code)}</span>
+          <h3 id="pc-${p.id}">${esc(p.name)}</h3>
+          ${Q.ui.info(p.purpose || p.name)}
         </div>
-
-        <div class="pc-card-foot">
-          <span class="pc-open">Explore</span>
-          <span class="pc-open-icon" aria-hidden="true">${icon('arrow-right')}</span>
+        <p class="pc2-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
+        <div class="pc2-score"><span class="pc2-pct tnum">${pct ?? '—'}<small>%</small></span><span class="pc2-score-note">ISO readiness</span><span class="ui-badge ${tone} dot pc2-status">${label}</span></div>
+        ${meter(pct, tone)}
+        <div class="pc2-metrics">${docM}${kpiM}${evM}</div>
+        <div class="pc2-foot">
+          <span class="pc2-owner"><span>Owner:</span> <b>${esc(Q.pname(p.owner))}</b></span>
+          <span class="pc2-team">${members.slice(0, 4).map((id, i) => avatar(id, i ? ' stack' : '')).join('')}<span class="pc2-members">${members.length} member${members.length === 1 ? '' : 's'}</span></span>
         </div>
+        <div class="pc2-clauses" aria-label="Applicable ISO 9001 clauses"><span class="pc2-iso">ISO 9001</span>${clauses.length ? clauses.map(c => `<span>${esc(c)}</span>`).join('') : '<span>Not mapped</span>'}${moreClauses ? `<span>+${moreClauses}</span>` : ''}<span class="pc2-explore">Explore${icon('arrow-right')}</span></div>
       </a>`;
     };
     // One section per configured category, with its colour, icon and description.
@@ -219,7 +218,7 @@
         ${list.length ? `<div class="pc-grid">${list.map(card).join('')}</div>` : `<div class="cat-empty">No processes in this category yet. <a href="#/settings/processes">Add or move a process</a></div>`}</section>`;
     };
     // One grid of process cards in display order (no category grouping on this page).
-    const map = `<div class="proc-showcase"><div class="pc-grid">${tops.map((p, i) => card(p, i)).join('')}</div></div>`;
+    const map = `<div class="proc-showcase"><div class="pc-grid pc2-grid">${tops.map(card).join('')}</div></div>`;
     const table = Q.table({ id: 'qmsproc', rows: () => tops, key: r => r.id, noun: 'processes', caption: 'Process register',
       columns: [
         { key: 'name', label: 'Process', sort: r => r.display_order, render: r => `<a class="proc" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a>` },

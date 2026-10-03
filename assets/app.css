@@ -2663,3 +2663,63 @@ html[data-ui="material"] .ui-demo { border: 0; box-shadow: var(--m-shadow); }
 .rev-list .tl-item:last-child { padding-bottom: 0; }
 .rev-list .active-rev > details > summary { background: var(--accent-soft); }
 .rev-trail > li.active-rev { background: none; margin: 0; padding: 0; border-bottom-color: var(--border); }
+
+/* ===================================================================== Update 18 — process cards */
+.pc2-grid { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; }
+.proc-card.pc2 { display: flex; flex-direction: column; gap: 0; min-height: 0; padding: 18px 20px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; color: var(--text); text-decoration: none; box-shadow: none; transition: border-color .15s, box-shadow .15s; }
+html[data-ui="material"] .proc-card.pc2 { border-color: transparent; box-shadow: var(--m-shadow); }
+.proc-card.pc2:hover { border-color: var(--border-strong); box-shadow: 0 8px 22px -10px rgba(16,24,40,.25); transform: none; }
+.proc-card.pc2:focus-visible { outline: none; box-shadow: var(--focus); }
+.pc2-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pc2-code { flex: none; display: inline-grid; place-items: center; min-width: 28px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--muted-bg); color: var(--text-2); font-size: 12px; font-weight: 600; }
+.pc2-head h3 { margin: 0; min-width: 0; font-size: 15px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc2-head .ui-info { flex: none; }
+.pc2-status { margin-left: auto; flex: none; }
+.pc2-desc { margin: 4px 0 0; font-size: 12.5px; line-height: 18px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc2-score { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.pc2-pct { font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -.02em; }
+.pc2-pct small { font-size: 18px; font-weight: 500; color: var(--text-2); margin-left: 1px; }
+.pc2-score-note { font-size: 12.5px; color: var(--text-3); }
+.pc-meter { display: grid; grid-template-columns: repeat(34, minmax(0, 1fr)); gap: 3px; height: 26px; margin-top: 10px; }
+.pc-meter i { display: block; border-radius: 3px; background: var(--muted-bg); }
+html[data-ui="material"] .pc-meter i { background: #E7EAEE; }
+.pc-meter.success i.on { background: var(--success); }
+.pc-meter.warning i.on { background: #D99A2B; }
+.pc-meter.danger i.on { background: var(--danger); }
+.pc-meter i.on { animation: pcFill .5s ease both; }
+@keyframes pcFill { from { opacity: .2; transform: scaleY(.5); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pc-meter i.on { animation: none; } }
+.pc2-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; border: 1px solid var(--border); border-radius: 10px; }
+.pc-metric { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; }
+.pc-metric + .pc-metric { border-left: 1px solid var(--border); }
+.pc-m-label { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-m-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pc-m-main b { font-size: 17px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-ring { width: 24px; height: 24px; flex: none; }
+.pc-ring line { stroke: var(--border-strong); stroke-width: 2.2; stroke-linecap: round; }
+.pc-ring.success line.on { stroke: var(--success); }
+.pc-ring.warning line.on { stroke: #D99A2B; }
+.pc-ring.danger line.on { stroke: var(--danger); }
+.pc-trend { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
+.pc-trend span { overflow: hidden; text-overflow: ellipsis; }
+.pc-trend svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pc-trend.good svg, .pc-trend.good b { color: var(--success); }
+.pc-trend.bad svg, .pc-trend.bad b { color: var(--danger); }
+.pc-trend b { font-weight: 600; }
+.pc2-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; min-width: 0; }
+.pc2-owner { font-size: 12.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pc2-owner b { color: var(--text); font-weight: 600; }
+.pc2-team { display: inline-flex; align-items: center; flex: none; }
+.pc2-team .av { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 10px; font-weight: 600; color: var(--text-2); box-shadow: 0 0 0 2px var(--surface); }
+.pc2-team .av.stack { margin-left: -4px; }
+.pc2-members { margin-left: 8px; font-size: 12.5px; color: var(--text-2); }
+.pc2-clauses { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-3); }
+.pc2-clauses span:not(.pc2-iso):not(.pc2-explore) { padding: 0 6px; line-height: 18px; border-radius: 5px; background: var(--muted-bg); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pc2-iso { margin-right: 2px; }
+.pc2-explore { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 500; color: var(--text-2); }
+.pc2-explore svg.lucide { width: 14px; height: 14px; transition: transform .15s; }
+.proc-card.pc2:hover .pc2-explore { color: var(--accent); }
+.proc-card.pc2:hover .pc2-explore svg.lucide { transform: translateX(2px); }
+@media (max-width: 420px) { .pc-metric { padding: 8px; } .pc-m-main b { font-size: 15px; } .pc-ring { width: 20px; height: 20px; } .pc2-pct { font-size: 28px; } }
+.pc2-score .pc2-status { margin-left: auto; align-self: center; }
+.pc-trend.muted { color: var(--text-3); }
