@@ -86,46 +86,48 @@
     const openActions = S.actions.filter(a => !Q.actionClosed(a));
     const overdueActions = openActions.filter(Q.actionOverdue);
     const mineApprovals = approvals.filter(Q.assignedToMe).length;
-    // Severity, not one red for everything: critical = act now, attention = plan it, clear = nothing open.
-    const SEV = { critical: ['triangle-alert', 'Critical'], attention: ['clock-alert', 'Needs attention'], clear: ['circle-check', 'All clear'] };
-    const cell = (href, label, v, d, sev) => { const k = v ? sev : 'clear'; return `<a href="${href}" class="sev-${k}" role="listitem"><span class="k">${icon(SEV[k][0])}${label}<span class="sr-only"> (${SEV[k][1]})</span></span><div class="v">${v}</div><div class="d">${d}</div></a>`; };
-    const strip = `<div class="attention-strip" role="list" aria-label="What requires attention">
-      ${cell('#/risks?level=High', 'High risks', high.length, `${S.risks.filter(r => Q.riskOpen(r)).length} open risks & opportunities`, 'critical')}
-      ${cell('#/capa?status=overdue', 'Overdue actions', overdueActions.length, `${openActions.length} corrective actions open`, 'critical')}
-      ${cell('#/documents?status=overdue', 'Overdue documents', docsOverdue.length, `review date passed · ${S.documents.filter(Q.docDueSoon).length} due in 30 days`, 'attention')}
-      ${cell('#/review?show=all', 'Pending approvals', approvals.length, `${mineApprovals} assigned to you`, 'attention')}
-      ${cell('#/qms/objectives?status=below', 'KPIs below target', kpiBelow.length, `of ${S.kpis.length} KPIs measured`, 'attention')}
-      ${cell('#/evidence?status=gaps', 'Evidence gaps', gaps.length, `${S.evidence.filter(e => e.status === 'Pending verification').length} awaiting verification`, 'attention')}</div>`;
+    // Four headline numbers. Everything else lives in the lists and the process table below.
+    const U = Q.ui, dueSoon = S.documents.filter(Q.docDueSoon).length;
+    const strip = U.stats([
+      { label: 'Overdue corrective actions', value: overdueActions.length, href: '#/capa?status=overdue', icon: 'list-checks', tone: overdueActions.length ? 'danger' : 'success', note: `${openActions.length} open in total` },
+      { label: 'High risks', value: high.length, href: '#/risks?level=High', icon: 'shield-alert', tone: high.length ? 'danger' : 'success', note: `${S.risks.filter(r => Q.riskOpen(r)).length} open risks & opportunities` },
+      { label: 'Documents overdue for review', value: docsOverdue.length, href: '#/documents?status=overdue', icon: 'calendar-clock', tone: docsOverdue.length ? 'warning' : 'success', note: `${dueSoon} more due in 30 days` },
+      { label: 'KPIs below target', value: kpiBelow.length, href: '#/qms/objectives?status=below', icon: 'target', tone: kpiBelow.length ? 'warning' : 'success', note: `of ${S.kpis.length} KPIs measured` }
+    ]);
 
-    // Needs your action
+    // Needs your action: one line per item, the whole row opens it.
     const work = [
-      ...Q.myWorkflows().map(w => { const d = Q.doc(w.doc); const verb = w.stage === 'review' ? 'Review' : w.stage === 'approval' ? 'Approve' : 'Publish'; return { due: w.due, ic: w.stage === 'publication' ? 'send' : w.stage === 'approval' ? 'stamp' : 'file-search', title: `${verb}: ${d.title} Rev ${w.rev}`, meta: `${Q.plabel(d.process)} · due ${Q.fmt(w.due)}`, overdue: w.due < today, action: `<a class="na-open" href="#/review/${w.id}" aria-label="Open review">${icon('arrow-right')}</a>` }; }),
-      ...S.actions.filter(a => a.owner === me && !Q.actionClosed(a)).map(a => ({ due: a.due, ic: 'list-checks', title: `Corrective action: ${a.title}`, meta: `${a.id} · ${a.stage} · due ${Q.fmt(a.due)}`, overdue: a.due < today, action: `<a class="na-open" href="#/capa?focus=${a.id}" aria-label="Open corrective action">${icon('arrow-right')}</a>` })),
-      ...S.documents.filter(d => d.owner === me && Q.docOverdue(d)).map(d => ({ due: d.nextReview, ic: 'calendar-clock', title: `Periodic review: ${d.title}`, meta: `${d.id} · review was due ${Q.fmt(d.nextReview)}`, overdue: true, action: `<button class="na-open" type="button" data-action="create-revision" data-id="${d.id}" aria-label="Create revision">${icon('plus')}</button>` }))
-    ].sort((a, b) => a.due < b.due ? -1 : 1);
-    const workHtml = work.length ? `<div class="needs-action-scroll" tabindex="0" aria-label="Scrollable list of work needing your action"><ul class="needs-action-list">${work.map(w => `<li><span class="na-icon">${icon(w.ic)}</span><div class="na-main"><div class="na-title">${esc(w.title)}</div><div class="na-meta">${w.overdue ? `<span class="date-overdue">Overdue</span> · ` : ''}${esc(w.meta)}</div></div>${w.action}</li>`).join('')}</ul></div><div class="needs-action-foot"><span>${work.length} assigned item${work.length === 1 ? '' : 's'}</span><span class="na-scroll-hint">${icon('mouse-pointer-2')} Scroll for more</span></div>` : '<div class="empty"><h3>Nothing needs your action today.</h3></div>';
+      ...Q.myWorkflows().map(w => { const d = Q.doc(w.doc); const verb = w.stage === 'review' ? 'Review' : w.stage === 'approval' ? 'Approve' : 'Publish'; return { due: w.due, icon: w.stage === 'publication' ? 'send' : w.stage === 'approval' ? 'stamp' : 'file-search', title: d.title, meta: `${verb} Rev ${w.rev} · ${Q.plabel(d.process)}`, href: `#/review/${w.id}` }; }),
+      ...S.actions.filter(a => a.owner === me && !Q.actionClosed(a)).map(a => ({ due: a.due, icon: 'list-checks', title: a.title, meta: `Corrective action ${a.id} · ${a.stage}`, href: `#/capa?focus=${a.id}` })),
+      ...S.documents.filter(d => d.owner === me && Q.docOverdue(d)).map(d => ({ due: d.nextReview, icon: 'calendar-clock', title: d.title, meta: `Periodic review · ${d.id}`, action: 'create-revision', data: { id: d.id } }))
+    ].sort((a, b) => a.due < b.due ? -1 : 1).map(w => ({ ...w, tone: w.due < today ? 'danger' : null, right: U.due(w.due) }));
 
-    // Process status table
+    // Process status: four columns. Issue counts become chips, and a process with nothing open shows nothing.
     const procRows = () => Q.topProcesses().map(p => ({ ...p, id: p.process_id, s: Q.stats(p.process_id) }));
+    const pl = (n, one, many = one + 's') => n === 1 ? one : many;
+    const issues = s => [
+      { n: s.actionsOverdue, label: pl(s.actionsOverdue, 'overdue action'), kind: 'danger' },
+      { n: s.highRisks, label: pl(s.highRisks, 'high risk'), kind: 'danger' },
+      { n: s.docsOverdue, label: pl(s.docsOverdue, 'overdue doc'), kind: 'warning' },
+      { n: s.kpisBelow, label: pl(s.kpisBelow, 'KPI below', 'KPIs below'), kind: 'warning' },
+      { n: s.evGaps, label: pl(s.evGaps, 'evidence gap'), kind: 'orange' },
+      { n: s.actions - (s.actionsOverdue || 0), label: pl(s.actions - (s.actionsOverdue || 0), 'open action'), kind: 'neutral' }];
+    const issueCount = s => (s.actionsOverdue || 0) + s.highRisks + s.docsOverdue + s.kpisBelow + s.evGaps + (s.actions - (s.actionsOverdue || 0));
     const procTable = Q.table({
       id: 'ovproc', rows: procRows, key: r => r.id, noun: 'processes', caption: 'Process status', foot: false,
-      tools: `${Q.seg('Show', [['all', 'All processes', procRows().length], ['attn', 'Needs attention', procRows().filter(r => r.s.health !== 'ok').length]], 'all')}<span class="right">Counts include subprocesses. Status reflects open items; ISO readiness is scored separately.</span>`,
+      tools: Q.seg('Show', [['all', 'All', procRows().length], ['attn', 'Needs attention', procRows().filter(r => r.s.health !== 'ok').length]], 'all'),
       segs: { attn: r => r.s.health !== 'ok' },
       columns: [
-        { key: 'name', label: 'Process', cls: 'c-sticky', sort: r => r.display_order, render: r => `<a class="proc proc-link" href="#/process/${r.id}"><b>${esc(r.process_code)}</b><span class="title">${esc(r.name)}</span></a><span class="sub">${esc(Q.pname(r.owner))}</span>` },
+        { key: 'name', label: 'Process', cls: 'c-sticky', sort: r => r.display_order, render: r => `<a class="ui-proc" href="#/process/${r.id}" title="Owner: ${esc(Q.pname(r.owner))}"><b>${esc(r.process_code)}</b><span>${esc(r.name)}</span></a>` },
         { key: 'health', label: 'Status', sort: r => ({ risk: 0, attn: 1, ok: 2 })[r.s.health], render: r => Q.health(r.s.health) },
-        { key: 'docs', label: 'Docs overdue', cls: 'c-num', sort: r => r.s.docsOverdue, render: r => Q.num(r.s.docsOverdue) },
-        { key: 'risks', label: 'High risks', cls: 'c-num', sort: r => r.s.highRisks, render: r => Q.num(r.s.highRisks) },
-        { key: 'kpi', label: 'KPIs off',  cls: 'c-num', sort: r => r.s.kpisBelow, render: r => Q.num(r.s.kpisBelow, 'warnv') },
-        { key: 'ev', label: 'Evidence gaps', cls: 'c-num', sort: r => r.s.evGaps, render: r => Q.num(r.s.evGaps) },
-        { key: 'ca', label: 'Actions', cls: 'c-num', sort: r => r.s.actions, render: r => r.s.actions ? `${r.s.actions}${r.s.actionsOverdue ? ` <span class="attn">(${r.s.actionsOverdue} overdue)</span>` : ''}` : '<span class="zero">—</span>' },
+        { key: 'issues', label: 'Open issues', sort: r => issueCount(r.s), render: r => U.chips(issues(r.s)) },
         { key: 'iso', label: 'ISO readiness', cls: 'c-iso', sort: r => r.s.iso.pct ?? -1, render: r => Q.miniProgress(r.s.iso.pct) }
       ]
     });
 
     const upcoming = S.documents.filter(d => d.nextReview && d.nextReview >= today && Q.days(today, d.nextReview) <= 60).sort((a, b) => a.nextReview < b.nextReview ? -1 : 1);
     const mgmt = S.managementActions.filter(a => a.status !== 'Closed').sort((a, b) => a.due < b.due ? -1 : 1);
-    const orgName = S.organization.name, orgPossessive = orgName.endsWith('s') ? `${orgName}'` : `${orgName}'s`;
+    const orgName = S.organization.name;
     Q.overviewParts = {
       welcome: Q.themeOverview?.() || '',
       attention: strip,
@@ -162,14 +164,14 @@
           </span>
         </button>`;
       })(),
-      work: `<section class="panel needs-action-card"><div class="panel-head"><h2>Needs your action</h2><span class="na-count">${work.length}</span></div>${workHtml}</section>`,
-      processes: `<section class="panel"><div class="panel-head"><h2>Process status</h2><span class="muted small">Which processes have problems?</span></div>${procTable}</section>`,
-      reviews: `<section class="panel"><div class="panel-head"><h2>Upcoming document reviews</h2><span class="muted small">next 60 days</span><div class="actions"><a class="btn sm ghost" href="#/documents?status=overdue">View overdue</a></div></div>
-        ${upcoming.length ? `<ul class="worklist">${upcoming.map(d => `<li><div class="w-main"><div class="w-title">${esc(d.title)}</div><div class="w-meta tnum">${esc(d.id)} · Rev ${esc(d.rev)} · ${esc(Q.pname(d.owner))}</div></div><span class="date-soon nowrap">${Q.fmt(d.nextReview)}</span><button class="btn sm" type="button" data-action="open-doc" data-id="${d.id}">Open Document</button></li>`).join('')}</ul>` : '<div class="empty">No reviews due in the next 60 days.</div>'}</section>`,
-      actions: `<section class="panel"><div class="panel-head"><h2>Management actions</h2><span class="muted small">${mgmt.length} open</span><div class="actions"><a class="btn sm ghost" href="#/mgmt-review/actions">Management Review</a></div></div>
-        ${mgmt.length ? `<ul class="worklist">${mgmt.map(a => `<li><div class="w-main"><div class="w-title">${esc(a.title)}</div><div class="w-meta">${esc(a.id)} · ${esc(Q.pname(a.owner))} · ${esc(Q.plabel(a.process))}</div></div><span class="nowrap">${Q.dueDate(a.due)}</span></li>`).join('')}</ul>` : '<div class="empty">No open management actions.</div>'}</section>`
+      work: U.card({ title: 'Needs your action', count: work.length, body: U.list(work, { empty: 'Nothing needs your action today.' }), flush: true, cls: 'ov-work' }),
+      processes: U.card({ title: 'Process status', info: 'Counts include subprocesses. Status reflects open items; ISO readiness is scored separately.', body: procTable, flush: true, cls: 'ov-proc' }),
+      reviews: U.card({ title: 'Upcoming document reviews', info: 'Controlled documents whose periodic review falls in the next 60 days.', link: { href: '#/documents?status=overdue', text: 'Overdue' }, flush: true,
+        body: U.list(upcoming.map(d => ({ icon: 'file-text', title: d.title, meta: `${d.id} · Rev ${d.rev} · ${Q.pname(d.owner)}`, action: 'open-doc', data: { id: d.id }, right: U.due(d.nextReview) })), { empty: 'No reviews due in the next 60 days.' }) }),
+      actions: U.card({ title: 'Management actions', count: mgmt.length, link: { href: '#/mgmt-review/actions', text: 'Management Review' }, flush: true,
+        body: U.list(mgmt.map(a => ({ icon: 'presentation', title: a.title, meta: `${Q.pname(a.owner)} · ${Q.proc(a.process)?.name || ''}`, href: '#/mgmt-review/actions', right: U.due(a.due) })), { empty: 'No open management actions.' }) })
     };
-    return Q.pageView('overview', { title: 'Overview', nav: 'overview', sub: `What needs attention across ${esc(orgPossessive)} processes today, ${Q.fmt(today)}.` });
+    return Q.pageView('overview', { title: 'Overview', nav: 'overview', sub: `${Q.fmt(today)} · ${esc(orgName)}` });
   };
 
   /* =================== Shared registers =================== */

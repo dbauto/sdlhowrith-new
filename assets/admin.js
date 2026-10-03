@@ -5,7 +5,7 @@
   /* Settings are grouped so the list can grow without becoming one long column.
    * Sections defined in settings-extra.js register themselves in Q.settingsViews. */
   const GROUPS = [
-    ['Workspace', [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['clause-map', 'Process ↔ ISO Clauses', 'list-checks'], ['workspace', 'Process Workspace', 'layout-dashboard'], ['pages', 'Page Layouts', 'layout-template'], ['regional', 'Regional', 'globe'], ['branding', 'Branding', 'sparkles']]],
+    ['Workspace', [['organization', 'Organization', 'building-2'], ['processes', 'Process Structure', 'network'], ['clause-map', 'Process ↔ ISO Clauses', 'list-checks'], ['workspace', 'Process Workspace', 'layout-dashboard'], ['pages', 'Page Layouts', 'layout-template'], ['regional', 'Regional', 'globe'], ['branding', 'Branding', 'sparkles'], ['ui-library', 'UI Components', 'blocks']]],
     ['People & access', [['users', 'Users & Access', 'users'], ['security', 'Security', 'shield-check'], ['notifications', 'Notifications', 'bell']]],
     ['Connections', [['integrations', 'Integrations', 'plug'], ['api', 'API & Webhooks', 'code']]],
     ['Trust & compliance', [['privacy', 'Data Privacy', 'lock-keyhole'], ['audit-log', 'Audit Log', 'scroll-text'], ['data', 'Data Export & Backup', 'hard-drive']]],

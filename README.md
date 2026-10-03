@@ -295,6 +295,24 @@ Update 14 let one audit hold several "areas" (processes) with their own auditors
 - **Process Audit Report:** one controlled report per audit, generated from the records in 19 sections (plus Executive Summary), including each auditor's contribution. Only Executive Summary, Auditor Comments, Lead Auditor Conclusion and Follow-up Requirements are editable. Generate Draft → Edit → Submit → Review → Approve → Publish → PDF. Publishing moves the audit to Follow-up; it closes only when the report is published and every NC is closed after effectiveness verification.
 - **Migration (auditModel 1 → 2):** runs once on load. Single-area audits are converted in place; multi-area audits are split into `IA-…A`, `IA-…B`… (one per process), keeping programme, dates (as sessions), team, findings, NCs, evidence, report history and activity. Findings follow their process; a finding whose process was not one of the audit's areas stays on the original audit and is flagged **Migration review required** (resolve it in Findings & NCs). The old multi-area audit remains as a read-only pointer to its split audits, and a previously published consolidated report is kept as the revision history of each split audit.
 
+## Update 16: cleaner dashboard components (ReUI-style UI kit)
+
+Pages felt crowded: two lines of text in every row, a button on every row, dashes in empty cells, coloured status text and explanation sentences everywhere. Update 16 adds a small component kit in the style of ReUI / shadcn dashboard blocks. It is plain CSS and JavaScript, with no framework.
+
+- **UI kit** (`assets/ui-kit.js`, `ui-` classes in `app.css`): stat card, card with a quiet header, one-line list rows, soft badges, issue chips, ⓘ info tips, sparklines and due-date badges. **Settings → Workspace → UI Components** shows each one with live data and the call to use.
+- **Overview rebuilt with the kit:**
+  - Four stat cards: overdue corrective actions, high risks, overdue documents and KPIs below target.
+  - Needs your action, Upcoming reviews and Management actions are one-line rows with a due badge. The whole row opens the item; there are no per-row buttons.
+  - The Process status table goes from 9 columns to 4: Process, Status, Open issues and ISO readiness. Open issues shows only non-zero counts as chips, so a healthy process has an empty cell instead of a row of dashes.
+  - Help sentences moved behind ⓘ.
+  - The ISO readiness gauge is unchanged. Component keys are unchanged, so saved Overview layouts and **Customize page** keep working.
+- **Applied to every page:**
+  - Status labels and process health render as soft badges.
+  - Zero/empty cells are faint.
+  - Table headers use sentence case instead of uppercase.
+  - List rows are a single line with hover highlight, and their buttons stay quiet until the row is hovered.
+  - Card headers are calmer.
+
 ## Files
 
 | File | Change |
@@ -315,6 +333,7 @@ Update 14 let one audit hold several "areas" (processes) with their own auditors
 | `assets/audit-workspace.js` | **New (Update 15).** Process audit workspace: plan, assignments, My Checklist, submit work, fieldwork, findings |
 | `assets/audit-nc.js` | **New.** NC register, monitoring, discussions, corrective action, verification and effectiveness |
 | `assets/audit-report.js` | Process Audit Report (19 sections), editor, workflow, revisions and A4 print/PDF layout |
+| `assets/ui-kit.js` | **New (Update 16).** Dashboard component kit and the UI Components settings page |
 | `assets/theme.js` | **New.** Theme switch and Material welcome banner |
 | `assets/account.js` | **New.** Help, notifications and account menus, organization switcher, sign-in, My Profile |
 | `assets/app.css` | Styles for the above |
