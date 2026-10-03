@@ -194,25 +194,15 @@
       return `<a href="${hashFor(v, { c })}" ${c === top && !focus && sel !== 'none' ? 'aria-current="true"' : ''}><span class="code">${c}</span><span class="nm">${esc(t)}</span><i class="flag ${worst(reqs)}" title="Requirement status"></i><span class="n">${inView(Q.docsForClause(c)).length}</span></a>` +
         (c === top ? `<div class="child">${reqs.map(r => `<a href="${hashFor(v, { c: r.clause })}" ${focus === r.clause ? 'aria-current="true"' : ''}><span class="code">${esc(r.clause)}</span><span class="nm">${esc(r.title)}</span><span class="n">${inView(Q.docsForClause(r.clause)).length}</span></a>`).join('')}</div>` : '');
     }).join('')}<hr><a href="${hashFor(v, { c: 'none' })}" ${sel === 'none' ? 'aria-current="true"' : ''}><span class="code">—</span><span class="nm">Not mapped to a clause</span><span class="n">${unmapped.length}</span></a></nav>`;
-    // Same columns as the view, so a user's column choice holds in every grouping.
-    const fields = dr.columns.map(k => Q.field(T, k)).filter(Boolean);
-    const miniDocs = docs => `<table class="dt tight"><thead><tr>${fields.map(f => `<th class="${f.cls || ''}">${esc(f.label)}</th>`).join('')}<th class="c-actions c-menu"><span class="sr-only">Actions</span></th></tr></thead><tbody>${docs.map(d => `<tr>${fields.map(f => `<td class="${f.cls || ''}">${f.render(d)}</td>`).join('')}<td class="c-actions c-menu"><span class="row-menu">${Q.docMenu(d)}</span></td></tr>`).join('')}</tbody></table>`;
-    let body;
-    if (sel === 'none') {
-      body = `<div class="browse-head"><div><h2>Not mapped to a clause</h2><p class="sub">${unmapped.length} documents${dr.filters.length ? ' in this view' : ''} have no ISO 9001 clause yet. Mapping them makes the clause view and audit preparation complete.</p></div></div>
-        ${unmapped.length ? `<div class="clause-block"><div class="table-scroll">${miniDocs(unmapped)}</div></div>` : '<div class="empty panel"><h3>Every document in this view is mapped</h3></div>'}`;
-    } else {
-      const reqs = Q.reqsIn(top).filter(r => !focus || r.clause === focus);
-      body = `<div class="browse-head"><div><h2><span class="proc-code">${esc(focus || top)}</span>${esc(focus ? S.iso.find(r => r.clause === focus)?.title : Q.clauseTitle(top))}</h2>
-        <p class="sub">${focus ? `Part of clause ${top} ${esc(Q.clauseTitle(top))}` : `${reqs.length} requirements mapped · ${inView(Q.docsForClause(top)).length} documents${dr.filters.length ? ' in this view' : ''}`}. A document can support more than one clause.</p></div>
-        <div class="actions"><a class="btn sm" href="#/evidence?view=clause&c=${esc(focus || top)}">${icon('paperclip')}Evidence for this clause</a></div></div>` +
-        (reqs.length ? reqs.map(r => {
-          const all = Q.docsForClause(r.clause), docs = inView(all);
-          return `<section class="clause-block" id="cl-${r.clause.replace(/\./g, '-')}"><header><span class="clause">${esc(r.clause)}</span><h3>${esc(r.title)}</h3><span class="proc-chips">${r.processes.map(p => Q.pcell(p)).join('')}</span>${Q.st(r.status, Q.ISO_KIND[r.status])}</header>${Q.AM?.clauseAudit(r) || ''}
-            ${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}
-            ${docs.length ? `<div class="table-scroll">${miniDocs(docs)}</div>` : all.length ? `<div class="gap" style="color:var(--text-3)">${all.length} document${all.length > 1 ? 's' : ''} mapped, none match this view's filters.</div>` : r.status === 'Not Applicable' ? '<div class="gap" style="color:var(--text-3)">Not applicable — excluded in the QMS scope.</div>' : `<div class="gap">${icon('triangle-alert')}No controlled document mapped to this requirement.</div>`}</section>`;
-        }).join('') : '<div class="empty panel"><h3>No requirements mapped under this clause</h3></div>');
-    }
+    const selected = sel === 'none' ? unmapped : inView(Q.docsForClause(focus || top));
+    const clauseTitle = sel === 'none' ? 'Not mapped to a clause' : (focus ? S.iso.find(r => r.clause === focus)?.title || '' : Q.clauseTitle(top));
+    const description = sel === 'none'
+      ? `${selected.length} documents${dr.filters.length ? ' in this view' : ''} have no ISO 9001 clause yet.`
+      : `${selected.length} document${selected.length === 1 ? '' : 's'} mapped${dr.filters.length ? ' in this view' : ''}. A document can support more than one clause.`;
+    const tableWhere = d => sel === 'none' ? !Q.docIso(d).length : Q.docIso(d).some(c => Q.clauseIn(c, focus || top));
+    const body = `<div class="browse-head"><div><h2>${sel === 'none' ? '' : `<span class="proc-code">${esc(focus || top)}</span>`}${esc(clauseTitle)}</h2><p class="sub">${esc(description)}</p></div>
+      ${sel === 'none' ? '' : `<div class="actions"><a class="btn sm" href="#/evidence?view=clause&c=${esc(focus || top)}">${icon('paperclip')}Evidence for this clause</a></div>`}</div>
+      ${selected.length ? Q.docTable(Q.vwTableId(T, v, `clause-${String(sel).replace(/[^a-z0-9]+/gi, '_')}`), { columns: dr.columns, where: d => where(d) && tableWhere(d), initialSort: dr.sort }) : '<div class="empty panel"><h3>No documents match this clause</h3><p>Change the view filters or choose another clause.</p></div>'}`;
     return `<div class="browse">${tree}<section>${body}</section></div>`;
   }
 
