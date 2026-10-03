@@ -31,18 +31,22 @@
   document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) Q.go(b.dataset.go); });
 
 
-  const readinessGauge = pct => {
-    const total = 34, on = Math.round(total * Math.max(0, Math.min(100, pct || 0)) / 100);
+  const readinessGauge = score => {
+    const total = 34, c = score.counts, a = score.applicable || 1;
+    const completeEnd = c['Complete'] / a;
+    const partialEnd = (c['Complete'] + c['Partially Complete']) / a;
     const cx = 110, cy = 104, inner = 67, outer = 84;
     const segs = Array.from({ length: total }, (_, i) => {
-      const a = Math.PI + Math.PI * i / (total - 1);
-      const x1 = (cx + Math.cos(a) * inner).toFixed(2);
-      const y1 = (cy + Math.sin(a) * inner).toFixed(2);
-      const x2 = (cx + Math.cos(a) * outer).toFixed(2);
-      const y2 = (cy + Math.sin(a) * outer).toFixed(2);
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${i < on ? 'on' : 'off'}"/>`;
+      const r = (i + .5) / total;
+      const cls = r <= completeEnd ? 'complete' : r <= partialEnd ? 'partial' : 'gap';
+      const a0 = Math.PI + Math.PI * i / (total - 1);
+      const x1 = (cx + Math.cos(a0) * inner).toFixed(2);
+      const y1 = (cy + Math.sin(a0) * inner).toFixed(2);
+      const x2 = (cx + Math.cos(a0) * outer).toFixed(2);
+      const y2 = (cy + Math.sin(a0) * outer).toFixed(2);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
     }).join('');
-    return `<svg class="rd-gauge" viewBox="0 0 220 112" role="img" aria-label="ISO 9001 readiness ${pct ?? 0}%">${segs}</svg>`;
+    return `<svg class="rd-gauge" viewBox="0 0 220 112" role="img" aria-label="ISO 9001 readiness ${score.pct ?? 0}%">${segs}</svg>`;
   };
 
   Q.actions['readiness-detail'] = () => {
@@ -59,7 +63,7 @@
             <div class="rd-modal-pct tnum">${s.pct ?? '—'}<small>%</small></div>
             <p>${s.points} of ${s.applicable} applicable requirements</p>
           </div>
-          ${readinessGauge(s.pct)}
+          ${readinessGauge(s)}
         </div>
         ${Q.readinessBlock(S.iso)}
         <div class="rd-gap-list">
@@ -127,17 +131,35 @@
       welcome: Q.themeOverview?.() || '',
       attention: strip,
       readiness: (() => {
-        const rs = Q.isoScore(S.iso);
-        const gaps = S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status)).length;
+        const rs = Q.isoScore(S.iso), c = rs.counts;
+        const gapCount = c['At Risk'] + c['Missing'];
         return `<button class="iso-ready-card" type="button" data-action="readiness-detail" aria-label="Open ISO 9001 readiness details">
-          <span class="irc-head"><span class="irc-title">ISO 9001 readiness</span><span class="irc-details">Details</span></span>
-          <span class="irc-body">
-            <span class="irc-copy">
-              <span class="irc-state">${rs.pct >= 80 ? 'On track' : rs.pct >= 60 ? 'Needs attention' : 'At risk'}</span>
-              <span class="irc-sub">${rs.points} of ${rs.applicable} applicable requirements</span>
-              <span class="irc-meta">${gaps ? `${gaps} gap${gaps === 1 ? '' : 's'} need review` : 'No critical gaps'}</span>
+          <span class="irc-head">
+            <span class="irc-title">ISO 9001 readiness</span>
+            <span class="irc-details">Details</span>
+          </span>
+          <span class="irc-gauge-section">
+            <span class="irc-gauge-wrap">
+              ${readinessGauge(rs)}
+              <span class="irc-center">
+                <span class="irc-center-label">Readiness</span>
+                <span class="irc-pct tnum">${rs.pct ?? '—'}<small>%</small></span>
+              </span>
             </span>
-            <span class="irc-gauge-wrap">${readinessGauge(rs.pct)}<span class="irc-pct tnum">${rs.pct ?? '—'}<small>%</small></span></span>
+          </span>
+          <span class="irc-metrics" aria-label="Readiness status breakdown">
+            <span class="irc-metric">
+              <span class="irc-metric-icon complete">${icon('circle-check')}</span>
+              <span class="irc-metric-copy"><span>Complete</span><b class="tnum">${c['Complete']}</b></span>
+            </span>
+            <span class="irc-metric">
+              <span class="irc-metric-icon partial">${icon('circle-dashed')}</span>
+              <span class="irc-metric-copy"><span>Partial</span><b class="tnum">${c['Partially Complete']}</b></span>
+            </span>
+            <span class="irc-metric">
+              <span class="irc-metric-icon gap">${icon('triangle-alert')}</span>
+              <span class="irc-metric-copy"><span>Gaps</span><b class="tnum">${gapCount}</b></span>
+            </span>
           </span>
         </button>`;
       })(),
