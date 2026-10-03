@@ -557,7 +557,7 @@
     let body;
     if (tab === 'inputs') body = mrInputs(last);
     else if (tab === 'actions') body = Q.table({ id: 'ma', rows: () => S.managementActions, noun: 'management actions', caption: 'Management review actions', segDefault: 'open',
-      tools: Q.seg('Status', [['open', 'Open', openMA.length], ['all', 'All', S.managementActions.length]], 'open'), segs: { open: a => a.status !== 'Closed' },
+      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search decisions and actions" aria-label="Search decisions and actions"></div>${Q.seg('Status', [['open', 'Open', openMA.length], ['all', 'All', S.managementActions.length]], 'open')}`, search: a => `${a.id} ${a.title} ${a.review} ${Q.pname(a.owner)} ${Q.plabel(a.process)}`, segs: { open: a => a.status !== 'Closed' },
       columns: [
         { key: 'id', label: 'ID', cls: 'c-id', sort: a => a.id, render: a => esc(a.id) },
         { key: 't', label: 'Decision / action', sort: a => a.title, render: a => `<span class="title">${esc(a.title)}</span>` },
@@ -565,7 +565,8 @@
         { key: 'p', label: 'Process', render: a => Q.pcell(a.process) },
         { key: 'o', label: 'Owner', sort: a => Q.pname(a.owner), render: a => `<span class="nowrap">${esc(Q.pname(a.owner))}</span>` },
         { key: 'd', label: 'Due', cls: 'c-date', sort: a => a.due, render: a => Q.dueDate(a.due, a.status === 'Closed') },
-        { key: 's', label: 'Status', render: a => a.status === 'Closed' ? Q.st('Closed', 'muted') : a.due < Q.today() ? Q.st('Overdue', 'danger') : Q.st('Open', 'info') }] });
+        { key: 's', label: 'Status', render: a => a.status === 'Closed' ? Q.st('Closed', 'muted') : a.due < Q.today() ? Q.st('Overdue', 'danger') : Q.st('Open', 'info') }],
+      expand: a => `<div class="exp-kv"><div><b>Management review</b><span class="tnum">${esc(a.review)}</span></div><div><b>Process</b><a href="#/process/${esc(a.process)}">${esc(Q.plabel(a.process))}</a></div><div><b>Owner</b><span>${esc(Q.pname(a.owner))}</span></div><div><b>Due</b><span>${Q.fmt(a.due)}</span></div></div>` });
     else if (tab === 'meetings') body = `<section class="panel"><ul class="worklist">${S.managementReviews.map(r => `<li><span class="w-kind">${icon(r.status === 'Held' ? 'circle-check' : 'calendar')}</span><div class="w-main"><div class="w-title">${esc(r.title)}</div><div class="w-meta">${esc(r.id)} · ${Q.fmt(r.date)} · chair ${esc(Q.pname(r.chair))} · ${r.attendees.length} attendees${r.decisions ? ` · ${r.decisions} decisions` : ''}</div></div>${Q.st(r.status, r.status === 'Held' ? 'success' : 'info')}${r.minutes ? `<a class="btn sm" href="#/evidence?view=list&focus=${r.minutes}">${icon('paperclip')}Minutes</a>` : `<button class="btn sm" type="button" data-action="toast" data-title="Agenda" data-msg="Agenda would be created from ${esc('MR-TPL-002')} with the current inputs.">${icon('clipboard-list')}Prepare agenda</button>`}</li>`).join('')}</ul></section>`;
     else body = Q.reportsBody(q.r);
     return { title: 'Management Review', nav: 'mgmt-review', html: head + callout + t + body };
