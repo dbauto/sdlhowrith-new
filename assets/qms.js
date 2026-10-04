@@ -239,6 +239,24 @@
     render: (b, ctx) => Q.panel({ title: ctx.title('Measured through'), actions: '<a class="btn sm ghost" href="#/qms/objectives">Objectives & KPIs</a>',
       body: `<ul class="health-list">${[...new Set(Q.S.kpis.map(k => k.objective))].slice(0, 7).map(o => { const below = Q.S.kpis.filter(k => k.objective === o && !Q.kpiOk(k)).length; return `<li>${icon('target')}<span>${esc(o)}</span><span class="v ${below ? 'attn' : 'zero'}" style="font-size:12px;white-space:nowrap">${below ? `${below} below target` : 'on target'}</span></li>`; }).join('')}</ul>` }) });
 
+  /* Process cards tilt toward the pointer with a moving sheen (off for reduced motion and touch). */
+  (() => {
+    const calm = matchMedia('(prefers-reduced-motion: reduce)');
+    let cur = null;
+    const reset = c => { c.style.removeProperty('--rx'); c.style.removeProperty('--ry'); c.classList.remove('tilting'); };
+    document.addEventListener('pointermove', e => {
+      if (calm.matches || e.pointerType === 'touch') return;
+      const c = e.target.closest?.('.fx-card');
+      if (cur && cur !== c) { reset(cur); cur = null; }
+      if (!c) return; cur = c;
+      const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      c.classList.add('tilting');
+      c.style.setProperty('--ry', `${((x - .5) * 12).toFixed(2)}deg`); c.style.setProperty('--rx', `${((.5 - y) * 10).toFixed(2)}deg`);
+      c.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`); c.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => { if (cur) { reset(cur); cur = null; } }, true);
+  })();
+
   /* ---------------- Processes component ---------------- */
   Q.actions['proc-view'] = d => { Q.UI.procView = d.view; Q.saveUI(); Q.render({ noFocus: true }); };
   Q.component('process-map', { group: 'Objectives & processes', name: 'Processes', icon: 'workflow', desc: 'Every process as a card or as a register table, with status and ISO readiness.',
@@ -264,15 +282,20 @@
     const arrow = up => `<svg viewBox="0 0 24 24" aria-hidden="true">${up ? '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' : '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>'}</svg>`;
     const trend = (up, good, text, val) => `<span class="pc-trend ${good ? 'good' : 'bad'}">${arrow(up)}<span>${esc(text)}</span>${val ? `<b>${esc(val)}</b>` : ''}</span>`;
     const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main"><b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
-    const card = p => {
-      const [label] = STATUS[p.s.health], tone = TONE[p.s.health];
+    // Update 20g: gradient 3D cards (same content: icon, name, purpose, ISO readiness, code, status, clauses).
+    const FX = ['slate', 'blue', 'teal', 'red', 'green', 'purple', 'steel', 'orange', 'indigo'];
+    const card = (p, i) => {
+      const [label] = STATUS[p.s.health], tone = TONE[p.s.health], pct = Math.max(0, Math.min(100, p.s.iso.pct || 0));
       const clauses = p.iso || [], visibleClauses = clauses.slice(0, 3), moreClauses = Math.max(0, clauses.length - visibleClauses.length);
-      return `<a class="proc-card pc2 clean-card tone-${tone}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
-        <span class="pc2-icon" aria-hidden="true">${icon(p.icon || 'landmark')}</span>
-        <h3 id="pc-${p.id}">${esc(p.name)}</h3>
-        <p class="pc2-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
-        <span class="pc2-progress" role="img" aria-label="ISO readiness ${p.s.iso.pct ?? 0}%"><i style="width:${Math.max(0, Math.min(100, p.s.iso.pct || 0))}%"></i></span>
-        <div class="pc2-tags" aria-label="Process tags"><span class="pc2-tag code">${esc(p.process_code)}</span><span class="pc2-tag status-${tone}">${esc(label)}</span>${visibleClauses.map(c => `<span class="pc2-tag">${esc(c)}</span>`).join('')}${moreClauses ? `<span class="pc2-tag">+${moreClauses}</span>` : ''}</div>
+      return `<a class="proc-card pc2 fx-card fx-${FX[i % FX.length]}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
+        <span class="fx-sheen" aria-hidden="true"></span>
+        <span class="fx-top"><span class="pc2-icon" aria-hidden="true">${icon(p.icon || 'landmark')}</span><span class="fx-dot ${tone}" title="${esc(label)}" aria-hidden="true"></span></span>
+        <span class="fx-body">
+          <h3 id="pc-${p.id}">${esc(p.name)}</h3>
+          <p class="pc2-desc" title="${esc(p.purpose)}">${esc(p.purpose)}</p>
+          <span class="fx-ready"><span class="pc2-progress" role="img" aria-label="ISO readiness ${pct}%"><i style="width:${pct}%"></i></span><b class="tnum">${pct}%</b><small>ISO readiness</small></span>
+          <span class="pc2-tags" aria-label="Process tags"><span class="pc2-tag code">${esc(p.process_code)}</span><span class="pc2-tag status-${tone}">${esc(label)}</span>${visibleClauses.map(c => `<span class="pc2-tag">${esc(c)}</span>`).join('')}${moreClauses ? `<span class="pc2-tag">+${moreClauses}</span>` : ''}</span>
+        </span>
       </a>`;
     };
     /* Legacy dense-card renderer retained below for reference during migration. */
