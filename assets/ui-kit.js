@@ -103,7 +103,7 @@
   const pager = (page, pages) => {
     if (pages <= 1) return '';
     const nums = []; for (let i = 1; i <= pages; i++) if (i === 1 || i === pages || Math.abs(i - page) <= 1) nums.push(i); else if (nums.at(-1) !== '…') nums.push('…');
-    return `<button type="button" class="ui-pg" data-bt-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="Previous page">${icon('chevron-left')}</button>${nums.map(n => n === '…' ? '<span class="ui-pg-gap">…</span>' : `<button type="button" class="ui-pg${n === page ? ' on' : ''}" data-bt-page="${n}" ${n === page ? 'aria-current="page"' : ''}>${n}</button>`).join('')}<button type="button" class="ui-pg" data-bt-page="${page + 1}" ${page >= pages ? 'disabled' : ''} aria-label="Next page">${icon('chevron-right')}</button>`;
+    return `<button type="button" class="ui-pg" data-bt-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="Previous page"><span class="flip">${icon('chevron-right')}</span></button>${nums.map(n => n === '…' ? '<span class="ui-pg-gap">…</span>' : `<button type="button" class="ui-pg${n === page ? ' on' : ''}" data-bt-page="${n}" ${n === page ? 'aria-current="page"' : ''}>${n}</button>`).join('')}<button type="button" class="ui-pg" data-bt-page="${page + 1}" ${page >= pages ? 'disabled' : ''} aria-label="Next page">${icon('chevron-right')}</button>`;
   };
   UI.btable = ({ title = 'Needs attention', rows = [], action = '', search = 'Search items', empty = 'Nothing needs attention.' }) => {
     const kinds = [...new Set(rows.map(r => r.kind).filter(Boolean))];

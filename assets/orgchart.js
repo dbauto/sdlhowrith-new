@@ -70,6 +70,74 @@
       ${heads.length ? `<ul class="oc-level">${heads.map(h => `<li>${node(h, o)}${stack(h, o)}</li>`).join('')}</ul>` : ''}</div></div>
       ${m.unplaced.length ? `<div class="oc-unplaced"><b>${icon('circle-help')}Not placed yet</b><span class="small muted">No manager set. Select a person to choose who they report to.</span><div class="oc-unplaced-list">${m.unplaced.map(id => node(id, o)).join('')}</div></div>` : ''}`;
   };
+  /* ---------- Flow canvas (Update 20c): node cards on a dotted canvas, square connectors with handles,
+   * department labels where the tree branches, pan / zoom / fit controls. One column per department head;
+   * everyone under a head is chained below them in reporting order. ---------- */
+  const FW = 236, FH = 82, GX = 36, GY = 46, TOP = 40;
+  const chain = id => reportsOf(id).flatMap(x => [{ id: x, by: id }, ...chain(x)]);
+  const fnode = (id, x, y, by, print = false) => {
+    const p = Q.person(id), procs = owned(id), n = descendants(id).length, m = Q.orgModel();
+    const foot = id === m.root ? `${icon('circle-check')}<span>Top management · ${m.count} people</span>`
+      : by && by !== m.root ? `${icon('user-round')}<span>Reports to ${esc(Q.pname(by))}</span>`
+      : procs.length ? `${icon('circle-check')}<span>Owns ${procs.map(x => esc(x.process_code)).join(' · ')}</span>`
+      : `<i class="fl-dash" aria-hidden="true"></i><span>${n ? `${n} ${n === 1 ? 'person' : 'people'} in team` : 'No process owned'}</span>`;
+    const tags = [id === qmsRep() ? 'QMS rep' : '', by && by !== m.root && procs.length ? procs.map(x => x.process_code).join(' · ') : ''].filter(Boolean);
+    const tag = print ? 'div' : 'button';
+    return `<${tag} ${print ? '' : 'type="button" '}class="fl-node${id === m.root ? ' root' : ''}" style="left:${x}px;top:${y}px;--c:${deptColor(p.dept)}" ${print ? '' : `data-action="oc-person" data-id="${esc(id)}" `}data-dept="${esc(p.dept)}"
+        ${print ? '' : `aria-label="${esc(`${p.name}, ${p.title}, ${p.dept}. Open details`)}"`}>
+      <span class="fl-h"><span class="fl-ic">${esc(Q.initials(id))}</span><span class="fl-t"><b>${esc(p.name)}</b><span>${esc(p.title)}</span></span>${print ? '' : `<span class="fl-more" aria-hidden="true">${icon('ellipsis')}</span>`}</span>
+      <span class="fl-f">${foot}${tags.length ? `<em>${esc(tags.join(' · '))}</em>` : ''}</span>${print ? '' : '<i class="fl-hd top"></i><i class="fl-hd bot"></i>'}</${tag}>`;
+  };
+  Q.orgFlowHtml = ({ print = false } = {}) => {
+    const m = Q.orgModel(); if (!m.root) return '<div class="empty"><h3>No people yet</h3><p>Add users in Settings → Users & Access.</p></div>';
+    const heads = reportsOf(m.root), cols = Math.max(1, heads.length), W = cols * FW + (cols - 1) * GX;
+    const rootX = (W - FW) / 2, rootY = TOP, busY = rootY + FH + 44, headY = busY + 44;
+    const nodes = [fnode(m.root, rootX, rootY, null, print)], paths = [], labels = [], plus = [];
+    let H = headY + FH;
+    const cx = x => x + FW / 2;
+    paths.push(`M${cx(rootX)} ${rootY + FH} V${busY}`);
+    if (heads.length > 1) paths.push(`M${cx(0)} ${busY} H${cx((cols - 1) * (FW + GX))}`);
+    heads.forEach((h, i) => {
+      const x = i * (FW + GX); let y = headY;
+      paths.push(`M${cx(x)} ${busY} V${headY}`);
+      labels.push(`<span class="fl-label" style="left:${cx(x)}px;top:${busY}px;--c:${deptColor(Q.person(h).dept)}">${esc(Q.person(h).dept)}</span>`);
+      nodes.push(fnode(h, x, y, null, print));
+      chain(h).forEach(c => { paths.push(`M${cx(x)} ${y + FH} V${y + FH + GY}`); y += FH + GY; nodes.push(fnode(c.id, x, y, c.by, print)); });
+      if (!print) paths.push(`M${cx(x)} ${y + FH} V${y + FH + 26}`);
+      plus.push(`<button type="button" class="fl-plus" style="left:${cx(x)}px;top:${y + FH + 26}px" data-action="go" data-href="#/settings/users" title="Add a person to ${esc(Q.person(h).dept)}" aria-label="Add a person to ${esc(Q.person(h).dept)}">${icon('plus')}</button>`);
+      H = Math.max(H, y + FH + (print ? 8 : 60));
+    });
+    const depts = new Set(active().map(id => Q.person(id).dept)).size;
+    if (print) return { W, H, html: `<div class="fl-world" style="width:${W}px;height:${H}px"><svg class="fl-edges" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>${labels.join('')}${nodes.join('')}</div>` };
+    return `<div class="fl" data-fl data-w="${W}" data-h="${H}">
+      <div class="fl-bar"><span class="fl-crumb">Organization <span aria-hidden="true">›</span> <b>${esc(Q.S.organization.name)}</b></span><span class="fl-sub">${m.count} people, ${depts} departments</span></div>
+      <div class="fl-vp" data-fl-vp tabindex="0" aria-label="Organization chart canvas. Drag to move, use the zoom buttons to zoom.">
+        <div class="fl-world" data-fl-world style="width:${W}px;height:${H}px">
+          <svg class="fl-edges" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>
+          ${labels.join('')}${nodes.join('')}${plus.join('')}</div></div>
+      <div class="fl-ctl" role="toolbar" aria-label="Canvas controls">
+        <button type="button" data-fl-z="out" aria-label="Zoom out">${icon('zoom-out')}</button><span data-fl-pct class="tnum">100%</span><button type="button" data-fl-z="in" aria-label="Zoom in">${icon('zoom-in')}</button>
+        <span class="fl-sep"></span><button type="button" data-fl-z="fit" aria-label="Fit to view" title="Fit to view">${icon('maximize')}</button></div></div>`;
+  };
+  // Pan (drag), zoom (buttons, Ctrl/⌘ + wheel) and fit. A drag never opens a card.
+  Q.orgFlowWire = root => {
+    const fl = root.querySelector('[data-fl]'); if (!fl) return;
+    const vp = fl.querySelector('[data-fl-vp]'), world = fl.querySelector('[data-fl-world]'), pct = fl.querySelector('[data-fl-pct]');
+    const W = +fl.dataset.w, H = +fl.dataset.h; let k = 1, tx = 0, ty = 0;
+    const apply = () => { world.style.transform = `translate(${tx}px,${ty}px) scale(${k})`; pct.textContent = `${Math.round(k * 100)}%`; };
+    const fit = () => { const vw = vp.clientWidth, vh = vp.clientHeight; k = Math.max(.3, Math.min(1, (vw - 48) / W, (vh - 84) / H)); tx = (vw - W * k) / 2; ty = Math.max(12, (vh - 64 - H * k) / 2); apply(); };
+    const zoomAt = (nk, px = vp.clientWidth / 2, py = vp.clientHeight / 2) => { nk = Math.max(.3, Math.min(1.6, nk)); tx = px - (px - tx) * nk / k; ty = py - (py - ty) * nk / k; k = nk; apply(); };
+    // Size the canvas to the chart at a readable zoom, then fit.
+    const vw = vp.clientWidth, kk = Math.max(.55, Math.min(1, (vw - 48) / W)); vp.style.height = `${Math.min(860, Math.max(420, H * kk + 110))}px`; fit();
+    fl.querySelector('.fl-ctl').addEventListener('click', e => { const b = e.target.closest('[data-fl-z]'); if (!b) return; const z = b.dataset.flZ; z === 'fit' ? fit() : zoomAt(k * (z === 'in' ? 1.2 : 1 / 1.2)); });
+    vp.addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const r = vp.getBoundingClientRect(); zoomAt(k * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+    let drag = null, moved = false;
+    vp.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, tx, ty }; moved = false; });
+    window.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!moved && Math.hypot(dx, dy) < 4) return; moved = true; vp.classList.add('grabbing'); tx = drag.tx + dx; ty = drag.ty + dy; apply(); });
+    window.addEventListener('pointerup', () => { drag = null; vp.classList.remove('grabbing'); });
+    vp.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+    vp.addEventListener('keydown', e => { const st = 40, m = { ArrowLeft: [st, 0], ArrowRight: [-st, 0], ArrowUp: [0, st], ArrowDown: [0, -st] }[e.key]; if (m && e.target === vp) { e.preventDefault(); tx += m[0]; ty += m[1]; apply(); } if ((e.key === '+' || e.key === '=') && e.target === vp) zoomAt(k * 1.2); if (e.key === '-' && e.target === vp) zoomAt(k / 1.2); });
+  };
   // Printable layout for the controlled copy: top management, then one block per department head.
   const compactHtml = () => {
     const m = Q.orgModel(); if (!m.root) return '';
@@ -95,11 +163,12 @@
     render: (b, ctx) => {
       const view = Q.UI.ocView || (matchMedia('(max-width: 720px)').matches ? 'list' : 'chart'), depts = [...new Set(active().map(id => Q.person(id).dept))].sort();
       return `<section class="panel oc-panel" id="org-chart"><div class="panel-head"><h2>${esc(ctx.title('Organization chart'))}</h2><span class="clause small muted">5.3</span><span class="muted small">${Q.orgModel().count} people</span>
-        <div class="actions">${Q.seg('View', [['chart', 'Chart'], ['list', 'List']], view).replace(/data-seg=/g, 'data-oc-view=')}
+        <div class="actions"><button class="btn sm" type="button" data-action="oc-print" title="Print the chart on one landscape page">${icon('file-down')}Print</button>${Q.seg('View', [['chart', 'Chart'], ['list', 'List']], view).replace(/data-seg=/g, 'data-oc-view=')}
           <label class="oc-filter"><span class="sr-only">Highlight department</span><select class="select" data-oc-dept><option value="">All departments</option>${depts.map(d => `<option${d === Q.UI.ocDept ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label></div></div>
-        <div class="panel-pad${Q.UI.ocDept ? ' oc-filtering' : ''}" data-oc-host data-dept-on="${esc(Q.UI.ocDept || '')}">${staleNote()}${view === 'list' ? listHtml() : Q.orgChartHtml()}
-          <p class="small muted oc-foot">Built from Settings → Users &amp; Access. Codes on a card are the processes that person owns. Deactivated users are not shown.</p></div></section>`;
-    } });
+        <div class="panel-pad${Q.UI.ocDept ? ' oc-filtering' : ''}" data-oc-host data-dept-on="${esc(Q.UI.ocDept || '')}">${staleNote()}${view === 'list' ? listHtml() : Q.orgFlowHtml() + unplacedHtml()}
+          <p class="small muted oc-foot">Drag the canvas to move around; use the controls or Ctrl + scroll to zoom. Built from Settings → Users &amp; Access. Codes on a card are the processes that person owns. Deactivated users are not shown.</p></div></section>`;
+    }, after: main => Q.orgFlowWire(main) });
+  const unplacedHtml = () => { const m = Q.orgModel(); return m.unplaced.length ? `<div class="oc-unplaced"><b>${icon('circle-help')}Not placed yet</b><span class="small muted">No manager set. Select a person to choose who they report to.</span><div class="oc-unplaced-list">${m.unplaced.map(id => node(id)).join('')}</div></div>` : ''; };
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-oc-view]'); if (!b) return;
     Q.UI.ocView = b.dataset.ocView; Q.saveUI(); Q.render({ noFocus: true, keepScroll: true });
@@ -116,6 +185,26 @@
   const paintDept = () => { const d = Q.UI.ocDept; document.querySelectorAll('[data-oc-host] [data-dept]').forEach(n => n.classList.toggle('oc-dim', !!d && n.dataset.dept !== d)); };
   window.addEventListener('hashchange', () => setTimeout(paintDept, 0));
   const render = Q.render; Q.render = (o = {}) => { const y = scrollY; render(o); if (o.keepScroll) scrollTo(0, y); paintDept(); };
+
+  /* ---------- Print: the same layout as a static diagram on one A4 landscape page ----------
+   * No menus, handles, add buttons, canvas dots or controls; scaled to fit; document header and footer. */
+  Q.actions['oc-print'] = () => {
+    const f = Q.orgFlowHtml({ print: true }); if (!f.W) { window.print(); return; }
+    const d = Q.doc(Q.S.context.orgChartDoc), org = Q.S.organization, m = Q.orgModel();
+    const PW = 1040, PH = 610, k = Math.min(1, PW / f.W, PH / f.H); // printable area of A4 landscape at 10 mm margins, less header and footer
+    document.querySelector('.oc-print-sheet')?.remove();
+    const sheet = document.createElement('div'); sheet.className = 'oc-print-sheet';
+    sheet.innerHTML = `<header class="ocs-head"><div><b>${esc(org.name)}</b><span>Organization Chart · ${esc(Q.standard())} clause 5.3</span></div>
+        <table><tr><td>Document</td><td><b>${esc(d?.id || '—')}</b></td><td>Revision</td><td><b>${esc(d?.rev || '—')}</b></td></tr><tr><td>Printed</td><td>${Q.fmt(Q.today())}</td><td>People</td><td>${m.count}</td></tr></table></header>
+      <div class="ocs-chart" style="width:${f.W * k}px;height:${f.H * k}px"><div class="ocs-scale" style="transform:scale(${k})">${f.html}</div></div>
+      <footer class="ocs-foot"><span>Codes on a card are the processes that person owns.</span><span>${Q.S.context.orgChartChanged && d?.effective && Q.S.context.orgChartChanged > d.effective ? 'Live chart — differs from the controlled copy' : 'Uncontrolled when printed'}</span></footer>`;
+    document.body.appendChild(sheet);
+    const page = document.createElement('style'); page.id = 'oc-page'; page.textContent = '@page { size: A4 landscape; margin: 10mm; }'; document.head.appendChild(page);
+    document.body.classList.add('print-oc'); Q.refreshIcons();
+    const done = () => { document.body.classList.remove('print-oc'); sheet.remove(); page.remove(); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => window.print(), 50);
+  };
 
   /* ---------- Person details: change who someone reports to ---------- */
   Q.actions['oc-person'] = d => {
