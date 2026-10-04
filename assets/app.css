@@ -343,12 +343,18 @@ table.dt { width: 100%; border-collapse: collapse; font-size: var(--fs-body); li
 .rd-modal-pct{font-size:42px;font-weight:650;line-height:1}.rd-modal-pct small{margin-left:2px;color:var(--text-3);font-size:18px;font-weight:500}
 .rd-modal-score p{margin-top:8px;color:var(--text-3);font-size:12px}
 .rd-modal-summary .rd-gauge{width:min(100%,360px);justify-self:center}
+.rd-modal-gauge-card{position:relative;display:grid;grid-template-columns:1fr;min-height:270px;place-items:center;padding:20px 24px 10px}
+.rd-modal-gauge-card .rd-gauge{width:min(100%,560px);height:auto}
+.rd-modal-gauge-center{position:absolute;left:50%;bottom:12%;display:flex;min-width:130px;transform:translateX(-50%);flex-direction:column;align-items:center;text-align:center}
+.rd-modal-gauge-label{color:var(--text-3);font-size:13px;line-height:18px}
+.rd-modal-gauge-pct{color:var(--text);font-size:58px;font-weight:650;line-height:62px}
+.rd-modal-gauge-pct small{margin-left:3px;color:var(--text-3);font-size:23px;font-weight:500}
 .rd-gap-list{margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
 .rd-gap-list h3{margin-bottom:10px;font-size:14px}
 .rd-gap-list ul{list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .rd-gap-list li{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px}
 .rd-gap-list li:last-child{border-bottom:0}
-@media(max-width:760px){.irc-metrics{grid-template-columns:1fr;margin-top:14px}.irc-metric+.irc-metric{border-left:0;border-top:1px solid var(--border)}.rd-modal-summary{grid-template-columns:1fr}.rd-gap-list li{grid-template-columns:58px minmax(0,1fr)}.rd-gap-list li .st{grid-column:2;justify-self:start}}
+@media(max-width:760px){.irc-metrics{grid-template-columns:1fr;margin-top:14px}.irc-metric+.irc-metric{border-left:0;border-top:1px solid var(--border)}.rd-modal-summary{grid-template-columns:1fr}.rd-modal-gauge-card{min-height:220px;padding-inline:12px}.rd-modal-gauge-pct{font-size:48px;line-height:52px}.rd-gap-list li{grid-template-columns:58px minmax(0,1fr)}.rd-gap-list li .st{grid-column:2;justify-self:start}}
 
 .readiness { display: grid; grid-template-columns: 200px 1fr; gap: var(--s5); align-items: center; }
 .readiness .pct { font-size: 40px; line-height: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }

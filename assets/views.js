@@ -57,13 +57,12 @@
       title: 'ISO 9001 readiness',
       sub: `${esc(S.organization.standard)} · ${s.pct ?? '—'}% readiness`,
       body: `<div class="modal-body">
-        <div class="rd-modal-summary">
-          <div class="rd-modal-score">
-            <span class="rd-modal-status">${s.pct >= 80 ? 'On track' : s.pct >= 60 ? 'Needs attention' : 'At risk'}</span>
-            <div class="rd-modal-pct tnum">${s.pct ?? '—'}<small>%</small></div>
-            <p>${s.points} of ${s.applicable} applicable requirements</p>
-          </div>
+        <div class="rd-modal-summary rd-modal-gauge-card">
           ${readinessGauge(s)}
+          <span class="rd-modal-gauge-center">
+            <span class="rd-modal-gauge-label">Readiness</span>
+            <span class="rd-modal-gauge-pct tnum">${s.pct ?? '—'}<small>%</small></span>
+          </span>
         </div>
         ${Q.readinessBlock(S.iso)}
         <div class="rd-gap-list">
