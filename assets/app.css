@@ -438,17 +438,6 @@ details.explain .explain-body { margin-top: 8px; padding: 12px 14px; background:
 .callout b { display: block; }
 .callout .dl { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 4px; font-size: var(--fs-small); color: var(--text-2); }
 .callout .dl span b { display: inline; font-weight: 600; color: var(--text); }
-.callout.warning.qms-alert { align-items: center; gap: 12px; min-height: 72px; padding: 14px 16px; border: 1px solid #d89a1e; border-left-width: 3px; border-radius: 10px; background: #fffbf1; color: var(--text); }
-.callout.warning.qms-alert { margin-bottom: 12px !important; }
-.qms-alert > .lucide { width: 18px; height: 18px; flex: none; margin: 0; color: #f1c329; }
-.qms-alert-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
-.callout.warning.qms-alert .qms-alert-copy b { color: var(--text); font-size: 14px; line-height: 19px; }
-.callout.warning.qms-alert .qms-alert-copy small { color: var(--text-2); font-size: 13px; line-height: 18px; }
-.qms-alert-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; margin-left: auto; padding-left: 12px; }
-.qms-alert-actions .btn { min-height: 32px; border-radius: 7px; }
-.qms-alert-actions .btn.ghost { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
-.qms-alert-actions .btn:not(.ghost) { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
-@media (max-width: 700px) { .qms-alert { align-items: flex-start; flex-wrap: wrap; } .qms-alert-actions { width: 100%; justify-content: flex-end; } }
 
 /* ============ Modals ============ */
 .modal-root { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(12, 28, 21, .45); }
@@ -956,29 +945,6 @@ body .sb .sb-item.sb-sub { padding-left: 42px; justify-content: flex-start; }
 .vtabs.is-scrolling::-webkit-scrollbar { display: block; height: 5px; }
 .vtabs.is-scrolling::-webkit-scrollbar-track { background: transparent; }
 .vtabs.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; transition: background-color .28s ease; }
-.vtabs { scrollbar-color: transparent transparent; }
-.view-card > .vtabs:not(.is-scrolling)::-webkit-scrollbar { width: 0; height: 0; }
-.view-card > .vtabs:not(.is-scrolling) { scrollbar-width: none; }
-.needs-action-scroll, .table-scroll,
-.pb-block.pb-fixed:not(.editing) > *,
-.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head),
-.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap { scrollbar-width: none; scrollbar-color: transparent transparent; }
-.needs-action-scroll::-webkit-scrollbar, .table-scroll::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > *::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head)::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap::-webkit-scrollbar { width: 0; height: 0; }
-.needs-action-scroll.is-scrolling, .table-scroll.is-scrolling,
-.pb-block.pb-fixed:not(.editing) > *.is-scrolling,
-.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling,
-.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
-.needs-action-scroll.is-scrolling::-webkit-scrollbar, .table-scroll.is-scrolling::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > *.is-scrolling::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling::-webkit-scrollbar,
-.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling::-webkit-scrollbar { width: 6px; height: 6px; }
-.needs-action-scroll.is-scrolling::-webkit-scrollbar-thumb, .table-scroll.is-scrolling::-webkit-scrollbar-thumb,
-.pb-block.pb-fixed:not(.editing) > *.is-scrolling::-webkit-scrollbar-thumb,
-.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling::-webkit-scrollbar-thumb,
-.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 .vtab { position: relative; display: flex; align-items: center; flex: none; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
 .vtab a { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 4px 0 12px; color: var(--text-2); font-weight: 500; white-space: nowrap; }
 .vtab a:hover { color: var(--text); text-decoration: none; }
@@ -3136,27 +3102,61 @@ tr.tone-warning .ui-bt-icon { background: var(--warning-bg); color: var(--warnin
 .flip { display: inline-grid; transform: scaleX(-1); }
 /* Org chart print sheet: only shown while printing (Print button on the chart). */
 .oc-print-sheet { display: none; }
+/* While measuring (off screen) and while printing, the sheet is exactly one A4 page: header, chart area, footer. */
+.oc-print-sheet.measuring, body.print-oc .oc-print-sheet { box-sizing: border-box; flex-direction: column; overflow: hidden; background: #fff; color: #17231E; font-size: 11px; }
+.oc-print-sheet.measuring { display: flex; position: fixed; left: -99999px; top: 0; visibility: hidden; }
+.oc-print-sheet .ocs-area { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; padding-top: 4px; }
+.oc-print-sheet .ocs-head { flex: none; } .oc-print-sheet .ocs-foot { flex: none; }
 @media print {
   body.print-oc > *:not(.oc-print-sheet) { display: none !important; }
   body.print-oc { background: #fff !important; margin: 0; }
-  body.print-oc .oc-print-sheet { display: block; color: #17231E; font-size: 11px;
+  body.print-oc .oc-print-sheet { display: flex; break-inside: avoid; page-break-after: avoid; color: #17231E; font-size: 11px;
     --surface: #fff; --surface-2: #F7F8F8; --text: #17231E; --text-2: #3E4A45; --text-3: #6B7671; --border: #D5DBD8; --border-strong: #B9C2BE; --accent: #1F6F4A; --success: #1B7A4B;
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .ocs-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 1.5px solid #17231E; }
-  .ocs-head b { display: block; font-size: 16px; } .ocs-head span { color: #3E4A45; }
-  .ocs-head table { border-collapse: collapse; font-size: 10px; } .ocs-head td { padding: 1px 6px; border: 1px solid #B9C2BE; } .ocs-head td:nth-child(odd) { color: #6B7671; }
-  .ocs-chart { position: relative; margin: 0 auto; overflow: hidden; }
-  .ocs-scale { transform-origin: 0 0; }
-  .oc-print-sheet .fl-world { position: relative; }
-  .oc-print-sheet .fl-node { box-shadow: none; cursor: default; border-color: #B9C2BE; break-inside: avoid; }
-  .oc-print-sheet .fl-f { background: #F7F8F8; }
-  .oc-print-sheet .fl-h { padding: 7px 8px 5px 10px; align-items: flex-start; }
-  .oc-print-sheet .fl-t b { font-size: 12.5px; line-height: 15px; }
-  .oc-print-sheet .fl-t span { white-space: normal; font-size: 10.5px; line-height: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .oc-print-sheet .fl-edges path { stroke: #8A948F; stroke-width: 1.2; }
-  .oc-print-sheet .fl-label { box-shadow: none; }
-  .ocs-foot { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 6px; border-top: 1px solid #D5DBD8; color: #6B7671; font-size: 10px; }
 }
+.oc-print-sheet .ocs-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 1.5px solid #17231E; }
+.oc-print-sheet .ocs-head b { display: block; font-size: 16px; } .oc-print-sheet .ocs-head span { color: #3E4A45; }
+.oc-print-sheet .ocs-head table { border-collapse: collapse; font-size: 10px; } .oc-print-sheet .ocs-head td { padding: 1px 6px; border: 1px solid #B9C2BE; } .oc-print-sheet .ocs-head td:nth-child(odd) { color: #6B7671; }
+.oc-print-sheet .ocs-chart { position: relative; margin: 0 auto; overflow: hidden; }
+.oc-print-sheet .ocs-scale { transform-origin: 0 0; }
+.oc-print-sheet .fl-world { position: relative; }
+.oc-print-sheet .fl-node { box-shadow: none; cursor: default; border-color: #B9C2BE; break-inside: avoid; }
+.oc-print-sheet .fl-f { background: #F7F8F8; }
+.oc-print-sheet .fl-h { padding: 7px 8px 5px 10px; align-items: flex-start; }
+.oc-print-sheet .fl-t b { font-size: 12.5px; line-height: 15px; }
+.oc-print-sheet .fl-t span { white-space: normal; font-size: 10.5px; line-height: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.oc-print-sheet .fl-edges path { stroke: #8A948F; stroke-width: 1.2; }
+.oc-print-sheet .fl-label { box-shadow: none; }
+.oc-print-sheet .ocs-foot { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 6px; border-top: 1px solid #D5DBD8; color: #6B7671; font-size: 10px; }
 .oc-panel .panel-head { flex-wrap: wrap; }
 .oc-panel .panel-head .actions { flex-wrap: wrap; max-width: 100%; }
 .oc-panel .oc-filter { min-width: 0; max-width: 100%; }
+/* Update 20d · org chart tree: card wrapper with an add-report button, side handles for stacked teams, chart-only people */
+.fl-item { position: absolute; width: 236px; height: 82px; }
+.fl-item > .fl-node { position: relative; left: auto; top: auto; width: 100%; height: 100%; }
+.fl-hd.left { left: -4px; top: 50%; margin: -3.5px 0 0; }
+.fl-node.guest { border-style: dashed; }
+.fl-node.guest .fl-ic { background: var(--surface); color: var(--c); box-shadow: inset 0 0 0 1.5px var(--c); }
+.fl-add { position: absolute; left: 50%; bottom: -12px; width: 24px; height: 24px; margin-left: -12px; padding: 0; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--accent); background: var(--surface); color: var(--accent); cursor: pointer; opacity: 0; transform: scale(.85); transition: opacity .12s, transform .12s; z-index: 2; }
+.fl-add svg { width: 13px; height: 13px; }
+.fl-item:hover .fl-add, .fl-item:focus-within .fl-add { opacity: 1; transform: none; }
+.fl-add:hover { background: var(--accent); color: #fff; }
+@media (hover: none) { .fl-add { opacity: 1; transform: none; } }
+.fl-addbtn { margin-left: auto; border-radius: 999px; }
+.oc-print-sheet .fl-item { position: absolute; }
+.fl-hd.bot.rail { left: 14px; margin-left: -3.5px; }
+.fl-vp { user-select: none; -webkit-user-select: none; }
+/* Follow-up refinements: readable light QMS alert with card spacing and quiet internal scrollbars. */
+.callout.warning.qms-alert { align-items: center; gap: 12px; min-height: 72px; margin-bottom: 12px !important; padding: 14px 16px; border: 1px solid #d89a1e; border-left-width: 3px; border-radius: 10px; background: #fffbf1; color: var(--text); }
+.callout.warning.qms-alert .qms-alert-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.callout.warning.qms-alert .qms-alert-copy b { color: var(--text); font-size: 14px; line-height: 19px; }
+.callout.warning.qms-alert .qms-alert-copy small { color: var(--text-2); font-size: 13px; line-height: 18px; }
+.qms-alert-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; margin-left: auto; padding-left: 12px; }
+.qms-alert-actions .btn { min-height: 32px; border-radius: 7px; }
+.qms-alert-actions .btn.ghost, .qms-alert-actions .btn:not(.ghost) { border-color: var(--border-strong); background: var(--surface); color: var(--text); }
+.view-card > .vtabs:not(.is-scrolling), .needs-action-scroll, .table-scroll { scrollbar-width: none; scrollbar-color: transparent transparent; }
+.view-card > .vtabs:not(.is-scrolling)::-webkit-scrollbar, .needs-action-scroll::-webkit-scrollbar, .table-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.view-card > .vtabs.is-scrolling, .needs-action-scroll.is-scrolling, .table-scroll.is-scrolling { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.view-card > .vtabs.is-scrolling::-webkit-scrollbar, .needs-action-scroll.is-scrolling::-webkit-scrollbar, .table-scroll.is-scrolling::-webkit-scrollbar { width: 6px; height: 6px; }
+.view-card > .vtabs.is-scrolling::-webkit-scrollbar-thumb, .needs-action-scroll.is-scrolling::-webkit-scrollbar-thumb, .table-scroll.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
