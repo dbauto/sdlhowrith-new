@@ -612,20 +612,64 @@
   };
 
   /* ============================== 4. Evidence ============================== */
+  /* Update 22 — Evidence uses the board layout of Policies: pill tabs, a Summary first (stat tiles, an
+   * "Evidence health" card with completeness/readiness rings and the weakest clauses, one "Needs attention"
+   * table). The other tabs keep their content. Old links keep working: ?view=clause|process|list, and
+   * ?c=, ?status= or ?p= without a view open the matching tab. */
   Q.views.evidence = (_, q) => {
-    const S = Q.S, view = ['process', 'list'].includes(q.view) ? q.view : 'clause';
+    const S = Q.S;
+    const view = ['summary', 'clause', 'process', 'list'].includes(q.view) ? q.view
+      : q.c || q.status ? 'clause' : q.p ? 'process' : q.focus ? 'list' : 'summary';
     const counts = {}; S.evidence.forEach(e => { counts[e.source.system] = (counts[e.source.system] || 0) + 1; });
-    const gaps = S.evidence.filter(Q.evGap).length;
+    const gaps = S.evidence.filter(Q.evGap).length, iso = Q.isoScore(S.iso);
+    const atRisk = iso.counts['At Risk'] + iso.counts['Missing'];
     const head = Q.pageHead({ title: 'Evidence', sub: `Records that prove the QMS works — organized by ISO 9001 subclause and by process. ${S.evidence.length} records · ${gaps} gaps.`,
-      actions: `<button class="btn" type="button" data-action="toast" data-title="Export" data-msg="Evidence pack by clause would be exported to PDF for the certification body.">${icon('download')}Export Audit Pack</button><button class="btn primary" type="button" data-action="link-evidence">${icon('link')}Link Evidence</button>` });
-    const bar = `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">${Q.seg('View', [['clause', 'By ISO subclause'], ['process', 'By process'], ['list', 'All records']], view).replace(/data-seg="(\w+)"/g, 'data-go="#/evidence?view=$1"')}
-      <span class="small muted">Sources: ${Object.entries(counts).map(([k, v]) => `${esc(k)} ${v}`).join(' · ')} · <a href="#/settings/integrations">Manage</a></span></div>`;
+      actions: `<button class="btn" type="button" data-action="toast" data-title="Export" data-msg="Evidence pack by clause would be exported to PDF for the certification body.">${icon('download')}Export Audit Pack</button>${view === 'summary' ? '' : `<button class="btn primary" type="button" data-action="link-evidence">${icon('link')}Link Evidence</button>`}` });
+    const tabs = [
+      { key: 'summary', label: 'Summary' },
+      { key: 'clause', label: 'By ISO subclause', n: atRisk, tone: atRisk ? 'danger' : '' },
+      { key: 'process', label: 'By process', n: Q.topProcesses().length },
+      { key: 'list', label: 'All records', n: S.evidence.length }];
+    const bar = `<div class="ev-tabbar">${Q.ui.tabs(tabs.map(t => ({ ...t, href: `#/evidence?view=${t.key}` })), view, 'Evidence views')}
+      <span class="small muted ev-sources">${icon('plug')}Sources: ${Object.entries(counts).map(([k, v]) => `${esc(k)} ${v}`).join(' · ')} · <a href="#/settings/integrations">Manage</a></span></div>`;
     let body;
     if (view === 'list') body = Q.evTable('ev', { initialSeg: q.status });
     else if (view === 'process') body = evByProcess(q.p);
-    else body = `<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>ISO 9001 readiness</h2><span class="small muted">${esc(S.organization.standard)}</span></div><div class="panel-pad">${Q.readinessBlock(S.iso)}</div></section>` + evByClause(q.c, q.status);
-    return { title: 'Evidence', nav: 'evidence', html: head + bar + body };
+    else if (view === 'clause') body = `<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>ISO 9001 readiness</h2><span class="small muted">${esc(S.organization.standard)}</span></div><div class="panel-pad">${Q.readinessBlock(S.iso)}</div></section>` + evByClause(q.c, q.status);
+    else body = evSummary();
+    return { title: view === 'summary' ? 'Evidence' : `Evidence · ${tabs.find(t => t.key === view).label}`, nav: 'evidence', html: head + bar + `<div class="tab-panel" role="tabpanel">${body}</div>` };
   };
+
+  function evSummary() {
+    const S = Q.S, iso = Q.isoScore(S.iso), c = iso.counts, pct = (n, t) => t ? Math.round(n / t * 100) : 100;
+    const verified = S.evidence.filter(e => e.status === 'Verified').length, pending = S.evidence.filter(e => e.status === 'Pending verification');
+    const gapList = S.evidence.filter(Q.evGap), ncOpen = S.findings.filter(f => f.nc && f.nc.status !== 'Closed');
+    const pOwner = r => Q.proc(r.processes[0])?.owner;
+    const att = [
+      ...gapList.map(e => ({ icon: 'paperclip', title: e.name, meta: `${e.id} · ${Q.plabel(e.process)} · ISO ${e.iso || '—'}`, kind: 'Evidence gap', owner: e.owner,
+        action: 'link-evidence', data: { process: e.process, control: e.control, name: e.name, replace: e.id }, right: Q.ui.badge(e.status, Q.EV_KIND[e.status]), tone: e.status === 'Missing' ? 'danger' : '' })),
+      ...S.iso.filter(r => ['Missing', 'At Risk'].includes(r.status)).sort((a, b) => Q.clauseSort(a.clause) < Q.clauseSort(b.clause) ? -1 : 1)
+        .map(r => ({ icon: 'list-checks', title: `${r.clause} ${r.title}`, meta: r.note || `${r.processes.map(Q.plabel).join(', ')}`, kind: 'Requirement', owner: pOwner(r),
+          href: `#/evidence?view=clause&c=${r.clause}`, right: Q.ui.badge(r.status, Q.ISO_KIND[r.status]), tone: r.status === 'Missing' ? 'danger' : '' })),
+      ...ncOpen.map(f => { const over = Q.AM?.ncOverdue(f); return { icon: 'search-check', title: f.title, meta: `${f.nc.no || f.id} · clause ${f.clause} · ${f.nc.classification || ''}`.replace(/ · $/, ''), kind: 'Audit NC', owner: f.nc.owner, due: f.nc.due,
+        href: f.nc.no ? `#/audits/nc/${f.nc.no}` : `#/audits/nc?clause=${encodeURIComponent(f.clause)}`, right: Q.ui.badge(over ? 'Overdue' : f.nc.status, over ? 'danger' : 'info'), tone: over ? 'danger' : '' }; }),
+      ...pending.map(e => ({ icon: 'badge-check', title: e.name, meta: `${e.id} · ${e.source.system} · ${Q.plabel(e.process)}`, kind: 'Verification', owner: e.owner,
+        href: `#/evidence?view=list&status=pending`, right: Q.ui.badge('Pending verification', 'info') })),
+      ...S.documents.filter(d => Q.docRestricted(d) && Q.docIso(d).length).map(d => ({ icon: 'file-lock', title: d.title, meta: `${d.id} · ISO ${Q.docIso(d).join(', ')} · counted from the owner’s description`, kind: 'Confidential document', owner: d.owner,
+        action: 'open-doc', data: { id: d.id }, right: Q.ui.badge('Description only', 'muted') }))];
+    const clauseBars = Q.CLAUSES.map(([k, t]) => { const s = Q.isoScore(Q.reqsIn(k)); return { k, t, s }; }).filter(x => x.s.pct != null).sort((a, b) => a.s.pct - b.s.pct)
+      .map(({ k, t, s }) => ({ label: `${k} ${t}`, pct: s.pct, value: `${s.pct}%`, note: `${s.counts['Complete']}/${s.applicable} complete`, href: `#/evidence?view=clause&c=${k}`, tone: s.pct < 50 ? 'danger' : s.pct < 85 ? 'warning' : '' }));
+    return Q.ui.summary({
+      stats: [
+        { label: 'Evidence records', value: S.evidence.length, icon: 'paperclip', href: '#/evidence?view=list', note: `${verified} verified · ${pending.length} pending` },
+        { label: 'Evidence gaps', value: gapList.length, icon: 'link', href: '#/evidence?view=list&status=gaps', tone: gapList.length ? 'danger' : null, note: 'missing or link unavailable' },
+        { label: 'Requirements complete', value: `${c['Complete']}/${iso.applicable}`, icon: 'list-checks', href: '#/evidence?view=clause', tone: c['At Risk'] + c['Missing'] ? 'warning' : null, note: `${c['At Risk']} at risk · ${c['Missing']} missing` }],
+      breakdown: { title: 'Evidence health', link: { href: '#/evidence?view=clause', text: 'By clause' },
+        rings: { outer: { pct: pct(verified, S.evidence.length), label: 'Completeness' }, inner: { pct: iso.pct, label: 'ISO readiness', note: 'all clauses' } },
+        bars: clauseBars },
+      attention: att, search: 'Search evidence, requirements, NCs…', empty: 'All evidence is linked and verified.',
+      action: `<button class="btn primary" type="button" data-action="link-evidence">${icon('link')}Link Evidence</button>` });
+  }
 
   const evRows = list => list.length ? `<table class="dt tight"><thead><tr><th>Evidence</th><th>Source</th><th class="c-date">Record date</th><th>Verification</th><th class="c-actions"></th></tr></thead><tbody>${list.map(e => `<tr data-key="${esc(e.id)}"><td><span class="title">${esc(e.name)}</span><span class="sub">${esc(e.id)} · ${esc(Q.plabel(e.process))} · control: ${esc(e.control)}</span></td><td class="small"><b>${esc(e.source.system)}</b><span class="sub" style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(e.source.record)}">${esc(e.source.record)}</span></td><td class="c-date">${Q.fmt(e.date)}</td><td>${Q.st(e.status, Q.EV_KIND[e.status])}</td><td class="c-actions">${Q.evGap(e) ? `<button class="btn sm" type="button" data-action="link-evidence" data-process="${e.process}" data-control="${esc(e.control)}" data-name="${esc(e.name)}" data-replace="${e.id}">${icon('link')}${e.status === 'Missing' ? 'Link' : 'Relink'}</button>` : `<button class="btn sm" type="button" data-action="toast" data-title="Open source record" data-msg="${esc(e.source.record)} would open in ${esc(e.source.system)}.">${icon('external-link')}Open</button>`}</td></tr>`).join('')}</tbody></table>` : '';
   const reqEvidence = r => [...new Map([...r.evidence.map(id => Q.S.evidence.find(e => e.id === id)).filter(Boolean), ...Q.evForClause(r.clause)].map(e => [e.id, e])).values()];

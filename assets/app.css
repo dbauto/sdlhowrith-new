@@ -3352,3 +3352,10 @@ a.ta-row:hover { background: var(--surface-2); text-decoration: none; }
 @keyframes pc-ready-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .fx-ready .pc2-progress i { transform-origin: left center; transition: none; animation: pc-ready-fill .75s cubic-bezier(.22,.61,.36,1) both; }
 @media (prefers-reduced-motion: reduce), print { .fx-ready .pc2-progress i { animation: none; } }
+
+/* ---------- Update 22 · Evidence board ---------- */
+.ev-tabbar { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-bottom: var(--s5); }
+.ev-tabbar > .ui-tabs { margin-bottom: 0; }
+.ev-sources { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.ev-sources svg { width: 14px; height: 14px; }
+@media (max-width: 720px) { .ev-sources { margin-left: 0; } }
