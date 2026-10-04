@@ -438,7 +438,7 @@ details.explain .explain-body { margin-top: 8px; padding: 12px 14px; background:
 .callout b { display: block; }
 .callout .dl { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 4px; font-size: var(--fs-small); color: var(--text-2); }
 .callout .dl span b { display: inline; font-weight: 600; color: var(--text); }
-.qms-alert { align-items: center; gap: 10px; min-height: 64px; padding: 12px 14px; border: 1px solid #6b560c; border-left-width: 1px; border-radius: 10px; background: #1b1b19; color: #f5f5f2; }
+.callout.warning.qms-alert { align-items: center; gap: 10px; min-height: 64px; padding: 12px 14px; border: 1px solid #6b560c; border-left-width: 1px; border-radius: 10px; background: #1b1b19; color: #f5f5f2; }
 .qms-alert > .lucide { width: 18px; height: 18px; flex: none; margin: 0; color: #f1c329; }
 .qms-alert-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .qms-alert-copy b { color: #f5f5f2; font-size: 14px; line-height: 18px; }
