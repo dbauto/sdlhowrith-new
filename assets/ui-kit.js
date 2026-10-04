@@ -100,14 +100,15 @@
         <svg viewBox="0 0 160 160" aria-hidden="true">${ring(66, ov, 'out')}${iv == null ? '' : ring(46, iv, 'in')}</svg>
         <span class="ui-rings-c"><span><b class="tnum">${ov}%</b><small title="${esc(outer.label)}">${esc(String(outer.label).split(' · ')[0])}</small></span></span></div>
       <ul class="ui-rings-key"><li><i class="out"></i><span>${esc(outer.label)}</span><b class="tnum">${ov}%</b></li>
-        <li><i class="in"></i><span>${esc(inner.label)}${inner.note ? `<small>${esc(inner.note)}</small>` : ''}</span><b class="tnum">${iv == null ? '—' : iv + '%'}</b></li></ul></div>`;
+        <li><i class="in"></i><span>${esc(inner.label)}${inner.note ? ` <small>${esc(inner.note)}</small>` : ''}</span><b class="tnum">${iv == null ? '—' : iv + '%'}</b></li></ul></div>`;
   };
   // Breakdown card: { title, link, rings: { outer, inner } | donut: {pct, label}, bars: [{ label, pct, value, note, href, tone }] }
   UI.breakdown = o => `<section class="ui-bd">
     <header><h2>${esc(o.title)}</h2>${o.link ? `<a class="ui-link" href="${esc(o.link.href)}">${esc(o.link.text)}${icon('chevron-right')}</a>` : ''}</header>
     ${o.rings ? UI.rings(o.rings) : o.donut ? UI.donut(o.donut.pct, o.donut.label) : ''}
-    ${(o.bars || []).length ? `<ul class="ui-bars">${o.bars.map(x => { const v = Math.max(0, Math.min(100, Math.round(x.pct || 0))), inner = `<span class="ui-bar-l"><i class="dot${x.tone ? ' ' + kind(x.tone) : ''}"></i>${esc(x.label)}</span><span class="ui-bar-t"><i class="${x.tone ? kind(x.tone) : ''}" style="width:${v}%"></i></span><span class="ui-bar-f"><span>${esc(x.note || '')}</span><b class="tnum">${esc(x.value != null ? String(x.value) : v + '%')}</b></span>`;
-      return `<li>${x.href ? `<a href="${esc(x.href)}">${inner}</a>` : inner}</li>`; }).join('')}</ul>` : (o.empty ? `<p class="small muted">${esc(o.empty)}</p>` : '')}
+    ${(o.bars || []).length ? `<ul class="ui-bars">${o.bars.slice(0, 5).map(x => { const v = Math.max(0, Math.min(100, Math.round(x.pct || 0))), inner = `<span class="ui-bar-l"><i class="dot${x.tone ? ' ' + kind(x.tone) : ''}"></i>${esc(x.label)}</span><span class="ui-bar-t"><i class="${x.tone ? kind(x.tone) : ''}" style="width:${v}%"></i></span><span class="ui-bar-f"><span>${esc(x.note || '')}</span><b class="tnum">${esc(x.value != null ? String(x.value) : v + '%')}</b></span>`;
+      return `<li>${x.href ? `<a href="${esc(x.href)}">${inner}</a>` : inner}</li>`; }).join('')}</ul>${(() => { const extra = Math.max(0, o.bars.length - 5), txt = `+ ${extra} more`;
+        return o.link ? `<a class="ui-bd-more" data-extra="${extra}" href="${esc(o.link.href)}"${extra ? '' : ' hidden'}><span>${txt}</span>${icon('chevron-right')}</a>` : `<span class="ui-bd-more" data-extra="${extra}"${extra ? '' : ' hidden'}><span>${txt}</span></span>`; })()}` : (o.empty ? `<p class="small muted">${esc(o.empty)}</p>` : '')}
   </section>`;
 
   // Table rows: { icon, title, meta, kind, owner (person id), due (ISO date) | dueText, right (status html), href | action+data, tone }
@@ -155,6 +156,30 @@
     const pg = e.target.closest?.('[data-bt-page]'); if (pg) { btUpdate(pg.closest('[data-bt]'), +pg.dataset.btPage); return; }
     const tr = e.target.closest?.('tr[data-bt-row]'); if (tr && !e.target.closest('a, button, input, select')) tr.querySelector('.ui-bt-title')?.click();
   });
+
+  /* Fit each board to the screen: the board takes the height left below its top edge, the table card fills it
+   * (rows scroll inside the card), and the left column hides bars from the bottom ("+ N more") until it fits.
+   * Stacked layouts (narrow screens) keep their natural height. */
+  let fitBoard = bd => {
+    const side = bd.querySelector('.ui-board-side'); if (!side) return;
+    side.classList.remove('tight'); side.querySelectorAll('.ui-bars li[hidden]').forEach(li => { li.hidden = false; });
+    const more = side.querySelector('.ui-bd-more'), setMore = hiddenN => { if (!more) return; const n = hiddenN + (+more.dataset.extra || 0); more.hidden = !n; more.firstElementChild.textContent = `+ ${n} more`; };
+    setMore(0);
+    if (getComputedStyle(bd).gridTemplateColumns.trim().split(/\s+/).length < 2) { bd.style.height = ''; bd.classList.remove('fit'); return; }
+    const host = bd.closest('#main') || document.body, padB = parseFloat(getComputedStyle(host).paddingBottom) || 0, top = bd.getBoundingClientRect().top + scrollY, h = Math.round(Math.max(380, innerHeight - top - padB - 2));
+    bd.style.height = `${h}px`; bd.classList.add('fit');
+    const fits = () => side.scrollHeight <= side.clientHeight + 1;
+    if (!fits()) side.classList.add('tight');
+    const lis = [...side.querySelectorAll('.ui-bars li')]; let hid = 0;
+    for (let i = lis.length - 1; i >= 0 && !fits(); i--) { lis[i].hidden = true; hid++; setMore(hid); }
+    if (!fits()) side.classList.add('tighter'); // last step: smaller ring, no key notes — the "+ N more" link stays visible
+  };
+  const fitReset = side => side.classList.remove('tighter');
+  const fitBoard0 = fitBoard; fitBoard = bd => { const side = bd.querySelector('.ui-board-side'); if (side) fitReset(side); fitBoard0(bd);
+  };
+  UI.fitBoards = () => document.querySelectorAll('.ui-board').forEach(bd => { if (!bd.closest('.ui-demo')) fitBoard(bd); });
+  let fitT = 0; window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(UI.fitBoards, 80); });
+  const render0 = Q.render; Q.render = (o = {}) => { render0(o); UI.fitBoards(); };
 
   // Summary tab: { stats (max 4), breakdown, attention rows, action, empty, title }
   UI.summary = ({ stats = [], breakdown = null, attention = [], action = '', empty = 'Nothing needs attention.', title = 'Needs attention', search }) =>
