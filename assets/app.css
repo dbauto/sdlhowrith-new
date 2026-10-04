@@ -439,6 +439,7 @@ details.explain .explain-body { margin-top: 8px; padding: 12px 14px; background:
 .callout .dl { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 4px; font-size: var(--fs-small); color: var(--text-2); }
 .callout .dl span b { display: inline; font-weight: 600; color: var(--text); }
 .callout.warning.qms-alert { align-items: center; gap: 12px; min-height: 72px; padding: 14px 16px; border: 1px solid #d89a1e; border-left-width: 3px; border-radius: 10px; background: #fffbf1; color: var(--text); }
+.callout.warning.qms-alert { margin-bottom: 12px !important; }
 .qms-alert > .lucide { width: 18px; height: 18px; flex: none; margin: 0; color: #f1c329; }
 .qms-alert-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .callout.warning.qms-alert .qms-alert-copy b { color: var(--text); font-size: 14px; line-height: 19px; }
