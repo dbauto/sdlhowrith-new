@@ -317,7 +317,7 @@
     const tabsHtml = `<div class="tabs ws-tabs" role="tablist" aria-label="Process workspace">${shown.map(t => {
       const n = NO_COUNT.has(t.key) ? null : tabCount(t.key, s), empty = n === 0;
       if (empty && cfg.emptyTabs === 'hide' && t.key !== tab) return '';
-      return `<a role="tab" href="#/process/${pid}${t.key === 'overview' ? '' : '/' + t.key}" aria-selected="${t.key === tab}" class="${empty ? 'empty' : ''}" ${empty ? 'title="Nothing recorded for this process yet"' : ''}>${esc(t.label || Q.WS_TABS[t.key])}${note[t.key] ? `<span class="tab-note" title="${n} in total">${note[t.key]}</span>` : n != null ? `<span class="tab-n">${empty ? '—' : n}</span>` : ''}</a>`;
+      return `<a role="tab" href="#/process/${pid}${t.key === 'overview' ? '' : '/' + t.key}" aria-selected="${t.key === tab}" class="${empty ? 'empty' : ''}" ${empty ? 'title="Nothing recorded for this process yet"' : ''}>${esc(t.label || Q.WS_TABS[t.key])}${note[t.key] ? `<span class="tab-note" title="${n} in total">${note[t.key]}</span>` : n != null ? `<span class="tab-n">${n}</span>` : ''}</a>`;
     }).join('')}<a class="ws-config" href="#/settings/workspace" title="Choose which tabs every process shows">${icon('settings')}<span class="sr-only">Configure process workspace tabs</span></a></div>`;
     const crumbs = [['QMS', '#/qms/scope'], ['Processes', '#/qms/processes'], ...(parent ? [[`${parent.process_code} ${parent.name}`, `#/process/${parent.process_id}`]] : []), [`${p.process_code} ${p.name}`, `#/process/${pid}`], ...(tab !== 'overview' ? [[label(tab)]] : [])];
     const head = Q.pageHead({ crumbs, title: `<span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}`,

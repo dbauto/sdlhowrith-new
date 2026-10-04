@@ -239,7 +239,7 @@
     risk: `<span class="health risk">${Q.icon('triangle-alert')}At risk</span>`
   })[h];
   Q.miniProgress = pct => pct == null ? '<span class="muted">—</span>' : `<span class="mini-progress"><span class="track"><span class="fill" style="width:${pct}%"></span></span>${pct}%</span>`;
-  Q.num = (n, cls = 'attn') => n ? `<span class="${cls}">${n}</span>` : '<span class="zero">—</span>';
+  Q.num = (n, cls = 'attn') => n ? `<span class="${cls}">${n}</span>` : '<span class="zero">0</span>';
 
   /* ---------------- Page chrome ---------------- */
   Q.crumbs = items => `<nav class="crumbs" aria-label="Breadcrumb">${items.map((c, i) => i < items.length - 1 ? `<a href="${c[1]}">${esc(c[0])}</a>${Q.icon('chevron-right')}` : `<span aria-current="page">${esc(c[0])}</span>`).join('')}</nav>`;
