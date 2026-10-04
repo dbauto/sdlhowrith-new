@@ -99,7 +99,7 @@
         { label: 'Stage', value: a.status, icon: 'activity', note: ci >= 0 && ci < steps.length - 1 ? `Next: ${steps[ci + 1]}` : 'complete' },
         { label: 'Findings', value: fs.length, icon: 'search-check', href: `#/audits/a/${a.id}/findings`, tone: openNc.length ? 'warning' : null, note: `${ncs.length} NC · ${openNc.length} open` },
         { label: 'Next session', value: next ? Q.fmt(next.date).replace(/ \d{4}$/, '') : '—', icon: 'calendar', href: `#/audits/a/${a.id}/plan#sessions`, note: next ? `${next.start}–${next.end} · ${next.title}` : `${(a.sessions || []).length} sessions` }],
-      breakdown: { title: 'Checklist progress', link: { href: `#/audits/a/${a.id}/checklist`, text: 'Checklist' }, donut: { pct: all.length ? done / all.length * 100 : 0, label: a.checklist && all.length ? `${done} of ${all.length} answered` : 'Checklist not built' }, bars, empty: 'No questions assigned yet.' },
+      breakdown: { title: 'Checklist progress', link: { href: `#/audits/a/${a.id}/checklist`, text: 'Checklist' }, rings: { outer: { pct: all.length ? done / all.length * 100 : 0, label: a.checklist && all.length ? `Completeness · ${done} of ${all.length} answered` : 'Completeness · checklist not built' }, inner: { pct: Q.isoScore(Q.isoForProcess(a.process)).pct, label: 'ISO readiness', note: Q.proc(a.process)?.name || 'audited process' } }, bars, empty: 'No questions assigned yet.' },
       attention: rows, search: 'Search…', empty: 'Nothing needs attention.' }) };
   }
 

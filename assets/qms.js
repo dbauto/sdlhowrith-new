@@ -84,7 +84,8 @@
             { label: 'Sites in scope', value: c.sites.length, icon: 'building-2', href: '#/qms/scope/scope', note: `${c.exclusions.length} exclusion${c.exclusions.length === 1 ? '' : 's'}` },
             { label: 'Context issues', value: issues, icon: 'globe', href: '#/qms/scope/context', tone: ctxDoc && Q.docOverdue(ctxDoc) ? 'danger' : null, note: `${c.issues.internal.length} internal · ${c.issues.external.length} external` },
             { label: 'Interested parties', value: c.parties.length, icon: 'users', href: '#/qms/scope/parties', note: `${mon} monitored` }],
-          breakdown: { title: 'Scope health', donut: { pct: pctOf(cur, keyDocs.length), label: 'Key documents current' },
+          breakdown: { title: 'Scope health', rings: { outer: { pct: pctOf(cur + mon + act, keyDocs.length + c.parties.length + c.sites.length), label: 'Completeness' },
+              inner: { pct: Q.isoScore(S.iso.filter(r => r.clause.startsWith('4.'))).pct, label: 'ISO readiness', note: 'clauses 4.1–4.4' } },
             bars: [
               { label: 'Key documents current', pct: pctOf(cur, keyDocs.length), value: `${cur}/${keyDocs.length}`, note: 'scope, context, structure', href: '#/qms/scope/organization', tone: cur < keyDocs.length ? 'warning' : '' },
               { label: 'Parties with monitoring', pct: pctOf(mon, c.parties.length), value: `${mon}/${c.parties.length}`, note: 'clause 4.2', href: '#/qms/scope/parties' },
@@ -121,7 +122,10 @@
             { label: 'Quality Policy', value: `Rev ${d.rev}`, icon: 'scroll-text', href: '#/qms/policies/quality', tone: Q.docOverdue(d) ? 'danger' : null, note: `Next review ${Q.fmt(d.nextReview)}` },
             { label: 'Other policies', value: others.length, icon: 'library', href: '#/qms/policies/other', note: `${others.filter(Q.docOverdue).length} review overdue` },
             { label: 'Objectives on target', value: `${objs.length - objBelow.length}/${objs.length}`, icon: 'target', href: '#/qms/policies/objectives', tone: objBelow.length ? 'warning' : null, note: 'all KPIs at or above target' }],
-          breakdown: { title: 'Policy communication', donut: { pct, label: 'Quality Policy acknowledged' }, bars },
+          breakdown: { title: 'Policy health', rings: {
+              outer: { pct: Math.round((pctOf([d, ...others].filter(x => !Q.docOverdue(x)).length, others.length + 1) + pct + pctOf(objs.length - objBelow.length, objs.length)) / 3), label: 'Completeness' },
+              inner: { pct: Q.isoScore(S.iso.filter(r => /^(5|6)\./.test(r.clause))).pct, label: 'ISO readiness', note: 'clauses 5 and 6' } },
+            bars: [{ label: 'Quality Policy acknowledged', pct, value: `${a.acknowledged}/${a.total}`, note: 'clause 5.2.2', href: '#/qms/policies/quality', tone: pct < 80 ? 'warning' : '' }, ...bars.slice(0, 4)] },
           attention: att, search: 'Search policies, objectives…', empty: 'All policies are current and acknowledged.',
           action: `<button class="btn primary" type="button" data-action="toast" data-title="Reminder sent" data-msg="${a.total - a.acknowledged} employees will be asked to read and acknowledge the Quality Policy.">${icon('send')}Remind ${a.total - a.acknowledged} People</button>` })];
       } });

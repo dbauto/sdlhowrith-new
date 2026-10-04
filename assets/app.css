@@ -3170,3 +3170,28 @@ tr.tone-warning .ui-bt-icon { background: var(--warning-bg); color: var(--warnin
 .view-card > .vtabs.is-scrolling, .needs-action-scroll.is-scrolling, .table-scroll.is-scrolling { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .view-card > .vtabs.is-scrolling::-webkit-scrollbar, .needs-action-scroll.is-scrolling::-webkit-scrollbar, .table-scroll.is-scrolling::-webkit-scrollbar { width: 6px; height: 6px; }
 .view-card > .vtabs.is-scrolling::-webkit-scrollbar-thumb, .needs-action-scroll.is-scrolling::-webkit-scrollbar-thumb, .table-scroll.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+.ui-rings { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 4px 0 16px; }
+.ui-rings-chart { position: relative; width: 176px; height: 176px; }
+.ui-rings-chart svg { width: 100%; height: 100%; }
+.ui-rings circle { fill: none; }
+.ui-rings .out { stroke-width: 14; } .ui-rings .in { stroke-width: 12; }
+.ui-rings .trk.out { stroke: color-mix(in srgb, var(--accent) 14%, var(--surface)); } .ui-rings .trk.in { stroke: color-mix(in srgb, var(--info) 13%, var(--surface)); }
+.ui-rings .val { stroke-linecap: round; } .ui-rings .val.out { stroke: var(--accent); } .ui-rings .val.in { stroke: var(--info); }
+.ui-rings-c { position: absolute; left: 25%; top: 25%; width: 50%; height: 50%; border-radius: 50%; container-type: size; display: flex; align-items: center; justify-content: center; }
+.ui-rings-c > span { width: 76%; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.ui-rings-c b { font-size: 27cqw; font-weight: 700; line-height: 1; white-space: nowrap; }
+.ui-rings-c small { font-size: max(9px, 10cqw); line-height: 1.2; color: var(--text-3); margin-top: 4%; max-width: 100%; overflow-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ui-rings-key { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.ui-rings-key li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.ui-rings-key li span { flex: 1; min-width: 0; } .ui-rings-key li b { color: var(--text); font-weight: 600; }
+.ui-rings-key i { width: 10px; height: 10px; border-radius: 50%; flex: none; } .ui-rings-key i.out { background: var(--accent); } .ui-rings-key i.in { background: var(--info); }
+@keyframes ui-ring-fill { from { stroke-dasharray: 0 var(--c); } }
+@keyframes ui-bar-fill { from { transform: scaleX(0); } }
+.ui-rings .val, .ui-donut .val { animation: ui-ring-fill .9s cubic-bezier(.22, .61, .36, 1) both; } .ui-rings .val.in { animation-delay: .15s; }
+.ui-bar-t i { transform-origin: left center; animation: ui-bar-fill .8s cubic-bezier(.22, .61, .36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .ui-rings .val, .ui-donut .val, .ui-bar-t i { animation: none; } }
+@media print { .ui-rings .val, .ui-donut .val, .ui-bar-t i { animation: none; } }
+.kpi-trend-cell { text-align: center !important; }
+.kpi-trend { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 92px; color: var(--text-3); white-space: nowrap; }
+.kpi-trend .ui-spark { width: 72px; } .kpi-trend-value { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 34px; font-size: 12px; color: var(--text-2); }
+.kpi-trend-value b { font-size: 11px; font-weight: 700; color: var(--text-3); } .kpi-trend.up .kpi-trend-value b { color: var(--success); } .kpi-trend.down .kpi-trend-value b { color: var(--danger); }

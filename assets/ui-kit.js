@@ -87,13 +87,25 @@
   // Ring chart with the value in the middle.
   UI.donut = (pct, label) => {
     const v = Math.max(0, Math.min(100, Math.round(pct || 0))), r = 52, c = 2 * Math.PI * r;
-    return `<div class="ui-donut" role="img" aria-label="${esc(label)} ${v}%"><svg viewBox="0 0 140 140" aria-hidden="true"><circle class="trk" cx="70" cy="70" r="${r}"/>${v ? `<circle class="val" cx="70" cy="70" r="${r}" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 70 70)"/>` : ''}</svg>
+    return `<div class="ui-donut" role="img" aria-label="${esc(label)} ${v}%"><svg viewBox="0 0 140 140" aria-hidden="true"><circle class="trk" cx="70" cy="70" r="${r}"/>${v ? `<circle class="val" cx="70" cy="70" r="${r}" style="--c:${c.toFixed(1)}" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 70 70)"/>` : ''}</svg>
       <span class="ui-donut-c"><small>${esc(label)}</small><b class="tnum">${v}%</b></span></div>`;
   };
-  // Breakdown card: { title, link, donut: {pct, label}, bars: [{ label, pct, value, note, href, tone }] }
+  // Two rings: outer = completeness, inner = ISO readiness. Both animate in (ease-out) unless reduced motion is set.
+  // { outer: { pct, label }, inner: { pct, label, note } }
+  UI.rings = ({ outer, inner }) => {
+    const ring = (r, pct, cls) => { const v = Math.max(0, Math.min(100, Math.round(pct ?? 0))), c = 2 * Math.PI * r;
+      return `<circle class="trk ${cls}" cx="80" cy="80" r="${r}"/>${v ? `<circle class="val ${cls}" cx="80" cy="80" r="${r}" style="--c:${c.toFixed(1)};--v:${(c * v / 100).toFixed(1)}" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 80 80)"/>` : ''}`; };
+    const ov = Math.round(outer.pct ?? 0), iv = inner.pct == null ? null : Math.round(inner.pct);
+    return `<div class="ui-rings"><div class="ui-rings-chart" role="img" aria-label="${esc(outer.label)} ${ov}%, ${esc(inner.label)} ${iv == null ? 'not applicable' : iv + '%'}">
+        <svg viewBox="0 0 160 160" aria-hidden="true">${ring(66, ov, 'out')}${iv == null ? '' : ring(46, iv, 'in')}</svg>
+        <span class="ui-rings-c"><span><b class="tnum">${ov}%</b><small title="${esc(outer.label)}">${esc(String(outer.label).split(' · ')[0])}</small></span></span></div>
+      <ul class="ui-rings-key"><li><i class="out"></i><span>${esc(outer.label)}</span><b class="tnum">${ov}%</b></li>
+        <li><i class="in"></i><span>${esc(inner.label)}${inner.note ? `<small>${esc(inner.note)}</small>` : ''}</span><b class="tnum">${iv == null ? '—' : iv + '%'}</b></li></ul></div>`;
+  };
+  // Breakdown card: { title, link, rings: { outer, inner } | donut: {pct, label}, bars: [{ label, pct, value, note, href, tone }] }
   UI.breakdown = o => `<section class="ui-bd">
     <header><h2>${esc(o.title)}</h2>${o.link ? `<a class="ui-link" href="${esc(o.link.href)}">${esc(o.link.text)}${icon('chevron-right')}</a>` : ''}</header>
-    ${o.donut ? UI.donut(o.donut.pct, o.donut.label) : ''}
+    ${o.rings ? UI.rings(o.rings) : o.donut ? UI.donut(o.donut.pct, o.donut.label) : ''}
     ${(o.bars || []).length ? `<ul class="ui-bars">${o.bars.map(x => { const v = Math.max(0, Math.min(100, Math.round(x.pct || 0))), inner = `<span class="ui-bar-l"><i class="dot${x.tone ? ' ' + kind(x.tone) : ''}"></i>${esc(x.label)}</span><span class="ui-bar-t"><i class="${x.tone ? kind(x.tone) : ''}" style="width:${v}%"></i></span><span class="ui-bar-f"><span>${esc(x.note || '')}</span><b class="tnum">${esc(x.value != null ? String(x.value) : v + '%')}</b></span>`;
       return `<li>${x.href ? `<a href="${esc(x.href)}">${inner}</a>` : inner}</li>`; }).join('')}</ul>` : (o.empty ? `<p class="small muted">${esc(o.empty)}</p>` : '')}
   </section>`;
@@ -190,7 +202,7 @@
       { label: 'Documents overdue', value: 3, icon: 'files', tone: 'danger', note: 'of 42 documents', href: '#/documents' },
       { label: 'Open risks', value: 12, icon: 'shield-alert', note: '2 high' },
       { label: 'Process health', value: 'Needs attention', icon: 'activity', tone: 'warning', note: 'text values shrink to fit' }];
-    const bd = { title: 'Process controls', link: { href: '#/settings/ui-library', text: 'Link' }, donut: { pct: 72, label: 'ISO 9001 readiness' },
+    const bd = { title: 'Process controls', link: { href: '#/settings/ui-library', text: 'Link' }, rings: { outer: { pct: 78, label: 'Completeness' }, inner: { pct: 61, label: 'ISO readiness', note: '12 requirements mapped' } },
       bars: [{ label: 'Documents current', pct: 90, value: '9/10', note: 'not overdue' }, { label: 'Evidence linked', pct: 60, value: '3/5', note: 'no missing links', tone: 'warning' }, { label: 'KPIs on target', pct: 25, value: '1/4', note: 'Sep 2026', tone: 'danger' }] };
     const rule = (t, d) => `<li><b>${esc(t)}</b><span>${esc(d)}</span></li>`;
     const tabsDemo = U.tabs([{ key: 'summary', label: 'Summary' }, { key: 'definition', label: 'Definition' }, { key: 'documents', label: 'Documents', n: 4 }, { key: 'risks', label: 'Risks', n: 2, tone: 'danger' }, { key: 'activity', label: 'Activity' }]
@@ -210,10 +222,12 @@
         "Q.ui.tabs([{ key, label, href, n, tone }], currentKey, ariaLabel)")}
       ${demo('Stat tile', 'Icon square, label with a short note, big number on the right. Tone colours the icon and number. Max 4, stacked.', `<div class="kit-col">${tiles.map(U.tile).join('')}</div>`,
         "Q.ui.tile({ label, value, unit, icon, tone: 'danger'|'warning'|null, note, href })")}
-      ${demo('Ring chart', 'One percentage with its label inside. Use for the single number the page is judged by.', `<div class="kit-row">${U.donut(86.8, 'Recovery rate average')}${U.donut(42, '5 of 12 audits reported')}${U.donut(0, 'Checklist not built')}</div>`,
+      ${demo('Two rings', 'Outer ring = completeness of the page’s own checks; inner ring = ISO readiness of the clauses the page covers. Both ease in when the card appears (off with reduced motion and in print).', `<div class="kit-row"><div style="width:260px">${U.rings({ outer: { pct: 80, label: 'Completeness' }, inner: { pct: 50, label: 'ISO readiness', note: 'clauses 4.1–4.4' } })}</div><div style="width:260px">${U.rings({ outer: { pct: 42, label: 'Completeness · 5 of 12 reported' }, inner: { pct: 75, label: 'ISO readiness', note: 'clauses 9.2 and 10.2' } })}</div></div>`,
+        "Q.ui.rings({ outer: { pct, label }, inner: { pct, label, note } })")}
+      ${demo('Ring chart', 'One percentage with its label inside, for places that need a single number.', `<div class="kit-row">${U.donut(86.8, 'Recovery rate average')}${U.donut(42, '5 of 12 audits reported')}${U.donut(0, 'Checklist not built')}</div>`,
         "Q.ui.donut(pct, label)")}
       ${demo('Breakdown card', 'Ring plus up to five progress bars, each with a note and value. Bars link to the tab with the detail.', `<div class="kit-col">${U.breakdown(bd)}</div>`,
-        "Q.ui.breakdown({ title, link: { href, text }, donut: { pct, label }, bars: [{ label, pct, value, note, href, tone }], empty })")}
+        "Q.ui.breakdown({ title, link: { href, text }, rings: { outer, inner } | donut: { pct, label }, bars: [{ label, pct, value, note, href, tone }], empty })")}
       ${demo('Attention table', 'Search, type filter, primary button, pagination (8 per page). Columns without data are left out. Try search, filter and page 2.',
         `<div class="ui-board-main">${U.btable({ title: 'Needs attention', rows, search: 'Search documents…', action: `<button class="btn primary" type="button" data-action="toast" data-title="Primary action" data-msg="One primary action per table.">${icon('plus')}Primary Action</button>` })}</div>`,
         "Q.ui.btable({ title, rows: [{ icon, title, meta, kind, owner, due | dueText, right, href | action+data, tone }], search, action, empty })")}

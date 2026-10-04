@@ -382,7 +382,9 @@
         { label: 'Documents overdue', value: s.docsOverdue, icon: 'files', tone: s.docsOverdue ? 'danger' : null, note: `of ${s.docs} documents`, href: `#/process/${pid}/documents` },
         { label: 'High risks', value: s.highRisks, icon: 'shield-alert', tone: s.highRisks ? 'danger' : null, note: `${s.openRisks} open risks & opportunities`, href: `#/process/${pid}/risks` },
         { label: 'KPIs below target', value: s.kpisBelow, icon: 'target', tone: s.kpisBelow ? 'warning' : null, note: `of ${s.kpis} KPIs`, href: `#/process/${pid}/kpis` }],
-      breakdown: { title: 'Process controls', link: { href: `#/process/${pid}/iso`, text: 'ISO Mapping' }, donut: { pct: isoPct, label: 'ISO 9001 readiness' },
+      breakdown: { title: 'Process controls', link: { href: `#/process/${pid}/iso`, text: 'ISO Mapping' }, rings: {
+          outer: { pct: pct(docs.filter(d => !Q.docOverdue(d)).length + ev.filter(e => !Q.evGap(e)).length + kp.filter(Q.kpiOk).length + ca.filter(a => !Q.actionOverdue(a)).length, docs.length + ev.length + kp.length + ca.length), label: 'Completeness' },
+          inner: { pct: isoPct, label: 'ISO readiness', note: `${iso.length} requirement${iso.length === 1 ? "" : "s"} mapped` } },
         bars: [
           bar('Documents current', docs.filter(d => !Q.docOverdue(d)).length, docs.length, 'not overdue for review', 'documents'),
           bar('Evidence linked', ev.filter(e => !Q.evGap(e)).length, ev.length, 'no missing links', 'evidence'),
