@@ -239,6 +239,13 @@
     render: (b, ctx) => Q.panel({ title: ctx.title('Measured through'), actions: '<a class="btn sm ghost" href="#/qms/objectives">Objectives & KPIs</a>',
       body: `<ul class="health-list">${[...new Set(Q.S.kpis.map(k => k.objective))].slice(0, 7).map(o => { const below = Q.S.kpis.filter(k => k.objective === o && !Q.kpiOk(k)).length; return `<li>${icon('target')}<span>${esc(o)}</span><span class="v ${below ? 'attn' : 'zero'}" style="font-size:12px;white-space:nowrap">${below ? `${below} below target` : 'on target'}</span></li>`; }).join('')}</ul>` }) });
 
+  // Process cards use an explicit colour or the next colour in display order.
+  Q.CARD_COLORS = [['forest', 'Forest', '#2F7A57', '#1A4A35'], ['teal', 'Teal', '#22706B', '#134744'], ['slate', 'Slate blue', '#485F86', '#2C3B57'], ['terracotta', 'Terracotta', '#9A5A43', '#63382A'],
+    ['sage', 'Sage', '#4E7862', '#2E4D3D'], ['plum', 'Plum', '#75507A', '#4A314F'], ['petrol', 'Petrol', '#2C6478', '#193F4E'], ['clay', 'Clay', '#866628', '#5A431B'],
+    ['indigo', 'Dusty indigo', '#575A92', '#35375F'], ['olive', 'Olive', '#61702F', '#3F4720'], ['mauve', 'Mauve', '#8A5468', '#5A3343'], ['graphite', 'Graphite', '#4A5450', '#2B312F']];
+  Q.cardColor = (p, i = 0) => Q.CARD_COLORS.find(c => c[0] === p?.cardColor) || Q.CARD_COLORS[i % Q.CARD_COLORS.length];
+  Q.cardColorVars = c => `--g1:${c[2]};--g2:${c[3]};--gs:${c[3]}73`;
+
   /* Process cards tilt toward the pointer with a moving sheen (off for reduced motion and touch). */
   (() => {
     const calm = matchMedia('(prefers-reduced-motion: reduce)');
@@ -283,11 +290,11 @@
     const trend = (up, good, text, val) => `<span class="pc-trend ${good ? 'good' : 'bad'}">${arrow(up)}<span>${esc(text)}</span>${val ? `<b>${esc(val)}</b>` : ''}</span>`;
     const metric = (label, value, ringHtml, trendHtml) => `<span class="pc-metric"><span class="pc-m-label" title="${esc(label)}">${esc(label)}</span><span class="pc-m-main"><b class="tnum">${esc(String(value))}</b></span>${trendHtml}</span>`;
     // Update 20g: gradient 3D cards (same content: icon, name, purpose, ISO readiness, code, status, clauses).
-    const FX = ['slate', 'blue', 'teal', 'red', 'green', 'purple', 'steel', 'orange', 'indigo'];
     const card = (p, i) => {
       const [label] = STATUS[p.s.health], tone = TONE[p.s.health], pct = Math.max(0, Math.min(100, p.s.iso.pct || 0));
       const clauses = p.iso || [], visibleClauses = clauses.slice(0, 3), moreClauses = Math.max(0, clauses.length - visibleClauses.length);
-      return `<a class="proc-card pc2 fx-card fx-${FX[i % FX.length]}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
+      const col = Q.cardColor(Q.proc(p.id), i);
+      return `<a class="proc-card pc2 fx-card fx-${esc(col[0])}" style="${Q.cardColorVars(col)}" href="#/process/${p.id}" aria-labelledby="pc-${p.id}">
         <span class="fx-sheen" aria-hidden="true"></span>
         <span class="fx-top"><span class="pc2-icon" aria-hidden="true">${icon(p.icon || 'landmark')}</span><span class="fx-dot ${tone}" title="${esc(label)}" aria-hidden="true"></span></span>
         <span class="fx-body">

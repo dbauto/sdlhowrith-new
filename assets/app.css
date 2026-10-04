@@ -3254,5 +3254,13 @@ tr.tone-warning .ui-bt-icon { background: var(--warning-bg); color: var(--warnin
 .fx-card .pc2-tag.code { background:rgba(0,0,0,.18); }
 .fx-card .pc2-tag.status-success::before,.fx-card .pc2-tag.status-warning::before,.fx-card .pc2-tag.status-danger::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; vertical-align:1px; }
 .fx-card .pc2-tag.status-success::before { background:#4ade80; } .fx-card .pc2-tag.status-warning::before { background:#fbbf24; } .fx-card .pc2-tag.status-danger::before { background:#fb7185; }
+.swatches.card-colors span { width:34px; height:34px; border-radius:9px; }
+.swatches.card-colors .cc-auto { width:auto; padding:0 10px; font-size:12px; font-weight:600; color:var(--text-2); background:var(--surface-2); border:1px dashed var(--border-strong); }
+.swatches.card-colors input:checked + .cc-auto { border-style:solid; border-color:var(--text); color:var(--text); }
+.swatches.card-colors input:focus-visible + span { outline:2px solid var(--accent); outline-offset:2px; }
+@keyframes pc-ready-fill { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+.fx-ready .pc2-progress i { transform-origin:left center; transition:none; animation:pc-ready-fill .75s cubic-bezier(.22,.61,.36,1) both; }
+@media (prefers-reduced-motion: reduce) { .fx-ready .pc2-progress i { animation:none; } }
+@media print { .fx-ready .pc2-progress i { animation:none; } }
 .fx-slate { --g1:#3a4556; --g2:#1d2633; --gs:rgba(29,38,51,.55); } .fx-blue { --g1:#2f5bea; --g2:#1638b8; --gs:rgba(22,56,184,.5); } .fx-teal { --g1:#0f7f8f; --g2:#0a5763; --gs:rgba(10,87,99,.5); } .fx-red { --g1:#c8141f; --g2:#8d0d16; --gs:rgba(141,13,22,.5); } .fx-green { --g1:#0f7a52; --g2:#0a5239; --gs:rgba(10,82,57,.5); } .fx-purple { --g1:#7b1fd6; --g2:#5212a0; --gs:rgba(82,18,160,.5); } .fx-steel { --g1:#3f4d63; --g2:#252f40; --gs:rgba(37,47,64,.55); } .fx-orange { --g1:#c2560a; --g2:#8a3706; --gs:rgba(138,55,6,.5); } .fx-indigo { --g1:#3446c9; --g2:#1f2b8f; --gs:rgba(31,43,143,.5); }
 @media (prefers-reduced-motion: reduce) { .proc-card.pc2.fx-card { transform:none !important; transition:box-shadow .2s; } .fx-sheen { display:none; } }
