@@ -2522,6 +2522,16 @@ button.cal-ev { width: 100%; text-align: left; border: 0; cursor: pointer; font:
 .ui-spark.danger polyline { stroke: var(--danger); } .ui-spark.danger circle { fill: var(--danger); }
 .ui-spark.warning polyline { stroke: var(--warning); } .ui-spark.warning circle { fill: var(--warning); }
 
+/* KPI register trend column: keep the sparkline and delta visually balanced. */
+.kpi-trend-cell { text-align: center !important; }
+.kpi-trend { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 92px; color: var(--text-3); white-space: nowrap; }
+.kpi-trend .ui-spark { width: 72px; }
+.kpi-trend-value { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 34px; font-size: 12px; color: var(--text-2); }
+.kpi-trend-value b { font-size: 11px; font-weight: 700; color: var(--text-3); }
+.kpi-trend.up .kpi-trend-value b { color: var(--success); }
+.kpi-trend.down .kpi-trend-value b { color: var(--danger); }
+.kpi-trend.flat .kpi-trend-value b { color: var(--text-3); }
+
 /* stat cards */
 .ui-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px; }
 .ui-stats-cell { display: flex; min-width: 0; }
