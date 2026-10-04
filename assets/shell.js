@@ -236,6 +236,19 @@
 
   /* ---------- Boot ---------- */
   Q.boot = () => {
+    if (!window.__iqmsScrollbars) {
+      window.__iqmsScrollbars = true;
+      let scrollTimer;
+      document.addEventListener('scroll', e => {
+        const el = e.target;
+        if (!(el instanceof Element) || el === document.documentElement || el === document.body) return;
+        const style = getComputedStyle(el);
+        if (!['auto', 'scroll'].includes(style.overflow) && !['auto', 'scroll'].includes(style.overflowY) && !['auto', 'scroll'].includes(style.overflowX)) return;
+        el.classList.add('is-scrolling');
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => el.classList.remove('is-scrolling'), 1000);
+      }, true);
+    }
     Q.renderSidebar();
     setPinned(!!Q.UI.pinned && desktop());
     setExpanded(false);

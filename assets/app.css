@@ -948,6 +948,27 @@ body .sb .sb-item.sb-sub { padding-left: 42px; justify-content: flex-start; }
 .vtabs.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; transition: background-color .28s ease; }
 .view-card > .vtabs:not(.is-scrolling)::-webkit-scrollbar { width: 0; height: 0; }
 .view-card > .vtabs:not(.is-scrolling) { scrollbar-width: none; }
+/* All internal scroll regions use an unobtrusive scrollbar that appears only during scrolling. */
+.needs-action-scroll, .table-scroll,
+.pb-block.pb-fixed:not(.editing) > *,
+.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head),
+.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap { scrollbar-width: none; scrollbar-color: transparent transparent; }
+.needs-action-scroll::-webkit-scrollbar, .table-scroll::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > *::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head)::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap::-webkit-scrollbar { width: 0; height: 0; }
+.needs-action-scroll.is-scrolling, .table-scroll.is-scrolling,
+.pb-block.pb-fixed:not(.editing) > *.is-scrolling,
+.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling,
+.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.needs-action-scroll.is-scrolling::-webkit-scrollbar, .table-scroll.is-scrolling::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > *.is-scrolling::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling::-webkit-scrollbar,
+.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling::-webkit-scrollbar { width: 6px; height: 6px; }
+.needs-action-scroll.is-scrolling::-webkit-scrollbar-thumb, .table-scroll.is-scrolling::-webkit-scrollbar-thumb,
+.pb-block.pb-fixed:not(.editing) > *.is-scrolling::-webkit-scrollbar-thumb,
+.pb-block.pb-fixed:not(.editing) > .panel > :not(.panel-head).is-scrolling::-webkit-scrollbar-thumb,
+.pb-block.pb-fixed:not(.editing) > .panel > .table-wrap.is-scrolling::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 .vtab { position: relative; display: flex; align-items: center; flex: none; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; margin-bottom: -1px; }
 .vtab a { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 4px 0 12px; color: var(--text-2); font-weight: 500; white-space: nowrap; }
 .vtab a:hover { color: var(--text); text-decoration: none; }
