@@ -239,7 +239,8 @@
     render: (b, ctx) => Q.panel({ title: ctx.title('Measured through'), actions: '<a class="btn sm ghost" href="#/qms/objectives">Objectives & KPIs</a>',
       body: `<ul class="health-list">${[...new Set(Q.S.kpis.map(k => k.objective))].slice(0, 7).map(o => { const below = Q.S.kpis.filter(k => k.objective === o && !Q.kpiOk(k)).length; return `<li>${icon('target')}<span>${esc(o)}</span><span class="v ${below ? 'attn' : 'zero'}" style="font-size:12px;white-space:nowrap">${below ? `${below} below target` : 'on target'}</span></li>`; }).join('')}</ul>` }) });
 
-  // Process cards use an explicit colour or the next colour in display order.
+  /* Card colours (Update 20h): 12 muted tones in the system's soft, earthy palette. White text passes WCAG AA (≥ 4.5:1) on every stop.
+   * A process can pick one (Settings → Process Structure → Card colour); "Auto" spreads the palette so neighbours differ. */
   Q.CARD_COLORS = [['forest', 'Forest', '#2F7A57', '#1A4A35'], ['teal', 'Teal', '#22706B', '#134744'], ['slate', 'Slate blue', '#485F86', '#2C3B57'], ['terracotta', 'Terracotta', '#9A5A43', '#63382A'],
     ['sage', 'Sage', '#4E7862', '#2E4D3D'], ['plum', 'Plum', '#75507A', '#4A314F'], ['petrol', 'Petrol', '#2C6478', '#193F4E'], ['clay', 'Clay', '#866628', '#5A431B'],
     ['indigo', 'Dusty indigo', '#575A92', '#35375F'], ['olive', 'Olive', '#61702F', '#3F4720'], ['mauve', 'Mauve', '#8A5468', '#5A3343'], ['graphite', 'Graphite', '#4A5450', '#2B312F']];
@@ -416,25 +417,17 @@
     ? `<button class="btn sm primary" type="button" data-action="kpi-record" data-id="${keys[0]}">${icon('plus')}Record Result</button><a class="btn sm" href="#/qms/objectives/k/${keys[0]}">Open KPI</a><button class="btn sm" type="button" data-action="go" data-href="#/process/${Q.S.kpis.find(k => k.id === keys[0]).process}/kpis">${icon('workflow')}Open process workspace</button>`
     : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} KPIs were asked to record this period's values.">${icon('bell')}Ask owners for values</button>`;
   // One KPI table for the register page and the process workspace tab.
-  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0, variant = '' } = {}) => {
-    const board = variant === 'board';
+  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', toolsEnd = '', title = 'KPIs', pageSize = 8 } = {}) => {
     const cols = (columns || Q.FIELDS.kpis.map(f => f.key)).map(k => Q.field(KT, k)).filter(Boolean)
       .filter(f => !(f.key === 'process' && process && !Q.children(process).length))
-      .map(f => {
-        let render = f.render;
-        if (board && f.key === 'name') render = k => `<span class="kbt-item"><span class="kbt-icon ${Q.kpiOk(k) ? 'ok' : 'bad'}">${icon('target')}</span><span class="kbt-copy"><a class="doc-link" href="#/qms/objectives/k/${esc(k.id)}">${esc(k.name)}</a><span class="sub" title="Objective: ${esc(k.objective)}">${esc(k.objective)}</span></span></span>`;
-        if (board && f.key === 'owner') render = k => `<span class="kbt-owner"><span class="avatar xs">${esc(Q.initials(k.owner))}</span><span>${esc(Q.pname(k.owner))}</span></span>`;
-        return { key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render };
-      });
+      .map(f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render }));
     cols.push({ key: 'actions', label: '', cls: 'c-actions c-menu', render: k => `<span class="row-menu">${kpiMenu(k)}</span>` });
-    const rows = () => Q.S.kpis.filter(k => (!process || Q.inProc(k.process, process)) && (!where || where(k)));
-    const boardTitle = board ? `<span class="kbt-title">${icon('target')}<b>KPIs</b><span class="kbt-count">${rows().length}</span></span>` : '';
-    const table = Q.table({ id, rows, columns: cols,
-      selectable: true, tight: !board, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, pageSize, expand: kpiExpand, selectionBar: kpiSel,
+    return Q.table({ id, rows: () => Q.S.kpis.filter(k => (!process || Q.inProc(k.process, process)) && (!where || where(k))), columns: cols,
+      selectable: true, tight: true, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, pageSize, expand: kpiExpand, selectionBar: kpiSel,
+      board: { title, icon: k => ({ icon: 'gauge', tone: Q.kpiOk(k) ? 'success' : 'danger' }), owner: k => k.owner },
       search: k => `${k.name} ${k.objective} ${Q.pname(k.owner)}`, ...(Q.tables[id] ? {} : { initialSort }),
-      tools: `${boardTitle}<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}`,
+      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}${toolsEnd ? `<span class="ui-bt-sp"></span>${toolsEnd}` : ''}`,
       empty: '<h3>No KPIs match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
-    return board ? `<div class="kpi-board-table">${table}</div>` : table;
   };
   // Record Result, Collect Data, KPI detail and the definition editor: kpi.js, kpi-ui.js, kpi-pages.js (Update 19).
 
@@ -448,20 +441,19 @@
     if (r.redirect) return { redirect: r.redirect };
     const v = r.v, where = Q.matcher(KT, v.filters);
     Q.vwRemember(KT);
-    let body, leaf = null;
+    let body, leaf = null, side = '';
     if (v.group === 'process') {
       const inV = Q.S.kpis.filter(where), n = id => inV.filter(k => Q.inProc(k.process, id)).length;
       const top = Q.topProcesses(), p = Q.proc(q.p) || top.find(x => n(x.process_id)) || top[0], pid = p.process_id;
       const below = id => inV.filter(k => Q.inProc(k.process, id) && !Q.kpiOk(k)).length;
-      const row = x => `<a href="${Q.vwHash(KT, v, { p: x.process_id })}" ${x.process_id === pid ? 'aria-current="true"' : ''}><span class="code">${esc(x.process_code)}</span><span class="nm">${esc(x.name)}</span>${below(x.process_id) ? `<i class="flag bad" title="${below(x.process_id)} below target"></i>` : ''}<span class="n">${n(x.process_id)}</span></a>`;
       leaf = `${p.process_code} ${p.name}`;
-      body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(KT, v)}</div><div class="browse"><nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(row).join('')}</nav><section>
-        <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ${n(pid)} KPIs${v.filters.length ? ' in this view' : ''}${below(pid) ? ` · <span class="date-overdue">${below(pid)} below target</span>` : ''}</p></div>
-        <div class="actions"><a class="btn sm" href="#/process/${pid}/kpis">${icon('workflow')}Open process workspace</a></div></div>
-        ${Q.kpiTable(Q.vwTableId(KT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort, variant: 'board' })}</section></div></div>`;
-    } else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(KT, v, where, q, Q.kpiTable, { flag: Q.kpiGroupFlag }); leaf = g.leaf; body = g.html; }
+      // Group list outside the view card (Reports-style menu); inside the card the table looks like an ungrouped view.
+      side = Q.gSide('Processes', top.map(x => ({ href: Q.vwHash(KT, v, { p: x.process_id }), on: x.process_id === pid, label: `${x.process_code} ${x.name}`, n: n(x.process_id), bad: below(x.process_id) })));
+      body = Q.kpiTable(Q.vwTableId(KT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort, bare: true, title: false,
+        extraTools: Q.vwSummary(KT, v) });
+    } else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(KT, v, where, q, Q.kpiTable, { flag: Q.kpiGroupFlag }); leaf = g.leaf; body = g.html; side = g.side || ''; }
     else body = Q.kpiTable(Q.vwTableId(KT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(KT, v) });
-    return { v, leaf, html: Q.vwCard(KT, v, body) };
+    return { v, leaf, html: Q.vwCard(KT, v, body, side) };
   }
   Q.component('kpi-views', { group: 'Objectives & processes', name: 'Objectives & KPIs register', icon: 'target', pages: ['objectives'], desc: 'The KPI register with its saved views, filters, grouping and export.',
     render: (b, ctx) => kpiCard(ctx.q).html || '', after: main => Q.vwAfter(KT, main) });
@@ -518,7 +510,7 @@
   const riskSel = keys => keys.length === 1
     ? `<button class="btn sm primary" type="button" data-action="assess-risk" data-id="${keys[0]}">${icon('gauge')}Reassess</button>`
     : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} risks were asked to update their treatment status.">${icon('bell')}Remind owners</button>`;
-  Q.riskTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0 } = {}) => {
+  Q.riskTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0, title = '', toolsEnd = '' } = {}) => {
     const cols = (columns || ['id', 'title', 'process', 'kind', 'rating', 'owner', 'due', 'status']).map(k => Q.field(RT, k)).filter(Boolean)
       .filter(f => !(f.key === 'process' && process && !Q.children(process).length))
       .map(f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render }));
@@ -527,7 +519,7 @@
       selectable: true, tight: true, noun: 'risks & opportunities', caption: 'Risks and opportunities', rowLabel: r => r.title, bare, pageSize, expand: riskExpand, selectionBar: riskSel,
       search: r => `${r.id} ${r.title} ${r.treatment} ${Q.pname(r.owner)}`, ...(Q.tables[id] ? {} : { initialSort }),
       footExtra: () => '<span style="margin-left:auto">Rating = likelihood × impact (1–5 each) · High ≥ 15 · Medium 8–12 · Low ≤ 6</span>',
-      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search risks & opportunities" aria-label="Search risks"></div>${extraTools}`,
+      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search risks & opportunities" aria-label="Search risks"></div>${extraTools}${toolsEnd ? `<span class="ui-bt-sp"></span>${toolsEnd}` : ''}`, ...(title !== '' ? { board: { title } } : {}),
       empty: '<h3>No risks or opportunities match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
   };
   Q.viewPage(RT, { route: '#/risks', noun: 'risks & opportunities',
@@ -537,11 +529,9 @@
     const inV = Q.S.risks.filter(where), n = id => inV.filter(r => Q.inProc(r.process, id)).length, top = Q.topProcesses();
     const p = Q.proc(q.p) || top.find(x => n(x.process_id)) || top[0], pid = p.process_id;
     const high = id => inV.filter(r => Q.inProc(r.process, id) && r.kind === 'Risk' && Q.riskLevel(r) === 'High').length;
-    const row = x => `<a href="${Q.vwHash(RT, v, { p: x.process_id })}" ${x.process_id === pid ? 'aria-current="true"' : ''}><span class="code">${esc(x.process_code)}</span><span class="nm">${esc(x.name)}</span>${high(x.process_id) ? `<i class="flag bad" title="${high(x.process_id)} high"></i>` : ''}<span class="n">${n(x.process_id)}</span></a>`;
-    return { leaf: `${p.process_code} ${p.name}`, html: `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(RT, v)}</div><div class="browse"><nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(row).join('')}</nav><section>
-      <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ${n(pid)} risks &amp; opportunities${v.filters.length ? ' in this view' : ''}${high(pid) ? ` · <span class="date-overdue">${high(pid)} high</span>` : ''}</p></div>
-      <div class="actions"><a class="btn sm" href="#/process/${pid}/risks">${icon('workflow')}Open process workspace</a><button class="btn sm" type="button" data-action="assess-risk" data-process="${pid}">${icon('gauge')}Assess New Risk</button></div></div>
-      ${Q.riskTable(Q.vwTableId(RT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort })}</section></div></div>` };
+    return { leaf: `${p.process_code} ${p.name}`,
+      side: Q.gSide('Processes', top.map(x => ({ href: Q.vwHash(RT, v, { p: x.process_id }), on: x.process_id === pid, label: `${x.process_code} ${x.name}`, n: n(x.process_id), bad: high(x.process_id) }))),
+      html: Q.riskTable(Q.vwTableId(RT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort, bare: true, title: false, extraTools: Q.vwSummary(RT, v) }) };
   };
 
   Q.views.risks = (parts, q) => {
@@ -556,11 +546,11 @@
       const r = Q.vwResolve(RT, q);
       if (r.redirect) { location.replace(r.redirect); return { title: 'Risks & Opportunities', nav: 'risks', html: '' }; }
       const v = r.v, where = Q.matcher(RT, v.filters); Q.vwRemember(RT);
-      let body;
-      if (v.group === 'process') body = riskByProcess(v, where, q).html;
-      else if (Q.vwFieldGroup(v.group)) body = Q.vwGrouped(RT, v, where, q, Q.riskTable, { flag: Q.riskGroupFlag }).html;
+      let body, side = '';
+      if (v.group === 'process') ({ html: body, side } = riskByProcess(v, where, q));
+      else if (Q.vwFieldGroup(v.group)) ({ html: body, side } = Q.vwGrouped(RT, v, where, q, Q.riskTable, { flag: Q.riskGroupFlag }));
       else body = Q.riskTable(Q.vwTableId(RT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(RT, v) });
-      return { title: 'Risks & Opportunities', nav: 'risks', html: head + t + Q.vwCard(RT, v, body), after: main => Q.vwAfter(RT, main) };
+      return { title: 'Risks & Opportunities', nav: 'risks', html: head + t + Q.vwCard(RT, v, body, side), after: main => Q.vwAfter(RT, main) };
     }
     const sel = q.cell;
     const risks = open.filter(r => r.kind === 'Risk');
@@ -716,10 +706,10 @@
   function evByProcess(sel) {
     const top = Q.topProcesses(), pid = Q.proc(sel) ? sel : top[0].process_id, p = Q.proc(pid), S = Q.S;
     const gaps = id => S.evidence.filter(e => Q.inProc(e.process, id) && Q.evGap(e)).length;
-    const tree = `<nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(x => `<a href="#/evidence?view=process&p=${x.process_id}" ${x.process_id === pid ? 'aria-current="true"' : ''}><span class="code">${esc(x.process_code)}</span><span class="nm">${esc(x.name)}</span>${gaps(x.process_id) ? `<i class="flag bad" title="${gaps(x.process_id)} gaps"></i>` : ''}<span class="n">${S.evidence.filter(e => Q.inProc(e.process, x.process_id)).length}</span></a>`).join('')}</nav>`;
+    const tree = Q.gSide('Processes', top.map(x => ({ href: `#/evidence?view=process&p=${x.process_id}`, on: x.process_id === pid, label: `${x.process_code} ${x.name}`, n: S.evidence.filter(e => Q.inProc(e.process, x.process_id)).length, bad: gaps(x.process_id) })));
     const els = p.elements.filter(e => e.ev || e.kind === 'Record' || e.kind === 'Activity');
     const elRows = els.map(e => { const ev = e.ev && S.evidence.find(x => x.id === e.ev); return `<li><span class="title">${esc(e.name)}</span><span class="kind">${esc(e.kind)}</span><span>${ev ? `${Q.st(ev.status, Q.EV_KIND[ev.status])} <span class="small muted">${esc(ev.id)} · ISO ${esc(ev.iso)}</span>` : '<span class="muted small">No evidence record expected / not yet defined</span>'}</span></li>`; }).join('');
-    return `<div class="browse">${tree}<section>
+    return `<div class="kg-page">${tree}<section class="kg-pmain">
       <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ISO 9001 ${esc(p.iso.join(', '))}</p></div><div class="actions"><a class="btn sm" href="#/process/${pid}/evidence">${icon('workflow')}Open in process workspace</a><button class="btn sm primary" type="button" data-action="link-evidence" data-process="${pid}">${icon('link')}Link Evidence</button></div></div>
       ${elRows ? `<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>Expected records</h2><span class="muted small">process elements that must leave evidence</span></div><ul class="elements">${elRows}</ul></section>` : ''}
       ${Q.evTable('ev-proc-' + pid, { process: pid })}</section></div>`;

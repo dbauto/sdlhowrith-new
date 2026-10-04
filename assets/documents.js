@@ -11,8 +11,8 @@
   const declaredBy = d => d.declared ? `Provided by ${esc(Q.pname(d.declared.by))} · ${Q.fmt(d.declared.date)}` : `Provided by ${esc(Q.pname(d.owner))}`;
 
   /* =================== Shared document table =================== */
-  Q.docTable = (id, { process = null, initialFilters, initialSeg, hideProcess = false, compact = false, pageSize = 0, columns = null, where = null, initialSort, bare = false, extraTools = '' } = {}) => {
-    if (columns) return docViewTable(id, { process, pageSize, columns, where, initialSort, bare, extraTools });
+  Q.docTable = (id, { process = null, initialFilters, initialSeg, hideProcess = false, compact = false, pageSize = 0, columns = null, where = null, initialSort, bare = false, extraTools = '', title = '', toolsEnd = '' } = {}) => {
+    if (columns) return docViewTable(id, { process, pageSize, columns, where, initialSort, bare, extraTools, title, toolsEnd });
     const rows = () => Q.S.documents.filter(d => !process || Q.inProc(d.process, process));
     const all = rows();
     const segs = {
@@ -57,7 +57,7 @@
       <button class="btn sm" type="button" data-action="toast" data-title="Change owner" data-msg="An owner picker would reassign ${keys.length} documents.">${icon('user-check')}Change owner…</button>
       <button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} selected documents were reminded of upcoming periodic reviews.">${icon('bell')}Remind owners</button>`;
   /* Saved-view table: columns and filter come from the view; search stays per session. */
-  function docViewTable(id, { process, pageSize, columns, where, initialSort, bare, extraTools }) {
+  function docViewTable(id, { process, pageSize, columns, where, initialSort, bare, extraTools, title = '', toolsEnd = '' }) {
     const fcol = f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render });
     const cols = columns.map(k => Q.field('documents', k)).filter(Boolean).filter(f => !(f.key === 'process' && process && !Q.children(process).length)).map(fcol);
     cols.push({ key: 'actions', label: '', cls: 'c-actions c-menu', render: d => `<span class="row-menu">${Q.docMenu(d)}</span>` });
@@ -67,7 +67,8 @@
       search: d => `${d.id} ${d.title} ${Q.pname(d.owner)} ${d.type}`, pageSize, expand: Q.docExpand, bare,
       // Header sorting is temporary; the view's default sort applies when the table is first shown.
       ...(Q.tables[id] ? {} : { initialSort }),
-      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search ID, name or owner" aria-label="Search documents"></div>${extraTools}`,
+      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search ID, name or owner" aria-label="Search documents"></div>${extraTools}${toolsEnd ? `<span class="ui-bt-sp"></span>${toolsEnd}` : ''}`,
+      ...(title !== '' ? { board: { title } } : {}),
       empty: '<h3>No documents match this view</h3><p>Change the filters, or clear the search.</p>', selectionBar: docSelBar });
   }
 
@@ -159,26 +160,22 @@
     if (r.redirect) { location.replace(r.redirect); return { title: 'Documented Information', nav: 'documents', html: '' }; }
     const v = r.v, where = Q.matcher(T, v.filters);
     Q.vwRemember(T); Q.UI.docsView = location.hash; Q.saveUI();
-    let body, leaf = null;
-    if (v.group === 'process') { const p = Q.proc(q.p) || Q.topProcesses().find(x => Q.S.documents.some(d => where(d) && Q.inProc(d.process, x.process_id))) || Q.topProcesses()[0]; leaf = `${p.process_code} ${p.name}`; body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(T, v)}</div>${docsByProcess(v, v, where, p.process_id)}</div>`; }
-    else if (v.group === 'clause') { const c = q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0]; leaf = c === 'none' ? 'Not mapped to a clause' : `${c} ${c.includes('.') ? Q.S.iso.find(x => x.clause === c)?.title || '' : Q.clauseTitle(c)}`; body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(T, v)}</div>${docsByClause(v, v, where, c)}</div>`; }
-    else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(T, v, where, q, Q.docTable, { flag: Q.docGroupFlag }); leaf = g.leaf; body = g.html; }
+    let body, leaf = null, side = '';
+    if (v.group === 'process') { const p = Q.proc(q.p) || Q.topProcesses().find(x => Q.S.documents.some(d => where(d) && Q.inProc(d.process, x.process_id))) || Q.topProcesses()[0]; leaf = `${p.process_code} ${p.name}`; ({ html: body, side } = docsByProcess(v, v, where, p.process_id)); }
+    else if (v.group === 'clause') { const c = q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0]; leaf = c === 'none' ? 'Not mapped to a clause' : `${c} ${c.includes('.') ? Q.S.iso.find(x => x.clause === c)?.title || '' : Q.clauseTitle(c)}`; ({ html: body, side } = docsByClause(v, v, where, c)); }
+    else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(T, v, where, q, Q.docTable, { flag: Q.docGroupFlag }); leaf = g.leaf; body = g.html; side = g.side; }
     else body = Q.docTable(Q.vwTableId(T, v), { columns: v.columns, where, pageSize: 10, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(T, v) });
     const crumbs = [['Documented Information', '#/documents?view=list'], ...(leaf ? [[v.name, hashFor(v)], [leaf]] : [[v.name]])];
-    return { title: `${leaf || v.name} · Documented Information`, nav: 'documents', html: docHead(crumbs) + Q.docTabs('library') + Q.vwCard(T, v, body), after: main => Q.vwAfter(T, main) };
+    return { title: `${leaf || v.name} · Documented Information`, nav: 'documents', html: docHead(crumbs) + Q.docTabs('library') + Q.vwCard(T, v, body, side), after: main => Q.vwAfter(T, main) };
   };
 
   function docsByProcess(v, dr, where, pid) {
     const top = Q.topProcesses(), p = Q.proc(pid), docs = Q.S.documents.filter(where);
     const n = id => docs.filter(d => Q.inProc(d.process, id)).length;
     const od = id => docs.filter(d => Q.inProc(d.process, id) && Q.docOverdue(d)).length;
-    const row = x => `<a href="${hashFor(v, { p: x.process_id })}" ${x.process_id === pid ? 'aria-current="true"' : ''}><span class="code">${esc(x.process_code)}</span><span class="nm">${esc(x.name)}</span>${od(x.process_id) ? `<i class="flag bad" title="${od(x.process_id)} overdue for review"></i>` : ''}<span class="n">${n(x.process_id)}</span></a>`;
-    const tree = `<nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(x => row(x) + (Q.children(x.process_id).length ? `<div class="child">${Q.children(x.process_id).map(row).join('')}</div>` : '')).join('')}</nav>`;
-    const parent = Q.proc(p.parent_process_id), mine = docs.filter(d => Q.inProc(d.process, pid));
-    const head = `<div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2>
-      <p class="sub">${parent ? `Subprocess of ${esc(parent.name)} · ` : ''}Owner ${esc(Q.pname(p.owner))} · ISO 9001 ${esc(p.iso.join(', '))} · ${mine.length} documents${dr.filters.length ? ' in this view' : ''}${mine.filter(Q.docOverdue).length ? ` · <span class="date-overdue">${mine.filter(Q.docOverdue).length} overdue</span>` : ''}</p></div>
-      <div class="actions"><a class="btn sm" href="#/process/${pid}">${icon('workflow')}Open process workspace</a><button class="btn sm" type="button" data-action="connect-doc" data-process="${pid}">${icon('file-plus')}Register Document</button></div></div>`;
-    return `<div class="browse">${tree}<section>${head}${Q.docTable(Q.vwTableId(T, v, pid), { process: pid, columns: dr.columns, where, initialSort: dr.sort })}</section></div>`;
+    const item = (x, child = false) => ({ href: hashFor(v, { p: x.process_id }), on: x.process_id === pid, child, label: `${x.process_code} ${x.name}`, n: n(x.process_id), bad: od(x.process_id) });
+    return { side: Q.gSide('Processes', top.flatMap(x => [item(x), ...Q.children(x.process_id).map(c => item(c, true))])),
+      html: Q.docTable(Q.vwTableId(T, v, pid), { process: pid, columns: dr.columns, where, initialSort: dr.sort, bare: true, title: false, extraTools: Q.vwSummary(T, v) }) };
   }
 
   Q.docsByClause = (...a) => docsByClause(...a);
@@ -189,21 +186,14 @@
     const inView = list => list.filter(where);
     const unmapped = inView(S.documents.filter(d => !Q.docIso(d).length));
     const worst = reqs => reqs.some(r => ['Missing', 'At Risk'].includes(r.status)) ? 'bad' : reqs.some(r => r.status === 'Partially Complete') ? 'warn' : 'ok';
-    const tree = `<nav class="browse-tree" aria-label="ISO 9001 clauses"><h3>${esc(Q.standard())} clauses</h3>${Q.CLAUSES.map(([c, t]) => {
-      const reqs = Q.reqsIn(c);
-      return `<a href="${hashFor(v, { c })}" ${c === top && !focus && sel !== 'none' ? 'aria-current="true"' : ''}><span class="code">${c}</span><span class="nm">${esc(t)}</span><i class="flag ${worst(reqs)}" title="Requirement status"></i><span class="n">${inView(Q.docsForClause(c)).length}</span></a>` +
-        (c === top ? `<div class="child">${reqs.map(r => `<a href="${hashFor(v, { c: r.clause })}" ${focus === r.clause ? 'aria-current="true"' : ''}><span class="code">${esc(r.clause)}</span><span class="nm">${esc(r.title)}</span><span class="n">${inView(Q.docsForClause(r.clause)).length}</span></a>`).join('')}</div>` : '');
-    }).join('')}<hr><a href="${hashFor(v, { c: 'none' })}" ${sel === 'none' ? 'aria-current="true"' : ''}><span class="code">—</span><span class="nm">Not mapped to a clause</span><span class="n">${unmapped.length}</span></a></nav>`;
+    const items = Q.CLAUSES.flatMap(([c, t]) => [{ href: hashFor(v, { c }), on: c === top && !focus && sel !== 'none', label: `${c} ${t}`, n: inView(Q.docsForClause(c)).length, bad: worst(Q.reqsIn(c)) === 'bad' },
+      ...(c === top ? Q.reqsIn(c).map(r => ({ href: hashFor(v, { c: r.clause }), on: focus === r.clause, child: true, label: `${r.clause} ${r.title}`, n: inView(Q.docsForClause(r.clause)).length, bad: ['Missing', 'At Risk'].includes(r.status) })) : [])]);
+    items.push({ href: hashFor(v, { c: 'none' }), on: sel === 'none', label: 'Not mapped to a clause', n: unmapped.length });
     const selected = sel === 'none' ? unmapped : inView(Q.docsForClause(focus || top));
-    const clauseTitle = sel === 'none' ? 'Not mapped to a clause' : (focus ? S.iso.find(r => r.clause === focus)?.title || '' : Q.clauseTitle(top));
-    const description = sel === 'none'
-      ? `${selected.length} documents${dr.filters.length ? ' in this view' : ''} have no ISO 9001 clause yet.`
-      : `${selected.length} document${selected.length === 1 ? '' : 's'} mapped${dr.filters.length ? ' in this view' : ''}. A document can support more than one clause.`;
     const tableWhere = d => sel === 'none' ? !Q.docIso(d).length : Q.docIso(d).some(c => Q.clauseIn(c, focus || top));
-    const body = `<div class="browse-head"><div><h2>${sel === 'none' ? '' : `<span class="proc-code">${esc(focus || top)}</span>`}${esc(clauseTitle)}</h2><p class="sub">${esc(description)}</p></div>
-      ${sel === 'none' ? '' : `<div class="actions"><a class="btn sm" href="#/evidence?view=clause&c=${esc(focus || top)}">${icon('paperclip')}Evidence for this clause</a></div>`}</div>
-      ${selected.length ? Q.docTable(Q.vwTableId(T, v, `clause-${String(sel).replace(/[^a-z0-9]+/gi, '_')}`), { columns: dr.columns, where: d => where(d) && tableWhere(d), pageSize: 10, initialSort: dr.sort }) : '<div class="empty panel"><h3>No documents match this clause</h3><p>Change the view filters or choose another clause.</p></div>'}`;
-    return `<div class="browse">${tree}<section>${body}</section></div>`;
+    const html = selected.length ? Q.docTable(Q.vwTableId(T, v, `clause-${String(sel).replace(/[^a-z0-9]+/gi, '_')}`), { columns: dr.columns, where: d => where(d) && tableWhere(d), pageSize: 10, initialSort: dr.sort, bare: true, title: false, extraTools: Q.vwSummary(T, v) })
+      : `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(T, v)}</div><div class="empty panel"><h3>No documents in this view for ${esc(sel === 'none' ? 'unmapped documents' : focus || top)}</h3><p>Change the view filters or choose another clause.</p></div></div>`;
+    return { side: Q.gSide(`${Q.standard()} clauses`, items), html };
   }
 
   /* =================== Document viewer modal =================== */

@@ -283,14 +283,20 @@
     const keys = [...new Set(recs.map(r => g.key(type, r)))].sort((a, b) => g.name(a).localeCompare(g.name(b)));
     const sel = keys.includes(q[g.param]) ? q[g.param] : keys[0];
     const of = k => recs.filter(r => g.key(type, r) === k), bad = k => flag ? of(k).filter(flag.test).length : 0;
-    const summary = `<div class="vc-summary">${Q.vwSummary(type, v)}</div>`;
+    const summary = `<div class="vc-summary">${Q.vwSummary(type, v)}</div>`; // used by the empty state
     if (!keys.length) return { leaf: null, html: `<div class="vc-body">${summary}<div class="empty panel"><h3>No ${esc(noun)} match this view</h3><p>Change the filters to see ${esc(noun)} grouped by ${groupLabel[v.group]}.</p></div></div>` };
-    const row = k => `<a href="${Q.vwHash(type, v, { [g.param]: k })}" ${k === sel ? 'aria-current="true"' : ''}>${g.code ? `<span class="avatar sm">${esc(g.code(k))}</span>` : ''}<span class="nm">${esc(g.name(k))}</span>${bad(k) ? `<i class="flag bad" title="${bad(k)} ${esc(flag.title)}"></i>` : ''}<span class="n">${of(k).length}</span></a>`;
-    const mine = of(sel);
-    return { leaf: g.name(sel), html: `<div class="vc-body">${summary}<div class="browse"><nav class="browse-tree by-field" aria-label="${g.heading}"><h3>${g.heading}</h3>${keys.map(row).join('')}</nav><section>
-      <div class="browse-head"><div><h2>${g.code ? `<span class="avatar">${esc(g.code(sel))}</span>` : ''}${esc(g.name(sel))}</h2><p class="sub">${esc(g.sub(sel, type, mine))} · ${esc(count(mine.length))}${v.filters.length ? ' in this view' : ''}${bad(sel) ? ` · <span class="date-overdue">${bad(sel)} ${esc(flag.title)}</span>` : ''}</p></div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>
-      ${tableFn(Q.vwTableId(type, v, `${v.group}-${String(sel).replace(/[^a-z0-9]+/gi, '_')}${process ? '-in-' + process : ''}`), { process, columns: v.columns, where: r => where(r) && g.key(type, r) === sel, initialSort: v.sort })}</section></div></div>` };
+    const side = Q.gSide(g.heading, keys.map(k => ({ href: Q.vwHash(type, v, { [g.param]: k }), on: k === sel, label: g.name(k), n: of(k).length, bad: bad(k) })));
+    return { leaf: g.name(sel), side, html: tableFn(Q.vwTableId(type, v, `${v.group}-${String(sel).replace(/[^a-z0-9]+/gi, '_')}${process ? '-in-' + process : ''}`),
+      { process, columns: v.columns, where: r => where(r) && g.key(type, r) === sel, initialSort: v.sort, bare: true, title: false, extraTools: Q.vwSummary(type, v) }) };
   };
+
+
+  /* ---------- Update 25 · grouped tables ----------
+   * A grouped view shows its groups as a plain menu beside the view card (Reports style); the card itself looks like
+   * an ungrouped view: view tabs, then search + view summary + Edit view + Export, then the table.
+   *   Q.gSide(heading, [{ href, on, label, n, bad, child }])   the group menu
+   *   Q.vwCard(type, v, body, side)                             the card, with the menu beside it when side is given */
+  Q.gSide = (heading, items) => `<nav class="settings-nav kg-side" aria-label="${esc(heading)}">${items.map(i => `<a href="${i.href}"${i.on ? ' aria-current="page"' : ''}${i.child ? ' class="kg-child"' : ''}><span class="nm">${esc(i.label)}</span>${i.bad ? '<i class="kg-dot" title="Needs attention"></i>' : ''}<span class="n">${i.n ?? ''}</span></a>`).join('')}</nav>`;
 
   Q.vwTabs = (type, active) => {
     const list = visible(type), n = list.length;
@@ -309,7 +315,8 @@
       <button type="button" class="vt-new" data-action="vw-new" data-type="${type}">${icon('plus')}New view</button>${ctxOf(type) ? `<span class="vt-ctx" title="Views are shared with the ${esc(pg(type).noun)} page; here they only show this process">${icon('workflow')}This process only</span>` : ''}</div>`;
   };
   Q.vwSummary = (type, v) => `<button type="button" class="view-summary" data-action="vw-edit" data-type="${type}" data-id="${v.id}" title="Edit view">${v.filters.length ? v.filters.map(r => `<span class="fchip">${esc(Q.describeRule(type, r))}</span>`).join('') : `<span class="muted">All ${esc(pg(type).noun)}</span>`}${v.group !== 'none' ? `<span class="fchip neutral">Grouped by ${groupLabel[v.group] || v.group}</span>` : ''}<span class="vs-edit">${icon('sliders-horizontal')}Edit view</span></button>`;
-  Q.vwCard = (type, v, body) => `<section class="view-card" aria-label="${esc(pg(type).noun)} — ${esc(v.name)}">${Q.vwTabs(type, v)}${body}</section>`;
+  Q.vwCard = (type, v, body, side = '') => { const card = `<section class="view-card" aria-label="${esc(pg(type).noun)} — ${esc(v.name)}">${Q.vwTabs(type, v)}${body}</section>`;
+    return side ? `<div class="kg-page">${side}<div class="kg-pmain">${card}</div></div>` : card; };
   const dropTables = (type, id) => Object.keys(Q.tables).filter(k => k.startsWith(`${type}-${id}`)).forEach(k => delete Q.tables[k]);
   Q.vwTableId = (type, v, suffix = '') => `${type}-${v.id}${suffix ? '-' + suffix : ''}`;
 

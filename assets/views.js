@@ -335,15 +335,15 @@
       if (r.redirect) return { redirect: r.redirect };
       const v = r.v, where = Q.vwWhere(type, v);
       const flag = { documents: Q.docGroupFlag, kpis: Q.kpiGroupFlag, risks: Q.riskGroupFlag }[type];
-      const inner = (extraBody && extraBody(v, where)) || (Q.vwFieldGroup(v.group) ? Q.vwGrouped(type, v, where, q, tableFn, { process: pid, flag }).html
-        : tableFn(Q.vwTableId(type, v, 'in-' + pid), { process: pid, columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(type, v) }));
-      return { html: Q.vwCard(type, v, inner), after: main => Q.vwAfter(type, main) };
+      const g = (extraBody && extraBody(v, where)) || (Q.vwFieldGroup(v.group) ? Q.vwGrouped(type, v, where, q, tableFn, { process: pid, flag })
+        : { html: tableFn(Q.vwTableId(type, v, 'in-' + pid), { process: pid, columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(type, v) }) });
+      return { html: Q.vwCard(type, v, g.html, g.side), after: main => Q.vwAfter(type, main) };
     };
     let body = '', after = null, res = null;
     if (tab === 'overview') body = processSummary(p, s, kids);
     else if (tab === 'definition') body = processDefinition(p, kids);
     else if (tab === 'activity') body = processActivity(p);
-    else if (tab === 'documents') res = viewTab('documents', Q.docTable, (v, where) => v.group === 'clause' ? `<div class="vc-body"><div class="vc-summary">${Q.vwSummary('documents', v)}</div>${Q.docsByClause(v, v, where, q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0])}</div>` : null);
+    else if (tab === 'documents') res = viewTab('documents', Q.docTable, (v, where) => v.group === 'clause' ? Q.docsByClause(v, v, where, q.c || (Q.CLAUSES.find(([k]) => Q.docsForClause(k).some(where)) || ['4'])[0]) : null);
     else if (tab === 'risks') res = viewTab('risks', Q.riskTable);
     else if (tab === 'kpis') res = viewTab('kpis', Q.kpiTable);
     else if (tab === 'evidence') body = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn" type="button" data-action="link-evidence" data-process="${pid}">${icon('link')}Link Evidence</button></div>` + Q.evTable('p-ev', { process: pid });

@@ -366,6 +366,15 @@
    *   title link (cfg)    → open        ⋯ menu  → row actions
    * Options: selectable, expand(r) → html, pageSize, selectionBar(keys) → buttons
    * (shown in a "N selected ▾" toolbar menu), search, filters, segs, sort.      */
+  const tableTitle = noun => { const n = String(noun || 'Records'); return n.charAt(0).toUpperCase() + n.slice(1); };
+  // Icon square per kind of record (by the table's noun); tone comes from the row's status pill.
+  const NOUN_ICON = [[/document|template/i, 'file-text'], [/kpi|result/i, 'gauge'], [/risk|opportunit/i, 'shield-alert'], [/corrective|action/i, 'list-checks'],
+    [/evidence|record/i, 'paperclip'], [/nonconform|finding/i, 'search-check'], [/audit/i, 'clipboard-check'], [/process/i, 'workflow'], [/user|session/i, 'user-round'],
+    [/objective/i, 'target'], [/requirement/i, 'badge-check'], [/workflow|request/i, 'git-branch'], [/improvement/i, 'sparkles'], [/webhook|key|event/i, 'plug']];
+  const nounIcon = noun => (NOUN_ICON.find(([re]) => re.test(noun || '')) || [0, 'circle'])[1];
+  const OWNER_COL = /^(owner|process owner|responsible owner|assignee|assigned to|responsible|lead auditor|auditor|raised by|approver|reviewer|chair|author|user)$/i;
+  const byName = () => { const m = {}; Object.entries(Q.S.people || {}).forEach(([id, p]) => { m[p.name] = id; }); return m; };
+  const textOf = html => String(html).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").trim();
   Q.table = cfg => {
     // Filter state survives re-renders within the session; URL-provided filters win.
     const prev = Q.tables[cfg.id];
@@ -376,8 +385,13 @@
     if ('initialSort' in cfg) t.sort = cfg.initialSort ? { ...cfg.initialSort } : null; // saved views own their sort
     t.selected = new Set(); t.expanded = null; t.page = t.page || 1;
     const exp = cfg.tools && cfg.exportable !== false ? `<button class="btn sm table-export" type="button" data-export title="Download the rows in this table as a CSV file (opens in Excel)">${Q.icon('download')}Export</button>` : '';
-    const tools = cfg.tools ? `<div class="table-tools">${cfg.tools}${exp}</div>` : '';
-    return `<div class="table-wrap${cfg.bare ? ' bare' : ''}" id="tw-${cfg.id}">${tools}<div id="tb-${cfg.id}"></div></div>`;
+    // Every table uses the board ("Needs attention") look: title + count, pill search and filters, icon squares,
+    // owner avatars, status pills, round pager. Behaviour is unchanged. Tune with board: { title, icon(r) → { icon, tone },
+    // owner(r) → person id }, or opt out with board: false.
+    const bd = cfg.board === false ? null : cfg.board || {};
+    const title = bd && cfg.tools && bd.title !== false ? `<h2 class="tw-title">${esc(bd.title || tableTitle(cfg.noun))}<span class="ui-count tnum" data-tw-count></span></h2>` : '';
+    const tools = cfg.tools ? `<div class="table-tools">${title}${cfg.tools}${bd && !cfg.tools.includes('ui-bt-sp') ? '<span class="ui-bt-sp"></span>' : ''}${exp}</div>` : '';
+    return `<div class="table-wrap${cfg.bare ? ' bare' : ''}${bd ? ' bt-skin' : ''}" id="tw-${cfg.id}">${tools}<div id="tb-${cfg.id}"></div></div>`;
   };
   Q.tableRows = id => {
     const t = Q.tables[id], c = t.cfg;
@@ -426,9 +440,31 @@
     const selHead = c.selectable && c.selectionBar && t.selected.size
       ? `${head.split('</th>').slice(0, c.selectable ? 1 : 0).join('</th>')}${c.selectable ? '</th>' : ''}<th class="sel-head" colspan="${nCols - 1}" scope="col"><div class="sel-head-in"><div class="menu-wrap"><button type="button" class="btn sm sel-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false">${t.selected.size} selected${Q.icon('chevron-down')}</button><div class="menu sel-menu" role="menu" hidden>${c.selectionBar([...t.selected])}</div></div><button type="button" class="btn sm ghost" data-clear-sel>Clear selection</button><span class="small muted">${t.selected.size === 1 ? 'Actions for this document are in the menu' : 'Ctrl-click or use the checkboxes to add rows'}</span></div></th>`
       : null;
+    const bd = c.board === false ? null : c.board || {};
+    const names = bd ? byName() : {};
+    // The item column: the first one that is not an id, number, date or menu column.
+    // Prefer the column that holds the record's title (a .title / .doc-link element) on the first row.
+    const plain = bd ? c.columns.map((col, i) => [col, i]).filter(([col]) => !/c-(id|num|date|actions|menu)\b/.test(col.cls || '') && col.label) : [];
+    const first = rows[0] ? c.columns.map(col => col.render(rows[0])) : [];
+    const itemCol = !bd || bd.icon === false ? -1 : (plain.find(([, i]) => /class="[^"]*\b(title|doc-link)\b/.test(first[i] || '')) || plain[0] || [0, -1])[1];
+    const toneOf = html => /class="st (danger)/.test(html) ? 'danger' : /class="st (warning|orange)/.test(html) ? 'warning' : '';
+    const cells = r => {
+      const out = c.columns.map(col => col.render(r));
+      if (!bd) return out;
+      c.columns.forEach((col, ci) => {
+        if (!OWNER_COL.test(col.label || '') || out[ci].includes('avatar')) return;
+        const id = bd.owner && col.key === 'owner' ? bd.owner(r) : names[textOf(out[ci])];
+        if (id) out[ci] = `<span class="user-cell"><span class="avatar sm">${esc(Q.initials(id))}</span><span class="nowrap">${esc(Q.pname(id))}</span></span>`;
+      });
+      if (itemCol >= 0 && !out[itemCol].includes('avatar')) {
+        const ic = bd.icon ? bd.icon(r) || {} : { icon: nounIcon(c.noun), tone: toneOf(out.join('')) };
+        out[itemCol] = `<span class="ui-bt-item"><span class="ui-bt-icon${ic.tone ? ' ' + ic.tone : ''}">${Q.icon(ic.icon || 'circle')}</span><span class="ui-bt-main">${out[itemCol]}</span></span>`;
+      }
+      return out;
+    };
     const body = rows.map(r => {
       const k = key(r), sel = t.selected.has(k), open = exp && t.expanded === k;
-      return `<tr class="${c.selectable ? 'selectable' : ''}${sel ? ' selected' : ''}${open ? ' expanded' : ''}${c.rowClass ? ' ' + c.rowClass(r) : ''}" data-key="${esc(k)}"${c.selectable ? ` aria-selected="${sel}"` : ''}>${c.selectable ? `<td class="c-check">${checkbox(sel, 'Select ' + (c.rowLabel ? c.rowLabel(r) : k))}</td>` : ''}${exp ? `<td class="c-exp"><button type="button" class="exp-btn" data-expand aria-expanded="${open}" aria-controls="x-${esc(id)}-${esc(k)}" aria-label="${open ? 'Hide' : 'Show'} details for ${esc(c.rowLabel ? c.rowLabel(r) : k)}">${Q.icon('chevron-down')}</button></td>` : ''}${c.columns.map(col => `<td class="${col.cls || ''}">${col.render(r)}</td>`).join('')}</tr>` +
+      return `<tr class="${c.selectable ? 'selectable' : ''}${sel ? ' selected' : ''}${open ? ' expanded' : ''}${c.rowClass ? ' ' + c.rowClass(r) : ''}" data-key="${esc(k)}"${c.selectable ? ` aria-selected="${sel}"` : ''}>${c.selectable ? `<td class="c-check">${checkbox(sel, 'Select ' + (c.rowLabel ? c.rowLabel(r) : k))}</td>` : ''}${exp ? `<td class="c-exp"><button type="button" class="exp-btn" data-expand aria-expanded="${open}" aria-controls="x-${esc(id)}-${esc(k)}" aria-label="${open ? 'Hide' : 'Show'} details for ${esc(c.rowLabel ? c.rowLabel(r) : k)}">${Q.icon('chevron-down')}</button></td>` : ''}${cells(r).map((h, ci) => `<td class="${c.columns[ci].cls || ''}">${h}</td>`).join('')}</tr>` +
         (exp ? `<tr class="exp-row${open ? ' open' : ''}" id="x-${esc(id)}-${esc(k)}" aria-hidden="${!open}"><td colspan="${nCols}"><div class="exp-grid"><div class="exp-inner">${open ? c.expand(r) : ''}</div></div></td></tr>` : '');
     }).join('');
     const empty = typeof c.empty === 'function' ? c.empty(t) : c.empty;
@@ -439,6 +475,7 @@
     host.innerHTML = rows.length
       ? `<div class="table-scroll"><table class="dt${c.tight ? ' tight' : ''}${exp ? ' has-exp' : ''}"><caption class="sr-only">${esc(c.caption || c.id)}</caption><thead><tr${selHead ? ' class="sel-mode"' : ''}>${selHead || head}</tr></thead><tbody>${body}</tbody></table></div>${foot}`
       : `<div class="empty">${empty || '<h3>No matching records</h3><p>Try clearing a filter.</p>'}</div>`;
+    const cnt = document.querySelector(`#tw-${CSS.escape(id)} [data-tw-count]`); if (cnt) cnt.textContent = all.length;
     Q.refreshIcons();
     if (before) host.querySelectorAll('tbody tr[data-key]').forEach(tr => {
       const y0 = before.get(tr.dataset.key); if (y0 == null) { tr.classList.add('row-in'); return; }
