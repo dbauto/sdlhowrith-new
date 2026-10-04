@@ -416,16 +416,25 @@
     ? `<button class="btn sm primary" type="button" data-action="kpi-record" data-id="${keys[0]}">${icon('plus')}Record Result</button><a class="btn sm" href="#/qms/objectives/k/${keys[0]}">Open KPI</a><button class="btn sm" type="button" data-action="go" data-href="#/process/${Q.S.kpis.find(k => k.id === keys[0]).process}/kpis">${icon('workflow')}Open process workspace</button>`
     : `<button class="btn sm" type="button" data-action="export-selected">${icon('download')}Export selected</button><button class="btn sm" type="button" data-action="toast" data-title="Reminder sent" data-msg="Owners of ${keys.length} KPIs were asked to record this period's values.">${icon('bell')}Ask owners for values</button>`;
   // One KPI table for the register page and the process workspace tab.
-  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0 } = {}) => {
+  Q.kpiTable = (id, { process = null, columns = null, where = null, initialSort, bare = false, extraTools = '', pageSize = 0, variant = '' } = {}) => {
+    const board = variant === 'board';
     const cols = (columns || Q.FIELDS.kpis.map(f => f.key)).map(k => Q.field(KT, k)).filter(Boolean)
       .filter(f => !(f.key === 'process' && process && !Q.children(process).length))
-      .map(f => ({ key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render: f.render }));
+      .map(f => {
+        let render = f.render;
+        if (board && f.key === 'name') render = k => `<span class="kbt-item"><span class="kbt-icon ${Q.kpiOk(k) ? 'ok' : 'bad'}">${icon('target')}</span><span class="kbt-copy"><a class="doc-link" href="#/qms/objectives/k/${esc(k.id)}">${esc(k.name)}</a><span class="sub" title="Objective: ${esc(k.objective)}">${esc(k.objective)}</span></span></span>`;
+        if (board && f.key === 'owner') render = k => `<span class="kbt-owner"><span class="avatar xs">${esc(Q.initials(k.owner))}</span><span>${esc(Q.pname(k.owner))}</span></span>`;
+        return { key: f.key, label: f.key === 'process' && process ? 'Subprocess' : f.label, cls: f.cls, min: f.min, sort: f.sort, render };
+      });
     cols.push({ key: 'actions', label: '', cls: 'c-actions c-menu', render: k => `<span class="row-menu">${kpiMenu(k)}</span>` });
-    return Q.table({ id, rows: () => Q.S.kpis.filter(k => (!process || Q.inProc(k.process, process)) && (!where || where(k))), columns: cols,
-      selectable: true, tight: true, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, pageSize, expand: kpiExpand, selectionBar: kpiSel,
+    const rows = () => Q.S.kpis.filter(k => (!process || Q.inProc(k.process, process)) && (!where || where(k)));
+    const boardTitle = board ? `<span class="kbt-title">${icon('target')}<b>KPIs</b><span class="kbt-count">${rows().length}</span></span>` : '';
+    const table = Q.table({ id, rows, columns: cols,
+      selectable: true, tight: !board, noun: 'KPIs', caption: 'Objectives and KPIs', rowLabel: k => k.name, bare, pageSize, expand: kpiExpand, selectionBar: kpiSel,
       search: k => `${k.name} ${k.objective} ${Q.pname(k.owner)}`, ...(Q.tables[id] ? {} : { initialSort }),
-      tools: `<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}`,
+      tools: `${boardTitle}<div class="search-input">${icon('search')}<input class="input" type="search" data-search placeholder="Search KPIs or objectives" aria-label="Search KPIs"></div>${extraTools}`,
       empty: '<h3>No KPIs match this view</h3><p>Change the view’s filters, or clear the search.</p>' });
+    return board ? `<div class="kpi-board-table">${table}</div>` : table;
   };
   // Record Result, Collect Data, KPI detail and the definition editor: kpi.js, kpi-ui.js, kpi-pages.js (Update 19).
 
@@ -449,7 +458,7 @@
       body = `<div class="vc-body"><div class="vc-summary">${Q.vwSummary(KT, v)}</div><div class="browse"><nav class="browse-tree" aria-label="Processes"><h3>Processes</h3>${top.map(row).join('')}</nav><section>
         <div class="browse-head"><div><h2><span class="proc-code">${esc(p.process_code)}</span>${esc(p.name)}</h2><p class="sub">Owner ${esc(Q.pname(p.owner))} · ${n(pid)} KPIs${v.filters.length ? ' in this view' : ''}${below(pid) ? ` · <span class="date-overdue">${below(pid)} below target</span>` : ''}</p></div>
         <div class="actions"><a class="btn sm" href="#/process/${pid}/kpis">${icon('workflow')}Open process workspace</a></div></div>
-        ${Q.kpiTable(Q.vwTableId(KT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort })}</section></div></div>`;
+        ${Q.kpiTable(Q.vwTableId(KT, v, pid), { process: pid, columns: v.columns, where, initialSort: v.sort, variant: 'board' })}</section></div></div>`;
     } else if (Q.vwFieldGroup(v.group)) { const g = Q.vwGrouped(KT, v, where, q, Q.kpiTable, { flag: Q.kpiGroupFlag }); leaf = g.leaf; body = g.html; }
     else body = Q.kpiTable(Q.vwTableId(KT, v), { columns: v.columns, where, initialSort: v.sort, bare: true, extraTools: Q.vwSummary(KT, v) });
     return { v, leaf, html: Q.vwCard(KT, v, body) };

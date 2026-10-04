@@ -1,6 +1,6 @@
 /* iQMS v3 — page layouts: a page is a set of pre-made components placed in areas.
  *
- *   LAYOUT  = { layout: '2-1' | '1-1' | '1', zones: { top: [], main: [], side: [], bottom: [] } }
+ *   LAYOUT  = { layout: '2-1' | '5-7' | '1-1' | '1', zones: { top: [], main: [], side: [], bottom: [] } }
  *   BLOCK   = { id, type, title?, opts?, size?: { w, h } } — one placed component
  *   COMPONENT (Q.component) = { name, desc, icon, group, pages?, settings?, render(block, ctx), after? }
  *
@@ -14,7 +14,7 @@
   const clone = v => JSON.parse(JSON.stringify(v));
   const ZONES = ['top', 'main', 'side', 'bottom'];
   const ZONE_LABEL = { top: 'Full width · top', main: 'Main column', side: 'Side column', bottom: 'Full width · bottom' };
-  const LAYOUTS = [['2-1', 'Wide + side'], ['1-1', 'Two equal'], ['1', 'One column']];
+  const LAYOUTS = [['2-1', 'Wide + side'], ['5-7', 'Narrow + wide'], ['1-1', 'Two equal'], ['1', 'One column']];
   const GRIP = '<svg class="pb-grip-ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5.5" cy="3.5" r="1.3"/><circle cx="10.5" cy="3.5" r="1.3"/><circle cx="5.5" cy="8" r="1.3"/><circle cx="10.5" cy="8" r="1.3"/><circle cx="5.5" cy="12.5" r="1.3"/><circle cx="10.5" cy="12.5" r="1.3"/></svg>';
 
   Q.COMPONENTS = {};
@@ -320,10 +320,12 @@
   Q.component('overview-actions', overviewPart('actions', { name: 'Management actions', icon: 'list-checks', minWidth: 4, minHeight: 240, desc: 'Open actions from management review.' }));
 
   const O = (id, type, w = 12, h = 0) => ({ id, type, size: { w, h } });
-  Q.page('overview', { title: 'Overview', route: '#/overview', layout: { layout: '1', zones: { top: [
-    O('ov-welcome', 'overview-welcome'), O('ov-attention', 'overview-attention'),
-    O('ov-readiness', 'overview-readiness', 6), O('ov-work', 'overview-work', 6),
-    O('ov-processes', 'overview-processes', 12, 520),
-    O('ov-reviews', 'overview-reviews', 6), O('ov-actions', 'overview-actions', 6)
-  ] } } });
+  // Dashboard arrangement (Update 24): greeting + readiness on top; narrow left column with the summary numbers, health
+  // and two short lists; wide right column with the process table, team activity and the personal work list.
+  Q.page('overview', { title: 'Overview', route: '#/overview', layout: { layout: '5-7', zones: {
+    top: [O('ov-welcome', 'overview-welcome', 8), O('ov-readiness', 'overview-readiness', 4)],
+    main: [O('ov-attention', 'overview-attention'), O('ov-health', 'overview-qms-health'), O('ov-reviews', 'overview-reviews'), O('ov-actions', 'overview-actions')],
+    side: [O('ov-processes', 'overview-processes', 12, 440), O('ov-team', 'overview-team-activity'), O('ov-work', 'overview-work')],
+    bottom: []
+  } } });
 })();

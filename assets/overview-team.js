@@ -275,7 +275,7 @@
 
   // Default layout: QMS Health + Team Activity side by side under the attention summary.
   const L = Q.PAGES.overview?.layout?.zones?.top;
-  if (L && !L.some(b => b.type === 'overview-qms-health')) {
+  if (L && !Object.values(Q.PAGES.overview.layout.zones).flat().some(b => b.type === 'overview-qms-health')) {
     const at = L.findIndex(b => b.type === 'overview-attention') + 1;
     L.splice(at, 0, { id: 'ov-health', type: 'overview-qms-health', size: { w: 6, h: 0 } }, { id: 'ov-team', type: 'overview-team-activity', size: { w: 6, h: 0 } });
   }
@@ -289,4 +289,17 @@
     }
     Q.S.overviewU21 = true; Q.save();
   }
+})();
+
+/* Update 24 — the Overview dashboard arrangement ("Narrow + wide"). A customised Overview is moved to it once:
+ * cards the user removed stay removed, cards they added keep their size and go to the bottom zone. */
+(() => {
+  const Q = window.Q, saved = Q.S.pageLayouts?.overview;
+  if (!saved || Q.S.overviewU24) return;
+  const def = Q.PAGES.overview.layout, mine = Object.values(saved.zones || {}).flat();
+  const has = t => mine.some(b => b.type === t), inDef = Object.values(def.zones).flat().map(b => b.type);
+  const zones = {}; Object.entries(def.zones).forEach(([z, list]) => { zones[z] = list.filter(b => has(b.type)).map(b => ({ ...b, size: { ...b.size } })); });
+  zones.bottom = [...(zones.bottom || []), ...mine.filter(b => !inDef.includes(b.type))];
+  Q.S.pageLayouts.overview = { layout: def.layout, zones };
+  Q.S.overviewU24 = true; Q.save();
 })();

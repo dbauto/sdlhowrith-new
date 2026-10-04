@@ -3349,13 +3349,74 @@ a.ta-row:hover { background: var(--surface-2); text-decoration: none; }
 .qh-val small { align-self: center; margin-top: 2px; }
 .pb-block:has(> .qh-card), .pb-block:has(> .ta-card) { align-self: stretch; }
 @media (max-width: 560px) { .ta-role { display: none; } }
-@keyframes pc-ready-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.fx-ready .pc2-progress i { transform-origin: left center; transition: none; animation: pc-ready-fill .75s cubic-bezier(.22,.61,.36,1) both; }
-@media (prefers-reduced-motion: reduce), print { .fx-ready .pc2-progress i { animation: none; } }
 
 /* ---------- Update 22 · Evidence board ---------- */
+/* Pill tabs on the left, the evidence sources on the right of the same row. */
 .ev-tabbar { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-bottom: var(--s5); }
 .ev-tabbar > .ui-tabs { margin-bottom: 0; }
 .ev-sources { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .ev-sources svg { width: 14px; height: 14px; }
 @media (max-width: 720px) { .ev-sources { margin-left: 0; } }
+
+/* ---------- Update 23 · register tables in the board ("Needs attention") style ----------
+ * Opt-in with Q.table({ board: {...} }). Only the look changes: select, sort, expand, menus and export work as before. */
+.bt-skin { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 1px 2px rgba(16, 24, 20, .04); overflow: hidden; }
+.bt-skin.bare { border: 0; border-radius: 0; box-shadow: none; background: none; }
+.bt-skin > .table-tools { gap: 10px; padding: 16px 18px; border-bottom: 0; background: none; }
+.bt-skin .tw-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0 6px 0 0; white-space: nowrap; }
+.bt-skin .table-tools .search-input { display: inline-flex; align-items: center; height: 38px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); padding: 0 12px; width: 260px; max-width: 100%; }
+.bt-skin .table-tools .search-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.bt-skin .table-tools .search-input .input { width: 100%; height: 36px; border: 0; background: none; box-shadow: none; padding-left: 26px; border-radius: 999px; }
+.bt-skin .table-tools .btn, .bt-skin .table-tools .view-summary { border-radius: 999px; }
+.bt-skin .table-tools .table-export { height: 38px; padding: 0 16px; }
+.bt-skin .table-scroll { padding: 0 6px; }
+.bt-skin .dt { border-top: 0; }
+.bt-skin .dt thead th { background: var(--surface-2); border-bottom: 0; font-size: 12px; font-weight: 500; color: var(--text-3); }
+.bt-skin .dt thead th:first-child { border-radius: 10px 0 0 10px; } .bt-skin .dt thead th:last-child { border-radius: 0 10px 10px 0; }
+.bt-skin .dt tbody td { padding-top: 14px; padding-bottom: 14px; vertical-align: middle; }
+.bt-skin .dt tbody tr:not(.exp-row):hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.bt-skin .ui-bt-item { min-width: 0; gap: 10px; }
+.bt-skin .ui-bt-main { min-width: 170px; }
+.bt-skin .ui-bt-icon { width: 30px; height: 30px; border-radius: 9px; } .bt-skin .ui-bt-icon svg { width: 15px; height: 15px; }
+.bt-skin .dt .kp-sub1 { max-width: 230px; }
+.bt-skin .user-cell { gap: 6px; } .bt-skin .user-cell .avatar.sm { width: 22px; height: 22px; font-size: 10px; }
+.bt-skin .dt td.c-exp, .bt-skin .dt th.c-exp { padding-left: 2px; padding-right: 2px; }
+.bt-skin .ui-bt-main .doc-link { font-weight: 500; color: var(--text); }
+.bt-skin .ui-bt-main .doc-link:hover { color: var(--accent); }
+.bt-skin .ui-bt-main .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.ui-bt-icon.danger { background: var(--danger-bg, #FDECEC); color: var(--danger); }
+.ui-bt-icon.warning { background: var(--warning-bg); color: var(--warning); }
+.ui-bt-icon.success { background: var(--success-bg); color: var(--success); }
+.ui-bt-icon.info { background: var(--info-bg); color: var(--info); }
+.bt-skin .st::before { display: none; }
+.bt-skin .st { padding: 0 9px; line-height: 20px; }
+.bt-skin .table-foot { border-top: 0; padding: 14px 18px 16px; }
+.bt-skin .pager { gap: 6px; }
+.bt-skin .pg { width: 32px; min-width: 32px; height: 32px; padding: 0; border-radius: 50%; background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 600; }
+.bt-skin .pg svg { width: 15px; height: 15px; }
+.bt-skin .pg[aria-current="page"] { background: var(--accent); color: #fff; }
+.bt-skin .pg[disabled] { opacity: .45; }
+.bt-skin .exp-row td { background: var(--surface-2); }
+@media (max-width: 720px) { .bt-skin .table-tools .search-input { width: 100%; } .bt-skin .ui-bt-sp { display: none; } }
+/* Every Q.table now uses the board look (Update 23b). Inside a panel or a view card the table has no second card. */
+.panel .bt-skin, .view-card .bt-skin.bare, .exp-row .bt-skin, .modal .bt-skin { border: 0; border-radius: 0; box-shadow: none; background: none; }
+.bt-skin > .table-tools .select, .bt-skin > .table-tools .combo-btn { height: 38px; border-radius: 999px; border: 0; background-color: var(--accent-soft); color: var(--accent); font-weight: 500; padding-left: 14px; }
+.bt-skin > .table-tools .combo-btn.placeholder .cb-label { color: var(--accent); }
+.bt-skin > .table-tools .seg { border-radius: 999px; border: 1px solid var(--border); padding: 3px; gap: 2px; background: var(--surface-2); }
+.bt-skin > .table-tools .seg button { height: 30px; border: 0; border-radius: 999px; padding: 0 12px; font-size: 13px; }
+.bt-skin > .table-tools .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(16, 24, 20, .08); }
+.bt-skin > .table-tools .right { margin-left: 0; }
+.bt-skin .dt td .title { font-weight: 500; color: var(--text); }
+.bt-skin .dt td .sub { font-size: 12px; color: var(--text-3); }
+/* Keep the board look within the old table widths: the icon square and avatars are paid for by tighter cell padding. */
+.bt-skin .dt th:not(.c-check):not(.c-exp), .bt-skin .dt td:not(.c-check):not(.c-exp) { padding-left: 9px; padding-right: 9px; }
+.bt-skin .ui-bt-item { gap: 8px; }
+.bt-skin .ui-bt-icon { width: 28px; height: 28px; border-radius: 8px; }
+.bt-skin .table-scroll { padding: 0 4px; }
+
+/* Update 24 · "Narrow + wide" page layout (the Overview dashboard): 5/12 left, 7/12 right. */
+.pb-l-5-7 > .pb-cols { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+@media (max-width: 1100px) { .pb-l-5-7 > .pb-cols { grid-template-columns: minmax(0, 1fr); } }
+.pb-l-5-7 .pb-main .ui-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pb-l-5-7 > .pb-top { align-items: stretch; }
+.pb-l-5-7 > .pb-top > .pb-block:not(.editing) > * { height: 100%; box-sizing: border-box; }
